@@ -17,3 +17,26 @@ API level 2. A failed call returns `{success: false, error: {code, message, reco
 | `PERMISSION_DENIED` | This session's permissions forbid the call: a path outside its read or write roots, a write into a project it may only read, or a child process it may not start. Retrying unchanged will not help; the recovery text names what to change, and details.path names the path when there is one. |
 | `FAILED_PRECONDITION` | The session is not in the state the call needs: no project is open, there is no composition, or a transaction is already open (or not open). Put the session in that state first; the recovery text says how. |
 | `BUSY` | The call is valid but cannot run now: the host is running a live show, or the work it needs is taken. Retry later; details.retryAfterMs says when, if the host knows. |
+
+## Finding codes
+
+`document.validate`, `document.patch` and `project.validate` report what they found as findings, `{severity, code, pointer, message, document}`: `pointer` is a JSON pointer into `document` (`scene` or `project`). A document with an `error` finding is not valid; `warning` and `info` do not change that. Each code has one severity, everywhere. `document.patch` refuses a patch whose result has a new `error` finding, or a new `scene.unknownKey`, with `INVALID_ARGUMENTS`, `details.pointer` and `details.findings`.
+
+| Code | Severity | Meaning |
+|---|---|---|
+| `schema.type` | error | A value has the wrong JSON type for its key in the generated document schema (a string where a number belongs, an array of the wrong length is schema.invalid). `pointer` names the value. |
+| `schema.required` | error | An object lacks a key its schema requires (`format`, `version`, a node's `kind`, a light's `name`). `pointer` names the object. |
+| `schema.enum` | error | A value is not one of the names the engine reads there (a node kind, a light type, a route op); the message lists them. |
+| `schema.range` | error | A number is outside the range the schema publishes for its key. |
+| `schema.invalid` | error | Any other schema violation: a wrong constant (`format`, `version`), an array of the wrong length, a value matching none of a key's allowed forms. The message is the validator's. |
+| `scene.unknownKey` | warning | A scene key the engine does not read. A file on disk is only warned about (ADR-278); `document.patch` refuses a patch that adds one with INVALID_ARGUMENTS and this pointer. `_` keys are notes and exempt. |
+| `scene.parse` | error | The engine refused the scene document when it built a composition from it, on a private engine; the message is the parser's. |
+| `scene.missing` | error | The project names a scene that did not load, so the orb stands in for its world (requireProjectScene). |
+| `project.parse` | error | The engine refused the project document (Engine::loadProject failed); the message is the loader's. |
+| `project.unknownKey` | info | A top-level project key this build does not read. It is kept verbatim on save (ADR-2132), so this is not a fault, but it is where a misspelt key shows up. |
+| `project.warning` | warning | A load warning with no more specific code (Engine::projectWarnings); the message is the engine's. |
+| `asset.missing` | error | A file the document names does not exist where it resolves (a node's asset, the project's audio, scene, environment or a stem). A node whose asset is missing is skipped at load and kept on save (ADR-2151). |
+| `asset.relinked` | warning | A file the project names was missing and was found elsewhere under the project folder by name, size and content hash; the load used that one. Saving the project writes the new path. |
+| `parameter.unknown` | warning | A path in the project's `parameters` that no registered parameter answers. It is not applied, and it is kept verbatim for the next save (ADR-2132). |
+| `route.dead` | warning | The route audit (ADR-902) found a route, track or effect that cannot reach the picture: an unknown source or target, a target that refuses modulation, a node that emits nothing. The message is the rule's. |
+| `route.hazard` | info | The route audit found an entry that reaches the picture but may not do what it says (a hazard rule). |

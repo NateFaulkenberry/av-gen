@@ -344,5 +344,8 @@ void registerSessionTools(ai::ToolRegistry& registry);
 void registerRenderTools(ai::ToolRegistry& registry);
 // `job.wait`'s answer for a record, shared by the tool body (host thread) and `Session::waitOnCaller`.
 [[nodiscard]] CallResult jobWaitResult(const JobRecord& record, bool timedOut);
+// ADR-2157: `document.get`, `document.validate`, `document.patch` and `project.validate`
+// (api/document_tools.cpp).
+void registerDocumentTools(ai::ToolRegistry& registry);
 
 } // namespace avgen::api

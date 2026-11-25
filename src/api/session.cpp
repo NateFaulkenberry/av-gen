@@ -176,6 +176,7 @@ void registerAllTools(ai::ToolRegistry& registry) {
     ai::registerDirectorTools(registry);
     registerSessionTools(registry);
     registerRenderTools(registry);
+    registerDocumentTools(registry);
 }
 
 // ---- life cycle --------------------------------------------------------------------------------------

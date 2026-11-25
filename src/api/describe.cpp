@@ -6,6 +6,7 @@
 #include "api/jsonrpc_server.hpp"
 #include "api/schema_types.hpp"
 #include "api/version.hpp"
+#include "api/warning_codes.hpp"
 #include "params/serialization.hpp"
 #include "scene/composition.hpp"
 
@@ -229,7 +230,19 @@ json errorCatalogue() {
     for (const ai::ToolErrorCode c : ai::kAllToolErrorCodes) {
         codes.push_back({{"code", ai::toolErrorCodeName(c)}, {"meaning", ai::toolErrorCodeMeaning(c)}});
     }
-    return json{{"format", "avgen-error-catalogue"}, {"version", 1}, {"api", kApiLevel}, {"codes", std::move(codes)}};
+    // ADR-2157: the finding codes document.validate, document.patch and project.validate return (one table,
+    // api/warning_codes.hpp), published beside the error codes a failed call returns.
+    json findings = json::array();
+    for (const FindingCodeInfo& f : kFindingCodes) {
+        findings.push_back({{"code", std::string(f.code)},
+                            {"severity", std::string(findingSeverityName(f.severity))},
+                            {"meaning", std::string(f.meaning)}});
+    }
+    return json{{"format", "avgen-error-catalogue"},
+                {"version", 1},
+                {"api", kApiLevel},
+                {"codes", std::move(codes)},
+                {"findings", std::move(findings)}};
 }
 
 json versionDocument() {
@@ -377,6 +390,20 @@ std::string errorsMarkdown(const json& errors) {
     md += "| Code | Meaning |\n|---|---|\n";
     for (const json& c : errors.at("codes")) {
         md += fmt::format("| `{}` | {} |\n", c.at("code").get<std::string>(), cell(c.at("meaning").get<std::string>()));
+    }
+    if (const auto findings = errors.find("findings"); findings != errors.end() && !findings->empty()) {
+        md += "\n## Finding codes\n\n";
+        md += "`document.validate`, `document.patch` and `project.validate` report what they found as findings, "
+              "`{severity, code, pointer, message, document}`: `pointer` is a JSON pointer into `document` (`scene` "
+              "or `project`). A document with an `error` finding is not valid; `warning` and `info` do not change "
+              "that. Each code has one severity, everywhere. `document.patch` refuses a patch whose result has a "
+              "new `error` finding, or a new `scene.unknownKey`, with `INVALID_ARGUMENTS`, `details.pointer` and "
+              "`details.findings`.\n\n";
+        md += "| Code | Severity | Meaning |\n|---|---|---|\n";
+        for (const json& f : *findings) {
+            md += fmt::format("| `{}` | {} | {} |\n", f.at("code").get<std::string>(), f.at("severity").get<std::string>(),
+                              cell(f.at("meaning").get<std::string>()));
+        }
     }
     return md;
 }

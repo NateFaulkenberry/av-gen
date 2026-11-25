@@ -15,17 +15,17 @@ Every call through a session returns the same envelope (ADR-2153): `{success, re
 - [camera](#camera) (3)
 - [capability](#capability) (2)
 - [director](#director) (12)
+- [document](#document) (3)
 - [entity](#entity) (1)
 - [environment](#environment) (2)
 - [field](#field) (2)
-- [job](#job) (4)
 - [lighting](#lighting) (1)
 - [material](#material) (1)
 - [modulation](#modulation) (4)
 - [parameter](#parameter) (5)
 - [performance](#performance) (7)
-- [project](#project) (9)
-- [render](#render) (3)
+- [project](#project) (10)
+- [render](#render) (1)
 - [scene](#scene) (8)
 - [sequence](#sequence) (4)
 - [sequencer](#sequencer) (4)
@@ -342,6 +342,47 @@ Compile a plan against the scene WITHOUT changing it, and put the result in fron
 
 Output: not yet described (listed in `schemas/tools-without-output-schema.json`).
 
+## document
+
+### `document.get`: Get a document
+
+MCP name `document_get`. Class `read`. Permissions: none. Requires: nothing. Since API 2. Flags: readOnly, idempotent.
+
+The scene or project document as the engine would write it now, with a content hash to compare later reads with. `scene` is Composition::toJson: every key the scene reads, plus the keys it keeps without reading (`_` notes, unknown top-level keys); the shape is schemas/avgen-scene.schema.json, and it is what document.patch paths point into. `project` is the document a project save would write, built without writing anything. Read it before patching.
+
+| Input | Type | Required | Range | Description |
+|---|---|---|---|---|
+| `document` | string, one of `scene`, `project` | yes |  | Which document |
+
+Output schema: `{"additionalProperties":true,"properties":{"content":{"description":"The document"},"document":{"description":"scene or project","type":"string"},"hash":{"description":"sha256:<hex> of the document's canonical JSON text","type":"string"}},"required":["document","content","hash"],"type":"object"}`
+
+### `document.validate`: Validate a document
+
+MCP name `document_validate`. Class `job`. Permissions: none. Requires: nothing. Since API 2. Flags: readOnly, idempotent, expensive.
+
+Check a scene or project document without installing it. First against the generated schema (schemas/avgen-<document>.schema.json, with the engine's own validator), then by building it on a private offline engine with its own asset registry: a scene is parsed into a composition and its node assets are resolved as the session's scene resolves them; a project is loaded from a scratch copy whose relative paths are resolved against the open project's folder. Returns structured findings {severity, code, pointer, message, document}; valid is true when none is an error. Unknown scene keys are warnings here (a file on disk is only warned about); document.patch refuses a patch that adds one.
+
+| Input | Type | Required | Range | Description |
+|---|---|---|---|---|
+| `content` | object | yes |  |  |
+| `document` | string, one of `scene`, `project` | yes |  | Which kind of document `content` is |
+
+Output schema: `{"additionalProperties":true,"properties":{"document":{"description":"scene or project","type":"string"},"findings":{"description":"Structured findings","items":{"additionalProperties":false,"properties":{"code":{"description":"A finding code (docs/api/errors.md)","enum":["schema.type","schema.required","schema.enum","schema.range","schema.invalid","scene.unknownKey","scene.parse","scene.missing","project.parse","project.unknownKey","project.warning","asset.missing","asset.relinked","parameter.unknown","route.dead","route.hazard"],"type":"string"},"document":{"description":"scene or project","enum":["scene","project"],"type":"string"},"message":{"description":"What was found, in a sentence","type":"string"},"pointer":{"description":"A JSON pointer into `document`; empty for the whole document","type":"string"},"severity":{"description":"error, warning or info","enum":["error","warning","info"],"type":"string"}},"required":["severity","code","pointer","message","document"],"type":"object"},"type":"array"},"hash":{"description":"sha256:<hex> of the content","type":"string"},"parameters":{"description":"scene: the parameters the parsed composition registers","type":"integer"},"valid":{"description":"No finding is an error","type":"boolean"}},"required":["valid","document","hash","findings"],"type":"object"}`
+
+### `document.patch`: Patch the scene document
+
+MCP name `document_patch`. Class `structural`. Permissions: none. Requires: `composition`. Since API 2. Flags: mutatesProject, undoable.
+
+Edit the scene by applying an RFC 6902 JSON Patch to its document (document.get {document: scene}), then rebuilding the composition from the result. One contract for every structural edit: add a light (`{op: add, path: /lights/-, value: {...}}`), a node (`/nodes/-`), change a node's tint (`/nodes/<i>/tint`), remove anything. Refused with INVALID_ARGUMENTS and details.pointer when an operation does not apply, when the result has a schema error it did not have before, or when it adds a key the engine does not read; nothing is changed then. Keys the patch does not touch are kept, including `_` notes and unknown top-level keys. The session's parameter overrides survive the rebuild: each is re-applied unless the patch set the value the document carries (overrides.yielded lists those). Routes are kept. dryRun checks the patch, builds the result on a private engine and changes nothing. It runs in the call's transaction, so transaction.rollback restores the pre-patch document. A rebuild restarts entity simulations; a live host refuses it while a show runs.
+
+| Input | Type | Required | Range | Description |
+|---|---|---|---|---|
+| `document` | string, one of `scene` | yes |  | Only the scene can be patched |
+| `dryRun` | boolean |  |  | Check and predict, change nothing |
+| `patch` | array of object | yes |  | RFC 6902 operations, applied in order |
+
+Output schema: `{"additionalProperties":true,"properties":{"applied":{"description":"The composition was rebuilt from the patched document","type":"boolean"},"changed":{"description":"What changed in the scene document","items":{"description":"{op, path}: a JSON pointer that changed"},"type":"array"},"dryRun":{"description":"This was a dry run","type":"boolean"},"findings":{"description":"Structured findings","items":{"additionalProperties":false,"properties":{"code":{"description":"A finding code (docs/api/errors.md)","enum":["schema.type","schema.required","schema.enum","schema.range","schema.invalid","scene.unknownKey","scene.parse","scene.missing","project.parse","project.unknownKey","project.warning","asset.missing","asset.relinked","parameter.unknown","route.dead","route.hazard"],"type":"string"},"document":{"description":"scene or project","enum":["scene","project"],"type":"string"},"message":{"description":"What was found, in a sentence","type":"string"},"pointer":{"description":"A JSON pointer into `document`; empty for the whole document","type":"string"},"severity":{"description":"error, warning or info","enum":["error","warning","info"],"type":"string"}},"required":["severity","code","pointer","message","document"],"type":"object"},"type":"array"},"hashAfter":{"description":"Its hash after (equal to hashBefore on a dry run)","type":"string"},"hashBefore":{"description":"The scene document's hash before","type":"string"},"overrides":{"description":"{kept, yielded, dropped}: the session's overrides after the rebuild"},"parametersAdded":{"description":"Parameters the rebuild registered that did not exist","items":{"description":"parameter path","type":"string"},"type":"array"},"parametersRemoved":{"description":"Parameters that no longer exist","items":{"description":"parameter path","type":"string"},"type":"array"},"predictedHash":{"description":"dryRun: the hash of the patched document as sent","type":"string"}},"required":["dryRun","applied","hashBefore","hashAfter","changed","parametersAdded","parametersRemoved","findings"],"type":"object"}`
+
 ## entity
 
 ### `entity.list`: List entities
@@ -408,55 +449,6 @@ Put a music influence field in the scene. It scales the depth of the reactions i
 | `tags` | array of string |  |  | Entity tags or profile names it governs; empty means all |
 
 Output: not yet described (listed in `schemas/tools-without-output-schema.json`).
-
-## job
-
-### `job.status`: Job status
-
-MCP name `job_status`. Class `read`. Permissions: none. Requires: nothing. Since API 2. Flags: readOnly, idempotent.
-
-One job's record: its state (queued, preparing, running, succeeded, failed, cancelled), what it is doing now, its progress, the files written so far and, once it has ended, its result -- per-frame hashes, the sequence hash, each file's sha256, timing (cold or warm device, pipeline compiles), whether it waited for the machine's GPU lock and for how long, and the warnings it logged.
-
-| Input | Type | Required | Range | Description |
-|---|---|---|---|---|
-| `id` | string | yes |  | The job id a render tool returned |
-
-Output schema: `{"additionalProperties":true,"properties":{"cancelRequested":{"description":"job.cancel was called","type":"boolean"},"created":{"description":"UTC, ISO 8601","type":"string"},"error":{"description":"{code, message, recovery, details?} when it failed, else null"},"finished":{"description":"UTC, ISO 8601, or null"},"framesDone":{"description":"Frames of the range rendered","type":"integer"},"framesTotal":{"description":"Frames in the range","type":"integer"},"id":{"description":"The job's id, e.g. job-3","type":"string"},"kind":{"description":"capture or sequence","enum":["capture","sequence"],"type":"string"},"outputs":{"description":"The files written, partial ones too when it failed or was cancelled","items":{"description":"{path, frame?, bytes, sha256}"},"type":"array"},"phase":{"description":"What it is doing now, in words (waiting for the GPU lock, compiling pipelines, playing history, rendering)","type":"string"},"progress":{"description":"0..1 over the whole job, history frames included","maximum":1.0,"minimum":0.0,"type":"number"},"request":{"description":"The normalised request: time range, size, fps, format, history, output path"},"result":{"description":"When it ended: frameHashes, sequenceHash, frameHash, outputs, timing, lock, warnings, gpuErrors; null before"},"snapshot":{"description":"The project copy it renders (in the session's scratch directory)","type":"string"},"state":{"description":"Where it is in its life","enum":["queued","preparing","running","succeeded","failed","cancelled"],"type":"string"},"tool":{"description":"The tool that started it","type":"string"}},"required":["id","tool","kind","state","phase","progress","outputs","result","error"],"type":"object"}`
-
-### `job.wait`: Wait for a job
-
-MCP name `job_wait`. Class `read`. Permissions: none. Requires: nothing. Since API 2. Flags: readOnly, idempotent.
-
-Block until the job ends or `timeoutMs` passes (default 30000), then return its record, with `timedOut` true when it is still running. It blocks only this caller: the session keeps answering other clients' calls and the job keeps rendering. A failed or cancelled job is a successful wait whose record says so.
-
-| Input | Type | Required | Range | Description |
-|---|---|---|---|---|
-| `id` | string | yes |  | The job id a render tool returned |
-| `timeoutMs` | integer |  | >= 0.0 | How long to wait, milliseconds (default 30000) |
-
-Output schema: `{"additionalProperties":true,"properties":{"cancelRequested":{"description":"job.cancel was called","type":"boolean"},"created":{"description":"UTC, ISO 8601","type":"string"},"error":{"description":"{code, message, recovery, details?} when it failed, else null"},"finished":{"description":"UTC, ISO 8601, or null"},"framesDone":{"description":"Frames of the range rendered","type":"integer"},"framesTotal":{"description":"Frames in the range","type":"integer"},"id":{"description":"The job's id, e.g. job-3","type":"string"},"kind":{"description":"capture or sequence","enum":["capture","sequence"],"type":"string"},"outputs":{"description":"The files written, partial ones too when it failed or was cancelled","items":{"description":"{path, frame?, bytes, sha256}"},"type":"array"},"phase":{"description":"What it is doing now, in words (waiting for the GPU lock, compiling pipelines, playing history, rendering)","type":"string"},"progress":{"description":"0..1 over the whole job, history frames included","maximum":1.0,"minimum":0.0,"type":"number"},"request":{"description":"The normalised request: time range, size, fps, format, history, output path"},"result":{"description":"When it ended: frameHashes, sequenceHash, frameHash, outputs, timing, lock, warnings, gpuErrors; null before"},"snapshot":{"description":"The project copy it renders (in the session's scratch directory)","type":"string"},"state":{"description":"Where it is in its life","enum":["queued","preparing","running","succeeded","failed","cancelled"],"type":"string"},"timedOut":{"description":"The wait ended at timeoutMs with the job still unfinished","type":"boolean"},"tool":{"description":"The tool that started it","type":"string"}},"required":["id","tool","kind","state","phase","progress","outputs","result","error","timedOut"],"type":"object"}`
-
-### `job.cancel`: Cancel a job
-
-MCP name `job_cancel`. Class `session`. Permissions: none. Requires: nothing. Since API 2. Flags: mutatesSession, idempotent.
-
-Stop a job: a queued one never starts; a running one stops after the frame it is on, keeping (and listing) the frames already written. Cancelling a job that has ended changes nothing and says so.
-
-| Input | Type | Required | Range | Description |
-|---|---|---|---|---|
-| `id` | string | yes |  | The job id a render tool returned |
-
-Output schema: `{"additionalProperties":true,"properties":{"cancelRequested":{"description":"job.cancel was called","type":"boolean"},"created":{"description":"UTC, ISO 8601","type":"string"},"error":{"description":"{code, message, recovery, details?} when it failed, else null"},"finished":{"description":"UTC, ISO 8601, or null"},"framesDone":{"description":"Frames of the range rendered","type":"integer"},"framesTotal":{"description":"Frames in the range","type":"integer"},"id":{"description":"The job's id, e.g. job-3","type":"string"},"kind":{"description":"capture or sequence","enum":["capture","sequence"],"type":"string"},"outputs":{"description":"The files written, partial ones too when it failed or was cancelled","items":{"description":"{path, frame?, bytes, sha256}"},"type":"array"},"phase":{"description":"What it is doing now, in words (waiting for the GPU lock, compiling pipelines, playing history, rendering)","type":"string"},"progress":{"description":"0..1 over the whole job, history frames included","maximum":1.0,"minimum":0.0,"type":"number"},"request":{"description":"The normalised request: time range, size, fps, format, history, output path"},"result":{"description":"When it ended: frameHashes, sequenceHash, frameHash, outputs, timing, lock, warnings, gpuErrors; null before"},"snapshot":{"description":"The project copy it renders (in the session's scratch directory)","type":"string"},"state":{"description":"Where it is in its life","enum":["queued","preparing","running","succeeded","failed","cancelled"],"type":"string"},"tool":{"description":"The tool that started it","type":"string"}},"required":["id","tool","kind","state","phase","progress","outputs","result","error"],"type":"object"}`
-
-### `job.list`: List jobs
-
-MCP name `job_list`. Class `read`. Permissions: none. Requires: nothing. Since API 2. Flags: readOnly, idempotent.
-
-This session's jobs, oldest first, each as job.status reports it.
-
-Input: none.
-
-Output schema: `{"additionalProperties":true,"properties":{"jobs":{"description":"The session's jobs, oldest first","items":{"additionalProperties":true,"properties":{"cancelRequested":{"description":"job.cancel was called","type":"boolean"},"created":{"description":"UTC, ISO 8601","type":"string"},"error":{"description":"{code, message, recovery, details?} when it failed, else null"},"finished":{"description":"UTC, ISO 8601, or null"},"framesDone":{"description":"Frames of the range rendered","type":"integer"},"framesTotal":{"description":"Frames in the range","type":"integer"},"id":{"description":"The job's id, e.g. job-3","type":"string"},"kind":{"description":"capture or sequence","enum":["capture","sequence"],"type":"string"},"outputs":{"description":"The files written, partial ones too when it failed or was cancelled","items":{"description":"{path, frame?, bytes, sha256}"},"type":"array"},"phase":{"description":"What it is doing now, in words (waiting for the GPU lock, compiling pipelines, playing history, rendering)","type":"string"},"progress":{"description":"0..1 over the whole job, history frames included","maximum":1.0,"minimum":0.0,"type":"number"},"request":{"description":"The normalised request: time range, size, fps, format, history, output path"},"result":{"description":"When it ended: frameHashes, sequenceHash, frameHash, outputs, timing, lock, warnings, gpuErrors; null before"},"snapshot":{"description":"The project copy it renders (in the session's scratch directory)","type":"string"},"state":{"description":"Where it is in its life","enum":["queued","preparing","running","succeeded","failed","cancelled"],"type":"string"},"tool":{"description":"The tool that started it","type":"string"}},"required":["id","tool","kind","state","phase","progress","outputs","result","error"],"type":"object"},"type":"array"}},"required":["jobs"],"type":"object"}`
 
 ## lighting
 
@@ -831,64 +823,33 @@ Load a project, replacing the session. Anything unsaved is lost. `path` is a bar
 
 Output: not yet described (listed in `schemas/tools-without-output-schema.json`).
 
+### `project.validate`: Validate a project
+
+MCP name `project_validate`. Class `job`. Permissions: `read`. Requires: nothing. Since API 2. Flags: readOnly, idempotent, expensive.
+
+Check a project without opening it in this session: it is loaded on a private offline engine with its own asset registry (Engine::loadProject, requireProjectScene, the route audit), checked against schemas/avgen-project.schema.json, its scene file against the scene schema, and every asset it and its scene name is resolved. Returns findings {severity, code, pointer, message, document} with codes such as asset.missing, asset.relinked, parameter.unknown, route.dead, scene.unknownKey and schema.*; valid is true when none is an error. `path` is a project file (resolved like project.open); without it, the session's own project as it is in memory, through a scratch copy (nothing of the person's is written).
+
+| Input | Type | Required | Range | Description |
+|---|---|---|---|---|
+| `path` | string |  |  | A project .json; omit for the open project as it is now |
+
+Output schema: `{"additionalProperties":true,"properties":{"counts":{"description":"{error, warning, info}"},"file":{"description":"The project validated, or (session) for the in-memory one","type":"string"},"findings":{"description":"Structured findings","items":{"additionalProperties":false,"properties":{"code":{"description":"A finding code (docs/api/errors.md)","enum":["schema.type","schema.required","schema.enum","schema.range","schema.invalid","scene.unknownKey","scene.parse","scene.missing","project.parse","project.unknownKey","project.warning","asset.missing","asset.relinked","parameter.unknown","route.dead","route.hazard"],"type":"string"},"document":{"description":"scene or project","enum":["scene","project"],"type":"string"},"message":{"description":"What was found, in a sentence","type":"string"},"pointer":{"description":"A JSON pointer into `document`; empty for the whole document","type":"string"},"severity":{"description":"error, warning or info","enum":["error","warning","info"],"type":"string"}},"required":["severity","code","pointer","message","document"],"type":"object"},"type":"array"},"loaded":{"description":"{parameters, routes, hasComposition} when the load succeeded, else null"},"valid":{"description":"No finding is an error","type":"boolean"}},"required":["valid","file","findings","counts"],"type":"object"}`
+
 ## render
 
 ### `render.probe`: Look at the frame
 
 MCP name `render_probe`. Class `read`. Permissions: none. Requires: `composition`. Since API 1. Flags: readOnly, idempotent.
 
-What the camera can currently see, as numbers: which nodes fall inside the frustum, where each sits in the frame, and how much of the height it fills. Use it to check a shot frames its subject before trusting that it does -- a camera pointed at nothing reports nothing rather than looking fine. Without `time` or `frame` it reads the camera the last frame used, the same as camera.get, so after moving the camera let a frame happen before asking what it sees. With `time` (or `frame` at `fps`) it evaluates the session's project as it is now -- unsaved edits included -- on a fresh offline engine at that time, exactly as a render's frame there is evaluated (history seek), so the rectangle is the one render.capture will draw: use it on a host that runs no frames (avgen serve). With `width` and `height` each rectangle is also given in pixels.
+What the camera can currently see, as numbers: which nodes fall inside the frustum, where each sits in the frame, and how much of the height it fills. Use it to check a shot frames its subject before trusting that it does -- a camera pointed at nothing reports nothing rather than looking fine. It reads the camera the last frame used, the same as camera.get, so after moving the camera let a frame happen before asking what it sees.
 
 | Input | Type | Required | Range | Description |
 |---|---|---|---|---|
-| `aspect` | number |  |  | Frame aspect ratio (default 16:9, or width/height) |
-| `fps` | number |  | >= 0.001 | The rate `frame` counts in (default: the project's render fps) |
-| `frame` | integer |  | >= 0.0 | Evaluate at this frame (at `fps`) on a fresh engine |
-| `height` | integer |  | >= 1.0, <= 16384.0 | The frame's height in pixels: adds a pixel rectangle |
+| `aspect` | number |  |  | Frame aspect ratio (default 16:9) |
 | `limit` | integer |  | >= 1.0, <= 200.0 | Maximum nodes reported (default 40) |
 | `node` | string |  |  | Ask about one node; omit for everything visible |
-| `time` | number |  | >= 0.0 | Evaluate the scene at this time (seconds) on a fresh engine |
-| `width` | integer |  | >= 1.0, <= 16384.0 | The frame's width in pixels: adds a pixel rectangle |
 
 Output: not yet described (listed in `schemas/tools-without-output-schema.json`).
-
-### `render.capture`: Capture a frame
-
-MCP name `render_capture`. Class `job`. Permissions: `gpu`, `write`. Requires: `composition`. Since API 2. Flags: mutatesSession, expensive, supportsCancellation, supportsProgress, deterministic.
-
-Render one frame of the project as it is in this session -- unsaved edits included; nothing is saved -- to a PNG (or EXR, by the path's extension), through the same offline render path a sequence uses, so the frame hash equals that frame's hash in a render.start sequence. Give `frame` (at `fps`) or `time` (seconds); neither is time 0. `history: play` (the default) first renders and discards every frame from 0, so the frame has the history a play-through had (cost grows with the time); `seek` jumps there, which is fast but may differ slightly on stateful content (envelopes, simulations). Returns a job id at once: job.wait for the result (frame hash, file sha256, timing). The size, rate and tier default to the project's render settings.
-
-| Input | Type | Required | Range | Description |
-|---|---|---|---|---|
-| `fps` | number |  | >= 0.001 | Frames per second (default: the project's render fps) |
-| `frame` | integer |  | >= 0.0 | The frame index at `fps` (frame / fps seconds) |
-| `height` | integer |  | >= 1.0, <= 16384.0 | Pixels (default: the project's render height) |
-| `history` | string, one of `play`, `seek` |  |  | play (default): render from 0 and keep the last frame; seek: jump to the frame |
-| `path` | string | yes |  | The image to write, .png or .exr; relative to the project folder; inside a write root |
-| `tier` | string, one of `preview`, `realtime`, `high`, `offline` |  |  | Quality tier (default: the project's, normally offline) |
-| `time` | number |  | >= 0.0 | Seconds; used when `frame` is not given |
-| `width` | integer |  | >= 1.0, <= 16384.0 | Pixels (default: the project's render width) |
-
-Output schema: `{"additionalProperties":true,"properties":{"end":{"description":"Range end, seconds (exclusive)","type":"number"},"format":{"description":"png, exr or video","enum":["png","exr","video"],"type":"string"},"fps":{"description":"Frames per second","type":"number"},"frames":{"description":"Frames it will render (the range is [start, end))","type":"integer"},"height":{"description":"Pixels","type":"integer"},"history":{"description":"play or seek","enum":["play","seek"],"type":"string"},"historyFrames":{"description":"history: play -- frames rendered and discarded before the range","type":"integer"},"job":{"description":"The job's id: pass it to job.wait, job.status or job.cancel","type":"string"},"kind":{"description":"capture or sequence","enum":["capture","sequence"],"type":"string"},"path":{"description":"Where the output goes (absolute)","type":"string"},"snapshot":{"description":"The project copy the job renders","type":"string"},"start":{"description":"Range start, seconds","type":"number"},"state":{"description":"queued","enum":["queued"],"type":"string"},"width":{"description":"Pixels","type":"integer"}},"required":["job","state","kind","frames","path"],"type":"object"}`
-
-### `render.start`: Render a sequence
-
-MCP name `render_start`. Class `job`. Permissions: `gpu`, `write`. Requires: `composition`. Since API 2. Flags: mutatesSession, expensive, supportsCancellation, supportsProgress, deterministic.
-
-Render a range of the project as it is in this session (unsaved edits included; nothing is saved) to a PNG or EXR sequence in a folder (frame_000000.png, numbered from the range's first frame) or to a video file. `range` is "start:end" in seconds, end exclusive, as --range is. Every frame is hashed in order as it is read back, before any encoder, so a video and a PNG sequence of one range report the same frame hashes. `history` as render.capture: play (the default) renders and discards the frames before a range that does not start at 0. Returns a job id at once; job.wait for the result, job.cancel to stop (the frames written so far are kept and listed).
-
-| Input | Type | Required | Range | Description |
-|---|---|---|---|---|
-| `fps` | number |  | >= 0.001 | Frames per second (default: the project's render fps) |
-| `height` | integer |  | >= 1.0, <= 16384.0 | Pixels (default: the project's render height) |
-| `history` | string, one of `play`, `seek` |  |  | play (default) or seek, for a range that starts after 0 |
-| `output` | string, one of `png`, `exr`, `video` | yes |  | png or exr (a folder of frames) or video (a file) |
-| `path` | string | yes |  | The folder (png, exr) or movie file (video, .mp4 or .mov); relative to the project folder; inside a write root |
-| `range` | string | yes |  | "start:end" in seconds, end exclusive, e.g. "0:4" |
-| `tier` | string, one of `preview`, `realtime`, `high`, `offline` |  |  | Quality tier (default: the project's, normally offline) |
-| `width` | integer |  | >= 1.0, <= 16384.0 | Pixels (default: the project's render width) |
-
-Output schema: `{"additionalProperties":true,"properties":{"end":{"description":"Range end, seconds (exclusive)","type":"number"},"format":{"description":"png, exr or video","enum":["png","exr","video"],"type":"string"},"fps":{"description":"Frames per second","type":"number"},"frames":{"description":"Frames it will render (the range is [start, end))","type":"integer"},"height":{"description":"Pixels","type":"integer"},"history":{"description":"play or seek","enum":["play","seek"],"type":"string"},"historyFrames":{"description":"history: play -- frames rendered and discarded before the range","type":"integer"},"job":{"description":"The job's id: pass it to job.wait, job.status or job.cancel","type":"string"},"kind":{"description":"capture or sequence","enum":["capture","sequence"],"type":"string"},"path":{"description":"Where the output goes (absolute)","type":"string"},"snapshot":{"description":"The project copy the job renders","type":"string"},"start":{"description":"Range start, seconds","type":"number"},"state":{"description":"queued","enum":["queued"],"type":"string"},"width":{"description":"Pixels","type":"integer"}},"required":["job","state","kind","frames","path"],"type":"object"}`
 
 ## scene
 
