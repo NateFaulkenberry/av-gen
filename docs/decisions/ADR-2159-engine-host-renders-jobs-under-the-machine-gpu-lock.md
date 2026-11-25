@@ -115,7 +115,23 @@ asset.import_audio, `modulation.create audio.bass -> nodes/resonator/emissiveBoo
   timeline camera sweep, 160x90): capture frame 12 `play` equals frame 12 of `render.start 0:0.75`, byte for byte
   in the PNG too, and equals it again in a fresh host; `seek` differs in 6,492 of 14,400 pixels (45 %). At frame 0
   the two are the same render.
-@@RESONATOR@@
+- **The probe (04-poc-plan.md section 5), on the resonator** (skinned `Breathe` clip + the `audio.bass` envelope route;
+  frame hashes are RenderJob's FNV over read-back pixels):
+
+  | Render | Frame hash | Against `render.start 0:2.083` (50 frames) |
+  |---|---|---|
+  | `render.capture` frame 24, `play` | `645df906acfb383c` | = sequence frame 24; PNG sha256 identical; the same hash in a fresh `avgen call` process and in the `avgen serve` run |
+  | `render.capture` frame 24, `seek` | `cc0ceeb33ab4d0c8` | 57,863 of 129,600 pixels (44.6 %) differ from play, max 231; = frame 0 of `render.start 1:2.083 seek` |
+  | `render.capture` frame 48, `play` | `e66b462858ff7175` | = sequence frame 48 |
+  | `render.capture` frame 48, `seek` | `bf3dfa638c5ea479` | 72,782 pixels (56.2 %) differ from play, max 215 |
+  | today's `--headless --frames 25 --capture` (t = 1.0) | (PNG) | 8,201 pixels (6.3 %) differ from capture frame 24 `play`, max 33 |
+
+  So on content with a skinned clip and an audio-reactive envelope, seeking to a frame is a different picture --
+  roughly half the frame, not a few LSB -- and `play` is the only history that reproduces the sequence. Today's
+  `--capture` is a third render path again (the phase-0 probe measured 14.6 % on the column scene). `render.probe
+  {node, frame: 24, width: 480, height: 270}` gave the resonator's rectangle at that frame, pixels x 8.0-472.0,
+  y -86.9-341.9 (it overflows the frame top and bottom); without `frame` the probe read the camera at load
+  (distance 6.2 m instead of the 12 m the project's camera has), which is why `time`/`frame` exists.
 
 ## Alternatives considered
 
