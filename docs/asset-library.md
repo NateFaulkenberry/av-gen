@@ -35,7 +35,7 @@ Project visual import is available to the AI through:
 asset.import { file }
 ```
 
-The source must resolve through the existing canonicalized `ToolContext::contentRoots()` boundary.
+The source must resolve through the session's `PathPolicy` (`ToolContext::paths().forRead`, ADR-2153): inside a read or write root, after `..` and symlinks are resolved, or the import is refused with `PERMISSION_DENIED`.
 Supported first-phase types are glTF/GLB models, HDR/EXR environments and common textures. The
 file is copied into `<project>/assets/{models,environments,textures}/`; an existing SHA-256 match
 is reported as a duplicate instead of copied again. A `.gltf` import preflights and copies its

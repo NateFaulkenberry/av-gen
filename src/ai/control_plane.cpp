@@ -1,15 +1,11 @@
 #include "ai/control_plane.hpp"
 
-#include "ai/director_tools.hpp"
-
-#include "ai/engine_tools.hpp"
+#include "api/version.hpp"
 #include "app/engine.hpp"
 #include "app/job_system.hpp"
 #include "core/log.hpp"
 
 #include <algorithm>
-#include <chrono>
-#include <thread>
 #include <chrono>
 #include <thread>
 
@@ -87,19 +83,38 @@ void AiSettings::reconcileWith(const ProviderRegistry& registry) {
 
 // ---- the plane ------------------------------------------------------------------------------------
 
-ControlPlane::ControlPlane(app::Engine& engine, app::JobSystem* jobs)
-    : jobs_(jobs), credentials_(makeSystemCredentialStore()),
-      orchestrator_(engine, tools_, queue_) {
-    registerEngineTools(tools_);
-    registerDirectorTools(tools_);
+api::SessionOptions studioSessionOptions() {
+    api::SessionOptions options;
+    options.client = api::ClientInfo{api::ClientKind::Studio, "avgen-studio", api::kEngineVersion};
+    options.permissions.openProjectFolder = true;
+    options.permissions.subprocess = true;
+    return options;
+}
+
+namespace {
+
+std::unique_ptr<api::Session> makeSession(api::SessionOptions options, api::Host& host) {
+    auto session = api::Session::create(std::move(options), host);
+    if (session) {
+        return std::move(*session);
+    }
+    // Only a relative root refuses; the assistant still works, with no roots at all (every path tool then
+    // says how to give it one).
+    log::error("ai: {}; the assistant's session has no roots", session.error().message);
+    api::SessionOptions fallback = studioSessionOptions();
+    return std::move(*api::Session::create(std::move(fallback), host));
+}
+
+} // namespace
+
+ControlPlane::ControlPlane(app::Engine& engine, app::JobSystem* jobs, api::SessionOptions options)
+    : jobs_(jobs), credentials_(makeSystemCredentialStore()), host_(engine),
+      session_(makeSession(std::move(options), host_)), orchestrator_(*session_) {
     registerBuiltinProviders(providerRegistry_);
     settings_.reconcileWith(providerRegistry_);
-    defaultSink_ = std::make_unique<SnapshotTransactionSink>(engine, snapshots_);
-    activeSink_ = defaultSink_.get();
-    orchestrator_.setTransactionSink(activeSink_);
     orchestrator_.setLimits(settings_.limits);
     log::info("ai: control plane ready -- {} tool(s) across {} domain(s), {} provider(s) available",
-              tools_.size(), tools_.domains().size(), providerRegistry_.entries().size());
+              tools().size(), tools().domains().size(), providerRegistry_.entries().size());
 }
 
 ControlPlane::~ControlPlane() { shutdown(); }
@@ -111,25 +126,9 @@ void ControlPlane::setCredentialStore(std::unique_ptr<CredentialStore> store) {
 }
 
 void ControlPlane::setTransactionSink(TransactionSink* sink) {
-    activeSink_ = sink != nullptr ? sink : defaultSink_.get();
-    orchestrator_.setTransactionSink(activeSink_);
-}
-
-void ControlPlane::setProjectsRoot(std::filesystem::path root) {
-    orchestrator_.setProjectsRoot(std::move(root));
-}
-
-void ControlPlane::setContentRoots(std::vector<std::filesystem::path> roots) {
-    orchestrator_.setContentRoots(std::move(roots));
-}
-
-void ControlPlane::setRecordingHook(RecordingHook hook) { orchestrator_.setRecordingHook(std::move(hook)); }
-void ControlPlane::setWatchHook(WatchHook hook) { orchestrator_.setWatchHook(std::move(hook)); }
-void ControlPlane::setEvaluationHook(EvaluationHook hook) { orchestrator_.setEvaluationHook(std::move(hook)); }
-void ControlPlane::setProfileHook(ProfileHook hook) { orchestrator_.setProfileHook(std::move(hook)); }
-
-void ControlPlane::setPerformanceSource(PerformanceSource source) {
-    orchestrator_.setPerformanceSource(std::move(source));
+    if (auto r = session_->setTransactionSink(sink); !r) {
+        log::warn("ai: {}", r.error().message);
+    }
 }
 
 void ControlPlane::setProvider(std::shared_ptr<Provider> provider) {
@@ -397,13 +396,13 @@ void ControlPlane::clearHistory() {
                    history_.end());
 }
 
-std::size_t ControlPlane::pump(double budgetMs) { return queue_.pump(budgetMs); }
+std::size_t ControlPlane::pump(double budgetMs) { return session_->pump(budgetMs); }
 
 void ControlPlane::shutdown() {
     cancelCurrentTask();
     // Release every worker waiting on the main thread before the engine goes away, or one will
     // wait for a pump that is never coming and take the shutdown with it.
-    queue_.shutdown();
+    host_.queue().shutdown();
     // Then *wait* for the running task, bounded. The job body captures `this`, so returning while
     // it is still inside the agent loop would leave a worker running over a destroyed control
     // plane. Cancellation plus a shut-down queue makes this prompt: the HTTP client polls the

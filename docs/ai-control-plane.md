@@ -66,12 +66,21 @@ key or a network.
  AI panel ──submit──► │ Orchestrator: gather → model → tools → validate  │
                       │        │                      │                  │
                       │        ▼                      ▼                  │
-                      │   Provider (HTTPS)      MainThreadQueue          │
+                      │   Provider (HTTPS)      api::Session::call       │
+                      │                         (validate, permissions)  │
                       └─────────────────────────────┬───────────────────-┘
-                                                    │  pump(), once per frame
+                                                    │  the host's MainThreadQueue, pump() once per frame
  frame thread ─────────────────────────────────────►├─► ToolRegistry ─► app::Engine
-                                                    └─► Transaction / SnapshotStore
+                                                    └─► Transaction / SnapshotStore / compensation log
 ```
+
+Since ADR-2153 the assistant is a client of `api::Session` (`src/api/session.*`), the object every
+client of the engine goes through. The Session holds the immutable tool registry (engine, Director and
+session tools), the fixed permissions and the `PathPolicy` every path-taking tool resolves through, its
+own `SnapshotStore`, the transaction sink, and the explicit transaction. The `ControlPlane` owns the
+Session and its `LocalHost` (the engine, the queue, the hooks the application installs); the
+`Orchestrator` calls `session.call` for every tool, and its task's transaction is
+`transaction.begin` / `commit` / `rollback`.
 
 | File | What it is |
 |---|---|
@@ -87,7 +96,10 @@ key or a network.
 | `ai/credentials.*` | keychain, environment fallback, in-memory store for tests |
 | `ai/context.*` | the system prompt and the ambient context block |
 | `ai/orchestrator.*` | the agent loop state machine, `AgentTask`, `Activity` |
-| `ai/control_plane.*` | the facade the application owns |
+| `ai/control_plane.*` | the facade the application owns: providers, credentials, tasks, and the Session |
+| `api/session.*`, `api/session_tools.cpp` | the Session, `LocalHost`, `session.info`, `transaction.*` (ADR-2153) |
+| `api/path_policy.*` | `SessionPermissions` and the one place a client-supplied path is resolved |
+| `api/compensation.*` | what a rollback does about files: the compensation log and the process-wide claims |
 | `ai/scripted_provider.*` | the one permitted mock (§52) |
 | `ui/ai_panel.*`, `ui/settings_panel.*` | the panels |
 | `app/settings.*` | application-level settings |
@@ -96,7 +108,7 @@ key or a network.
 
 | Thread | What runs there |
 |---|---|
-| Frame (main) | `ControlPlane::pump()`, and therefore **every tool body**; the panels |
+| Frame (main) | `ControlPlane::pump()` (the Session's host queue), and therefore **every tool body**; the panels |
 | JobSystem worker | the agent loop, context assembly, the HTTP request, parsing |
 | `NSURLSession` queue | the HTTP completion handler only |
 
@@ -125,13 +137,25 @@ every task needs (scene kind, counts, playhead, tempo, warnings); anything O(n) 
 pulled through a tool. The whole ambient block is under about a kilobyte regardless of scene size,
 and there is a test that says so.
 
+### Paths and permissions
+
+The Studio assistant's session (`ai::studioSessionOptions`, set up in `Application::initControlPlane`)
+reads the example folders, the source assets, Desktop and Downloads; writes `<prefs>/projects`; and
+reads and writes the open project's folder, whichever project is open (owner decision 1). A headless
+run has no roots beyond the open project's folder. A relative path resolves against the project's
+folder (or the first write root), never the working directory. A path outside the roots is
+`PERMISSION_DENIED`; no project open is `FAILED_PRECONDITION`.
+
 ### Transactions
 
-One per task, opened lazily on the first mutating tool, committed once. The snapshot covers
-parameter base values, modulation routes, presets and the timeline — exactly what the tools can
-change. Rollback happens on a provider failure after mutations, on cancellation, and on an
-unhandled error; **not** on a tool returning an error, which is information the agent is expected
-to act on.
+One per task, opened lazily on the first mutating tool (the session's `transaction.begin`), committed
+once. The snapshot covers parameter base values, modulation routes, presets, the timeline, the
+composition and the sequence. The task's calls accept irreversible tools (a save, an import), so a
+task that mixes them is marked partial and its rollback says what it could not restore; files its
+imports created are deleted by the compensation log unless something else still needs them.
+Rollback happens on a provider failure after mutations, on cancellation, and on an unhandled error;
+**not** on a tool returning an error, which is information the agent is expected to act on.
+[docs/api/transactions.md](api/transactions.md) lists, per tool, what a rollback restores.
 
 ---
 
@@ -204,8 +228,10 @@ header and not in the body or the URL, and that no tool annotation reaches the m
 
 ### Testing tools
 
-`tests/unit/test_ai_tools.cpp` — a real `app::Engine`, the real registry, a `ToolContext`. Nothing
-is mocked; §54 forbids fake engine APIs and a suite that passed against a stand-in would prove only
+`tests/unit/test_ai_tools.cpp` — a real `app::Engine`, the real registry, a `ToolContext` (with
+`Fixture::allow` standing in for a session's roots). `tests/unit/test_api_session.cpp` — the same
+tools through a real `api::Session`: permissions, transactions, the compensation log, the live
+policy, the threading. Nothing is mocked; §54 forbids fake engine APIs and a suite that passed against a stand-in would prove only
 that the stand-in works.
 
 `tests/integration/test_ai_control_plane.cpp` — the whole path, with a `ScriptedProvider` as the

@@ -13,6 +13,7 @@
 #include "ai/tool_api.hpp"
 #include "ai/tool_context.hpp"
 #include "ai/transaction.hpp"
+#include "api/path_policy.hpp"
 #include "app/engine.hpp"
 #include "scene/composition.hpp"
 #include "support/synth.hpp"
@@ -36,8 +37,22 @@ struct Fixture {
     app::Engine engine{app::EngineMode::Offline};
     ai::ToolRegistry registry;
     ai::ToolContext ctx{engine};
+    // A bare context, no session: the fixture keeps the snapshot store a session would (ADR-2153).
+    ai::SnapshotStore snapshots;
 
-    Fixture() { ai::registerEngineTools(registry); }
+    Fixture() {
+        ai::registerEngineTools(registry);
+        ctx.setSnapshots(&snapshots);
+    }
+
+    // The folders the context may read and write, as a session's permissions would give them (ADR-2153;
+    // this replaced setProjectsRoot / setContentRoots).
+    void allow(std::vector<std::filesystem::path> read, std::vector<std::filesystem::path> write = {}) {
+        api::SessionPermissions permissions;
+        permissions.readRoots = std::move(read);
+        permissions.writeRoots = std::move(write);
+        ctx.setPaths(api::PathPolicy(std::move(permissions), &engine));
+    }
 
     ai::ToolResult call(const std::string& name, json args = json::object()) {
         return registry.invoke(name, args, ctx);
@@ -894,7 +909,7 @@ TEST_CASE("An assistant can create a project, save it and open it again", "[ai][
     std::filesystem::create_directories(root);
 
     Fixture f;
-    f.ctx.setProjectsRoot(root);
+    f.allow({}, {root});
 
     // Nothing there yet, and the tool says so rather than inventing a listing.
     auto listed = f.call("project.list");
@@ -927,7 +942,7 @@ TEST_CASE("An assistant can create a project, save it and open it again", "[ai][
     // Open it into a *different* engine, which is the only version of this test worth running: the
     // same engine would pass even if the file on disk were empty.
     Fixture other;
-    other.ctx.setProjectsRoot(root);
+    other.allow({}, {root});
     const auto opened = other.call("project.open", json{{"name", "All You Got"}});
     INFO((opened.error ? opened.error->message : std::string{}));
     REQUIRE(opened.success);
@@ -948,7 +963,7 @@ TEST_CASE("The project tools refuse a name that would escape the projects folder
     std::filesystem::remove_all(root);
     std::filesystem::create_directories(root);
     Fixture f;
-    f.ctx.setProjectsRoot(root);
+    f.allow({}, {root});
 
     for (const char* bad : {"../escape", "..", ".hidden", "a/b", "", "with\\backslash"}) {
         INFO("name: " << bad);
@@ -978,14 +993,17 @@ TEST_CASE("Saving without a project says which tool to use instead", "[ai][tools
     const auto r = f.call("project.save");
     CHECK_FALSE(r.success);
     REQUIRE(r.error.has_value());
-    CHECK(r.error->code == ai::ToolErrorCode::InvalidArguments);
+    // ADR-2153: "no project open" is the session's state, not the call's arguments.
+    CHECK(r.error->code == ai::ToolErrorCode::FailedPrecondition);
     CHECK(r.error->recovery.find("project.create") != std::string::npos);
 
     // And without a root configured, the name-based tools refuse rather than guessing a location.
     const auto created = f.call("project.create", json{{"name", "Somewhere"}});
     CHECK_FALSE(created.success);
     REQUIRE(created.error.has_value());
-    CHECK(created.error->code == ai::ToolErrorCode::Unavailable);
+    // ADR-2153: a session with no write root is refused by its permissions, and told how to get one.
+    CHECK(created.error->code == ai::ToolErrorCode::PermissionDenied);
+    CHECK(created.error->recovery.find("--write-root") != std::string::npos);
 }
 
 // ---- generating a world -------------------------------------------------------------------------
@@ -996,8 +1014,7 @@ TEST_CASE("The assistant can find a recipe and generate the world it describes",
         SKIP("examples/recipes is not present in this checkout");
     }
     Fixture f;
-    f.ctx.setContentRoots({std::filesystem::path(AVGEN_SOURCE_DIR) / "examples",
-                           std::filesystem::path(AVGEN_SOURCE_DIR) / "assets"});
+    f.allow({std::filesystem::path(AVGEN_SOURCE_DIR) / "examples", std::filesystem::path(AVGEN_SOURCE_DIR) / "assets"});
 
     const auto listed = f.call("world.list_recipes");
     REQUIRE(listed.success);
@@ -1041,11 +1058,14 @@ TEST_CASE("Content resolution refuses a path that climbs out of its root", "[ai]
     std::ofstream(root / "inside" / "ok.txt") << "x";
 
     Fixture f;
-    f.ctx.setContentRoots({root});
-    CHECK(f.ctx.resolveContent(root / "inside" / "ok.txt").has_value());
-    CHECK_FALSE(f.ctx.resolveContent(root / ".." / ".." / "etc" / "passwd").has_value());
-    CHECK_FALSE(f.ctx.resolveContent("/etc/passwd").has_value());
-    CHECK_FALSE(f.ctx.resolveContent(std::filesystem::path("/tmp")).has_value());
+    f.allow({root});
+    CHECK(f.ctx.paths().forRead((root / "inside" / "ok.txt").string()).has_value());
+    // ADR-2153: outside every root is PermissionDenied (it used to be indistinguishable from missing).
+    const auto climbed = f.ctx.paths().forRead((root / ".." / ".." / "etc" / "passwd").string());
+    REQUIRE_FALSE(climbed.has_value());
+    CHECK(climbed.error().code == ai::ToolErrorCode::PermissionDenied);
+    CHECK_FALSE(f.ctx.paths().forRead("/etc/passwd").has_value());
+    CHECK_FALSE(f.ctx.paths().forRead("/tmp").has_value());
 
     std::filesystem::remove_all(root);
 }
@@ -1071,8 +1091,7 @@ TEST_CASE("The assistant can create a project and import a track into it", "[ai]
     REQUIRE(tone.writeWav(source).has_value());
 
     Fixture f;
-    f.ctx.setProjectsRoot(projects);
-    f.ctx.setContentRoots({desktop});
+    f.allow({desktop}, {projects});
 
     // Importing before there is a project says which tool to reach for, rather than writing the
     // copy somewhere arbitrary.
@@ -1116,8 +1135,7 @@ TEST_CASE("Importing refuses a file outside the readable folders", "[ai][tools][
     std::ofstream(root / "secret" / "private.wav") << "not audio";
 
     Fixture f;
-    f.ctx.setProjectsRoot(root / "projects");
-    f.ctx.setContentRoots({root / "allowed"});
+    f.allow({root / "allowed"}, {root / "projects"});
     REQUIRE(f.call("project.create", json{{"name", "Guarded"}}).success);
 
     for (const auto& bad : {root / "secret" / "private.wav",
@@ -1126,7 +1144,7 @@ TEST_CASE("Importing refuses a file outside the readable folders", "[ai][tools][
         const auto r = f.call("asset.import_audio", json{{"file", bad.string()}});
         CHECK_FALSE(r.success);
         REQUIRE(r.error.has_value());
-        CHECK(r.error->code == ai::ToolErrorCode::NotFound);
+        CHECK(r.error->code == ai::ToolErrorCode::PermissionDenied); // ADR-2153: was NotFound
     }
     // And nothing was copied into the project by the attempts.
     CHECK_FALSE(std::filesystem::exists(root / "projects" / "Guarded" / "audio"));
@@ -1143,8 +1161,7 @@ TEST_CASE("The assistant imports visual assets transactionally", "[ai][tools][as
     std::filesystem::copy_file(source, root / "allowed" / "tree.glb", std::filesystem::copy_options::overwrite_existing);
 
     Fixture f;
-    f.ctx.setProjectsRoot(root / "projects");
-    f.ctx.setContentRoots({root / "allowed"});
+    f.allow({root / "allowed"}, {root / "projects"});
     REQUIRE(f.call("project.create", json{{"name", "Visual"}}).success);
 
     const auto imported = f.call("asset.import", json{{"file", (root / "allowed" / "tree.glb").string()}});
@@ -1382,7 +1399,7 @@ TEST_CASE("The assistant can put an object in the scene and take it out", "[ai][
     Fixture f;
     REQUIRE(f.engine.loadFile(helixScene()).has_value());
     REQUIRE(f.engine.composition() != nullptr);
-    f.ctx.setContentRoots({std::filesystem::path(AVGEN_SOURCE_DIR) / "assets"});
+    f.allow({std::filesystem::path(AVGEN_SOURCE_DIR) / "assets"});
     const std::size_t before = f.engine.composition()->nodes().size();
 
     // A group: an empty transform, which is how a scene gets tidied.
@@ -1406,7 +1423,7 @@ TEST_CASE("The assistant can put an object in the scene and take it out", "[ai][
                                 json{{"name", "smuggled"}, {"asset", "/etc/passwd"}});
     CHECK_FALSE(outside.success);
     REQUIRE(outside.error.has_value());
-    CHECK(outside.error->code == ai::ToolErrorCode::NotFound);
+    CHECK(outside.error->code == ai::ToolErrorCode::PermissionDenied); // ADR-2153: was NotFound
 
     // Parenting, and the cycle it must refuse.
     REQUIRE(f.call("scene.create_node", json{{"name", "child"}, {"kind", "group"},

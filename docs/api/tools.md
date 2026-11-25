@@ -4,7 +4,7 @@
 
 API level 1, engine 0.3.0. Machine-readable form: `schemas/tool-catalogue.json`; the error codes are in [errors.md](errors.md).
 
-Every tool returns the same envelope: `{success, result}` or `{success: false, error: {code, message, recovery}}`. Arguments are validated against the input schema before the tool runs.
+Every call through a session returns the same envelope (ADR-2153): `{success, result, summary, changes, warnings, transaction, job}`, and on failure `error: {code, message, recovery, details?}` with `result` null. Arguments are validated against the input schema before the tool runs. **Requirements** are what the host must provide for a tool to be available (a composition, or a host hook); `session.info` answers supported, available and permitted per tool.
 
 **Execution class** says how a call is scheduled: `read` (no change), `instant` (a value, applied at the next frame), `rebind` (a route, key or shot added or removed), `structural` (the composition is rebuilt), `session` (changes the session, not the project: open, save, import, seek) and `job` (seconds to minutes: a child process or a render). **Permissions** are what a session must allow: `read` and `write` (files the caller names), `subprocess`, `gpu`.
 
@@ -28,14 +28,16 @@ Every tool returns the same envelope: `{success, result}` or `{success: false, e
 - [scene](#scene) (8)
 - [sequence](#sequence) (4)
 - [sequencer](#sequencer) (4)
+- [session](#session) (1)
 - [signal](#signal) (1)
+- [transaction](#transaction) (4)
 - [world](#world) (2)
 
 ## asset
 
 ### `asset.list`: List available assets
 
-MCP name `asset_list`. Class `read`. Permissions: `read`. Since API 1. Flags: readOnly, idempotent.
+MCP name `asset_list`. Class `read`. Permissions: `read`. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 List stable asset IDs visible to this session, including built-in and project-owned assets.
 
@@ -48,7 +50,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `asset.search`: Search available assets
 
-MCP name `asset_search`. Class `read`. Permissions: `read`. Since API 1. Flags: readOnly, idempotent.
+MCP name `asset_search`. Class `read`. Permissions: `read`. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 Search built-in and project asset metadata by stable ID, name or type.
 
@@ -61,7 +63,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `asset.get`: Get asset metadata
 
-MCP name `asset_get`. Class `read`. Permissions: `read`. Since API 1. Flags: readOnly, idempotent.
+MCP name `asset_get`. Class `read`. Permissions: `read`. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 Resolve one stable asset ID from asset.list or asset.search and return its ownership, type, path and tags.
 
@@ -73,7 +75,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `asset.import`: Import an asset into the project
 
-MCP name `asset_import`. Class `session`. Permissions: `read`, `write`. Since API 1. Flags: mutatesSession, idempotent.
+MCP name `asset_import`. Class `session`. Permissions: `read`, `write`. Requires: nothing. Since API 1. Flags: mutatesSession, idempotent.
 
 Copy a supported model, environment or texture into the open project's assets directory. The source must be reported by asset.list_importable or be inside an authorized content root; the original is never modified. Returns a stable project asset ID and copied dependencies.
 
@@ -85,7 +87,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `asset.list_importable`: List importable media
 
-MCP name `asset_list_importable`. Class `read`. Permissions: `read`. Since API 1. Flags: readOnly, idempotent.
+MCP name `asset_list_importable`. Class `read`. Permissions: `read`. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 Audio, glTF scenes and HDR environments the session can reach, by path. Use this to find a file rather than guessing where it lives -- a path outside the folders this session was given is refused, and guessing produces that refusal rather than a file.
 
@@ -98,7 +100,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `asset.import_audio`: Import audio
 
-MCP name `asset_import_audio`. Class `session`. Permissions: `read`, `write`. Since API 1. Flags: mutatesSession, idempotent.
+MCP name `asset_import_audio`. Class `session`. Permissions: `read`, `write`. Requires: nothing. Since API 1. Flags: mutatesSession, idempotent.
 
 Copy an audio file into the open project and make it the session's track, then analyze it. Copied rather than referenced on purpose: a project that points at a file on somebody's desktop stops working the day that file moves, and the project format stores a relative path and a hash precisely so it does not have to. Reports the duration, rate and channel count read back from the decoder, because an import that silently decoded nothing is the failure worth catching.
 
@@ -112,7 +114,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `audio.get_analysis`: Audio analysis
 
-MCP name `audio_get_analysis`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `audio_get_analysis`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 What the analyzer currently hears: loudness, the five frequency bands (auto-gained, and as long-term levels), spectral centroid, a loudness-independent energy, the onset rate, stereo width, the onset and its register, tempo and beat position in musical time (which beat of which bar), plus when each musical event (beat, downbeat, build, break, drop, impact) last fired. This is the state audio-reactive work is built on.
 
@@ -124,7 +126,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `camera.get`: Camera state
 
-MCP name `camera_get`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `camera_get`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 The camera's pose, mode, field of view, and the lens, exposure and focus settings that are exposed as parameters. Read this before moving the camera: in orbit mode the position and target parameters are ignored, and the mode is part of the answer.
 
@@ -134,7 +136,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `camera.set`: Move the camera
 
-MCP name `camera_set`. Class `instant`. Permissions: none. Since API 1. Flags: mutatesProject, idempotent, undoable.
+MCP name `camera_set`. Class `instant`. Permissions: none. Requires: nothing. Since API 1. Flags: mutatesProject, idempotent, undoable.
 
 Place the camera. Position and target are world-space metres; fovDegrees is the vertical field of view. The camera must be in free mode for an explicit pose to have any effect, so this switches it there and tells you it did. Pass mode explicitly to override.
 
@@ -149,7 +151,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `camera.frame_node`: Frame a node
 
-MCP name `camera_frame_node`. Class `instant`. Permissions: none. Since API 1. Flags: mutatesProject, idempotent, undoable.
+MCP name `camera_frame_node`. Class `instant`. Permissions: none. Requires: nothing. Since API 1. Flags: mutatesProject, idempotent, undoable.
 
 Point the camera at a node and stand far enough back to fit it in shot. Computes the distance from the node's own world bounds and the current field of view, so it is a framing decision rather than a guessed coordinate. 'margin' widens the shot: 1.0 fits exactly, 1.5 leaves room around the subject.
 
@@ -166,7 +168,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `capability.list`: What AV Gen supports
 
-MCP name `capability_list`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `capability_list`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 The capability registry: every engine domain, whether it is reachable from here, what this particular session actually contains, and -- importantly -- the domains that are NOT exposed and why, and `features`: the scene keys, node kinds, effect kinds, render outputs and AOVs this build can parse. Call this before planning anything ambitious; it will save you from trying to do something this build cannot do.
 
@@ -176,7 +178,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `capability.list_tools`: List tools
 
-MCP name `capability_list_tools`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `capability_list_tools`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 List every operation this build of AV Gen exposes, with a one-line description. Call this when a tool name is rejected, or to discover what is available before planning.
 
@@ -190,7 +192,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `director.inspect_scene`: Inspect the scene for directing
 
-MCP name `director_inspect_scene`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `director_inspect_scene`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 What a plan can name and when things happen: every subject (characters, heroes, nodes, cameras, effects) by kind and id, the song's sections as they come round ("chorus 2" is the second time the chorus comes back) with what each one sounds like -- its own energy, and the audio measured under it: a level-free energy, onsets per second (kick, snare, hat), brightness in Hz and each band's level in dB -- the meter (which beat is bar 1, bars per phrase), the piece's length, and the plans this project already holds (revise one by reusing its id). Prefer this over parameter-level inspection when directing.
 
@@ -202,7 +204,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `director.inspect_subject`: Inspect a subject
 
-MCP name `director_inspect_subject`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `director_inspect_subject`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 Resolve a name as a person said it ("Rook", "the Umbra hero mushroom", "the Valley Wide camera") to one subject, or learn that it is ambiguous (with every candidate) or unknown (with the nearest names). Never guess between candidates: choose one only by writing its kind and id into the plan's subject. For a character, also returns what it can do.
 
@@ -215,7 +217,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `director.inspect_capabilities`: Inspect capabilities
 
-MCP name `director_inspect_capabilities`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `director_inspect_capabilities`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 The capability registry, generated from the scene: each character's activities (semantic names; whether each exists on its loaded rig and how long it plays), locomotion speeds and jump envelope; the camera vocabulary; event kinds and whether each renders deterministically; effect types and instances. Ask before planning an action -- a capability not listed does not exist.
 
@@ -227,7 +229,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `director.propose_reactivity`: The default audio-reactivity plan
 
-MCP name `director_propose_reactivity`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `director_propose_reactivity`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 The Director's default audio-reactivity plan for this scene (ADR-927), from the reactive catalogue (director.inspect_capabilities, "reactive"): routes at three levels -- hats and claps on small things, the kick and the bar on the heroes (each hero its own layer, timing and amplitude), the section on the world's light, fog, wind and colour -- with staggered delays and depth that follows the section. Returns the plan (its "routes" and "sources"), the music's layers, a summary and what was left alone and why. Changes nothing: edit the plan if the request asks for something else, then director.propose_plan it for the person's approval.
 
@@ -239,7 +241,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `director.resolve_time`: Resolve a musical time
 
-MCP name `director_resolve_time`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `director_resolve_time`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 Place a time as a person said it -- "1:30", "bar 64 beat 3", "the second chorus", "end of the bridge + 2s" -- in seconds, against this song's sections and beat grid. Use it to check; in a plan, write the time as said and let the engine place it.
 
@@ -251,7 +253,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `director.plan_schema`: The Director Plan contract
 
-MCP name `director_plan_schema`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `director_plan_schema`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 The fields and vocabularies of a Director Plan, generated from what the engine accepts.
 
@@ -261,7 +263,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `director.validate_plan`: Validate a Director Plan
 
-MCP name `director_validate_plan`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `director_validate_plan`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 Check a plan against the scene without changing anything: names, times, capabilities, clearances, overlaps, camera precedence, determinism. Every finding names the plan item it concerns; an error means that item (and what depends on it) would not be built.
 
@@ -273,7 +275,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `director.record_plan`: Record a plan's live performances
 
-MCP name `director_record_plan`. Class `job`. Permissions: none. Since API 1. Flags: readOnly, requiresApproval.
+MCP name `director_record_plan`. Class `job`. Permissions: none. Requires: `recording`. Since API 1. Flags: readOnly, requiresApproval.
 
 Bake a plan whose performances are live (mode goal): play the project from zero on a scratch copy, keep what each character actually did and when its events happened, check the recording plays back and scrubs exactly, and put the RECORDED plan in front of the person for approval. Nothing is applied until they approve. Takes seconds; use it when the person wants a live performance fixed, or wants cues on its events (which only a recording can time).
 
@@ -285,7 +287,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `director.watch_events`: Watch the film for what happens in it
 
-MCP name `director_watch_events`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `director_watch_events`. Class `read`. Permissions: none. Requires: `watch`. Since API 1. Flags: readOnly, idempotent.
 
 Play the project from zero on a scratch copy (audio off, nothing changed) and list every world event it raises -- a scenario's beat, a character's named completion, a goal's arrival -- with its time and who raised it. Then propose a plan whose times are {"event": name, "subject": who, "occurrence": n}: the observation is attached to it for you. Takes seconds.
 
@@ -297,7 +299,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `director.evaluate`: Evaluate a plan with the quality evaluator
 
-MCP name `director_evaluate`. Class `job`. Permissions: `subprocess`. Since API 1. Flags: mutatesSession, expensive.
+MCP name `director_evaluate`. Class `job`. Permissions: `subprocess`. Requires: `evaluation`. Since API 1. Flags: mutatesSession, expensive.
 
 Render a span of the film with a plan in it -- a candidate you have not proposed ("plan"), or a revision the project already holds ("planId") -- on a scratch copy, and ask the Creative Critic about it. Nothing in the project changes and nothing is proposed: evaluate several candidates, director.compare them, and director.propose_plan only the one that won. Returns the evaluator's headline, dimension scores and findings, each finding keyed by the plan items its time span overlaps; the report is kept with the plan's evaluations. Minutes, not seconds: render the span that matters (a set piece, a section), not the film.
 
@@ -314,7 +316,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `director.compare`: Compare two evaluations of a plan
 
-MCP name `director_compare`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `director_compare`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 Diff two of a plan's kept evaluations (director.evaluate): dimension scores up and down, findings resolved, new and persisting (matched by the evaluator's stable keys), and the issues per plan item in each. Name them by label or by revision ("revision 3"); omit both for the last two.
 
@@ -328,7 +330,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `director.propose_plan`: Propose a Director Plan
 
-MCP name `director_propose_plan`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, requiresApproval, deterministic.
+MCP name `director_propose_plan`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, requiresApproval, deterministic.
 
 Compile a plan against the scene WITHOUT changing it, and put the result in front of the person: what will be added or replaced, and every finding. Nothing is applied until they approve; the task then ends waiting for them. Whatever cannot be built is left out and said, never substituted -- if you want a substitute (a jump for a backflip), propose it as a change and say so. Reuse an existing plan's id to revise it.
 
@@ -342,7 +344,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `entity.list`: List entities
 
-MCP name `entity_list`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `entity_list`. Class `read`. Permissions: none. Requires: `composition`. Since API 1. Flags: readOnly, idempotent.
 
 The entities in the scene: what each one drives, the behaviours it runs, how many reactions it carries, and the profile it was built from. Reactions are what a music field scales, so an entity with none is one a field cannot affect.
 
@@ -354,7 +356,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `environment.get`: Environment state
 
-MCP name `environment_get`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `environment_get`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 Sky, sun, fog, volumetrics, wind and ambient brightness, as the parameters that drive them. Anything absent is absent from this scene, not zero.
 
@@ -364,7 +366,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `environment.set`: Set environment values
 
-MCP name `environment_set`. Class `instant`. Permissions: none. Since API 1. Flags: mutatesProject, idempotent, undoable.
+MCP name `environment_set`. Class `instant`. Permissions: none. Requires: nothing. Since API 1. Flags: mutatesProject, idempotent, undoable.
 
 Set several environment parameters at once, which is how an atmosphere is actually changed -- fog, sun and sky colour move together or the result looks wrong. Each entry is a parameter path from environment.get and its new value. Unknown paths are reported rather than ignored.
 
@@ -378,7 +380,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `field.list`: List music influence fields
 
-MCP name `field_list`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `field_list`. Class `read`. Permissions: none. Requires: `composition`. Since API 1. Flags: readOnly, idempotent.
 
 The fields in the scene and what each resolved to: where it is, how far it reaches, which entities it governs, and -- the part worth reading -- whether it follows something baked or something live. A field on a baked actor is a pure function of time and survives a scrub exactly; one on a live entity does not (ADR-091).
 
@@ -388,7 +390,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `field.create`: Create a music influence field
 
-MCP name `field_create`. Class `structural`. Permissions: none. Since API 1. Flags: mutatesProject, idempotent, undoable.
+MCP name `field_create`. Class `structural`. Permissions: none. Requires: `composition`. Since API 1. Flags: mutatesProject, idempotent, undoable.
 
 Put a music influence field in the scene. It scales the depth of the reactions its governed entities already have, so the same `audio.bass -> emissiveGain` an author wrote becomes spatial: full strength at the centre, nothing at the edge, smooth between. Give it a `source` to make it follow a node or entity -- a character carrying the music with them -- and `tags` to say which entities it governs.
 
@@ -409,7 +411,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `lighting.list`: List lights
 
-MCP name `lighting_list`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `lighting_list`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 Every light in the flattened scene, with the parameter paths that control it. A light that came in with a glTF node is scaled and tinted by that node's lightIntensity and lightColor; rig lights are driven by lightrig/*; ecology lights are derived and are not editable.
 
@@ -421,7 +423,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `material.list`: List material controls
 
-MCP name `material_list`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `material_list`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 The material parameters this scene exposes: per-node emissive boost and roughness scale, and for procedural nodes the per-part tint, emissive colour, emissive gain, roughness and opacity; for procedural nodes and SDF objects also material/thinFilm/* (oxide thickness in nm, 0 = off: about 25 straw, 48 bronze, 55 purple, 65 blue at ior 2.4) and material/anisotropy/* (strength -1..1, 0 = off; rotation in radians) (ADR-1143). Emissive colour is HDR -- values well above 1 are correct and are what makes something glow.
 
@@ -436,7 +438,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `modulation.list`: List modulation routes
 
-MCP name `modulation_list`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `modulation_list`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 Every modulation route: which signal drives which parameter, how hard, with what operation, and whether it is actually bound. An unbound route is a connection that does nothing, so check that field.
 
@@ -449,7 +451,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `modulation.create`: Create a modulation route
 
-MCP name `modulation_create`. Class `rebind`. Permissions: none. Since API 1. Flags: mutatesProject, idempotent, undoable.
+MCP name `modulation_create`. Class `rebind`. Permissions: none. Requires: nothing. Since API 1. Flags: mutatesProject, idempotent, undoable.
 
 Connect a signal to a parameter so it moves with the music. 'amount' is the depth and may be negative to invert. 'op' says how it meets the parameter's value: add is the usual choice, multiply scales it, replace overwrites it. Use attackMs/decayMs to smooth a jumpy source, and an envelope to turn a momentary event such as music.drop into something that decays rather than flashing for one frame. The route is bound immediately and the result says whether it resolved.
 
@@ -470,7 +472,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `modulation.set_depth`: Change a route's depth
 
-MCP name `modulation_set_depth`. Class `instant`. Permissions: none. Since API 1. Flags: mutatesProject, idempotent, undoable.
+MCP name `modulation_set_depth`. Class `instant`. Permissions: none. Requires: nothing. Since API 1. Flags: mutatesProject, idempotent, undoable.
 
 Change how hard an existing modulation route drives its target.
 
@@ -484,7 +486,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `modulation.remove`: Remove a modulation route
 
-MCP name `modulation_remove`. Class `rebind`. Permissions: none. Since API 1. Flags: mutatesProject, destructive, undoable.
+MCP name `modulation_remove`. Class `rebind`. Permissions: none. Requires: nothing. Since API 1. Flags: mutatesProject, destructive, undoable.
 
 Delete a modulation route by index. Indices shift afterwards, so re-read modulation.list before removing another.
 
@@ -498,7 +500,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `parameter.list_groups`: Parameter groups
 
-MCP name `parameter_list_groups`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `parameter_list_groups`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 The top-level parameter groups in this scene and how many parameters each holds. The cheapest way to orient yourself before searching: groups are things like 'camera', 'env', 'scene', 'nodes', 'procedural', 'post', 'layers'.
 
@@ -508,7 +510,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `parameter.search`: Search parameters
 
-MCP name `parameter_search`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `parameter_search`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 Find parameters by a fragment of their path or label. This is the primary way to discover what a scene actually exposes -- node transforms, sky and sun, fog, wind, camera, post, material emission. Results carry canonical paths; never guess a path.
 
@@ -524,7 +526,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `parameter.get`: Get parameters
 
-MCP name `parameter_get`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `parameter_get`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 Full metadata for named parameters: current base value, the modulated value in effect this frame, default, hard and soft ranges, group and whether it can be modulated. Read before writing -- ranges here are what a set will be clamped to.
 
@@ -536,7 +538,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `parameter.set`: Set a parameter
 
-MCP name `parameter_set`. Class `instant`. Permissions: none. Since API 1. Flags: mutatesProject, idempotent, undoable.
+MCP name `parameter_set`. Class `instant`. Permissions: none. Requires: nothing. Since API 1. Flags: mutatesProject, idempotent, undoable.
 
 Set a parameter's base value. Accepts a number for a scalar, or an array with one entry per component for a vector or colour. Values outside the parameter's hard range are clamped and the result says so. If a timeline track or a modulation route is overwriting this value every frame, the result says that too -- a set that is silently overridden looks exactly like a set that worked.
 
@@ -550,7 +552,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `parameter.reset`: Reset a parameter
 
-MCP name `parameter_reset`. Class `instant`. Permissions: none. Since API 1. Flags: mutatesProject, idempotent, undoable.
+MCP name `parameter_reset`. Class `instant`. Permissions: none. Requires: nothing. Since API 1. Flags: mutatesProject, idempotent, undoable.
 
 Put a parameter back to the value the scene declared as its default.
 
@@ -564,7 +566,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `performance.get_stats`: Performance
 
-MCP name `performance_get_stats`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `performance_get_stats`. Class `read`. Permissions: none. Requires: `performance`. Since API 1. Flags: readOnly, idempotent.
 
 Frame cost and what it is spent on: frame time, GPU time where the device can measure it, draw calls, triangles, visible and culled instances, light count and per-pass GPU time. Read this before and after any change made under a frame-rate constraint. If no renderer is attached to this session the result says so rather than reporting zeros.
 
@@ -574,7 +576,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `performance.profile_scene`: Profile the scene for live performance
 
-MCP name `performance_profile_scene`. Class `job`. Permissions: `subprocess`. Since API 1. Flags: readOnly, expensive.
+MCP name `performance_profile_scene`. Class `job`. Permissions: `subprocess`. Requires: `profile`. Since API 1. Flags: readOnly, expensive.
 
 Run the live scene profiler (avgen --live-profile) on a scratch copy of the project, in a child process, and return its record (schema avgen.liveprofile/1): frame statistics against the target's budget, the critical path (GPU, CPU or sync), GPU time by category, CPU time by stage, resources, and optimization candidates with ESTIMATED savings (and MEASURED ones when verifyCandidates > 0). Headless by default (deterministic, no present); "live" opens windows and measures the real loop. Seconds to minutes. The editor keeps rendering meanwhile, so the GPU is shared and the numbers are contended: for numbers to quote, run the command with the editor closed.
 
@@ -593,7 +595,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `performance.optimize_scene`: Optimize the scene for a frame rate
 
-MCP name `performance_optimize_scene`. Class `job`. Permissions: `subprocess`. Since API 1. Flags: mutatesSession, expensive.
+MCP name `performance_optimize_scene`. Class `job`. Permissions: `subprocess`. Requires: `profile`. Since API 1. Flags: mutatesSession, expensive.
 
 Search lever combinations (avgen --live-profile --optimize, headless, on a scratch copy) for the least MEASURED visual change that reaches the target (budget x 0.9). Every single lever is measured for time (A/B) and picture (ORIGINAL vs OPTIMIZED: pixel, SSIM, edge, luminance incl. matched, temporal, inside the hero boxes); combinations are ESTIMATED from the singles and then MEASURED. Heroes are never degraded by default. With apply=true the chosen levers are added to the project's live ceilings when the answer arrives (never the scene; performance.set_live_quality clearOverrides undoes it). Minutes. The editor shares the GPU meanwhile.
 
@@ -613,7 +615,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `performance.apply_low_risk_optimizations`: Apply the low-risk optimizations
 
-MCP name `performance_apply_low_risk_optimizations`. Class `job`. Permissions: `subprocess`. Since API 1. Flags: mutatesSession, expensive.
+MCP name `performance_apply_low_risk_optimizations`. Class `job`. Permissions: `subprocess`. Requires: `profile`. Since API 1. Flags: mutatesSession, expensive.
 
 Measure every low-risk, hero-safe lever on a scratch copy (time by A/B, picture by the Quality Lab) and add to the project's live ceilings only those with a saving outside the noise. Never edits the scene; heroes exempt. The answer lists what was applied with its measured saving and visual change. Minutes.
 
@@ -631,7 +633,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `performance.benchmark_before_after`: Benchmark before and after
 
-MCP name `performance_benchmark_before_after`. Class `job`. Permissions: `subprocess`. Since API 1. Flags: readOnly, expensive.
+MCP name `performance_benchmark_before_after`. Class `job`. Permissions: `subprocess`. Requires: `profile`. Since API 1. Flags: readOnly, expensive.
 
 ORIGINAL vs OPTIMIZED on a scratch copy (avgen --live-profile --compare): "project" (default) compares the project without and with its live ceilings; or name levers ("scale85,volumequarter"). Both are MEASURED: frame cost by counterbalanced A/B and the picture by the Quality Lab, with the self-difference floor (ORIGINAL rendered twice). Read-only.
 
@@ -650,7 +652,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `performance.get_live_quality`: Read the live quality settings
 
-MCP name `performance_get_live_quality`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `performance_get_live_quality`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 The project's live block (ADR-1084/1100): profile (QUALITY/BALANCED/PERFORMANCE), the strategy, the lowest level the controller may use, the degradation priority, and the ceilings the Optimize review applied. Unset fields are reported as null and mean the default. The frame-rate target is not the project's: it is the Live panel's, for every scene (ADR-1360).
 
@@ -660,7 +662,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `performance.set_live_quality`: Change the live quality settings
 
-MCP name `performance_set_live_quality`. Class `session`. Permissions: none. Since API 1. Flags: mutatesSession, idempotent.
+MCP name `performance_set_live_quality`. Class `session`. Permissions: none. Requires: nothing. Since API 1. Flags: mutatesSession, idempotent.
 
 Change the project's live block. Only the fields given change; null clears one. "applyLevers" adds A/B levers (the candidates' "lever" names: volumequarter, posttaps, castercull, lodbias2, ...) to the project's ceilings -- what the Optimize review's Apply does. Never edits the scene; the quality only ever lowers what the scene asks for, and heroes are exempt. Save the project to keep it.
 
@@ -679,7 +681,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `project.get_state`: Project state
 
-MCP name `project_get_state`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `project_get_state`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 High-level state of the open project: file, scene, audio, transport, and how much of each kind of thing exists. Start here; it is cheap and it tells you what to ask about next.
 
@@ -689,7 +691,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `project.create_snapshot`: Create rollback point
 
-MCP name `project_create_snapshot`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent, undoable.
+MCP name `project_create_snapshot`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent, undoable.
 
 Capture a restorable snapshot of the parameter domain (parameter values, modulation routes, presets and the timeline). Take one before substantial work. The AI task wrapper already takes one automatically; this is for a checkpoint inside a long task.
 
@@ -701,7 +703,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `project.list_snapshots`: List rollback points
 
-MCP name `project_list_snapshots`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `project_list_snapshots`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 The snapshots taken this session, oldest first.
 
@@ -711,7 +713,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `project.restore_snapshot`: Restore rollback point
 
-MCP name `project_restore_snapshot`. Class `structural`. Permissions: none. Since API 1. Flags: mutatesProject, destructive, undoable.
+MCP name `project_restore_snapshot`. Class `structural`. Permissions: none. Requires: nothing. Since API 1. Flags: mutatesProject, destructive, undoable.
 
 Put the parameter domain back to a snapshot. Everything changed since is discarded.
 
@@ -723,7 +725,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `project.list`: List projects
 
-MCP name `project_list`. Class `read`. Permissions: `read`. Since API 1. Flags: readOnly, idempotent.
+MCP name `project_list`. Class `read`. Permissions: `read`. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 Every project in the projects folder, by name. Use this before opening one rather than guessing a name.
 
@@ -733,7 +735,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `project.create`: Create a project
 
-MCP name `project_create`. Class `session`. Permissions: `write`. Since API 1. Flags: mutatesSession, destructive.
+MCP name `project_create`. Class `session`. Permissions: `write`. Requires: nothing. Since API 1. Flags: mutatesSession, destructive.
 
 Start a new empty project under this name and save it, so it exists on disk before anything is built in it. The session is replaced: anything unsaved is lost.
 
@@ -745,7 +747,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `project.save`: Save the project
 
-MCP name `project_save`. Class `session`. Permissions: `write`. Since API 1. Flags: mutatesSession, idempotent.
+MCP name `project_save`. Class `session`. Permissions: `write`. Requires: nothing. Since API 1. Flags: mutatesSession, idempotent.
 
 Write the open project back to its own file. Fails when the session has never been saved, which is when project.create or project.save_as is the tool you want. Reports the path and confirms it exists afterwards, because a save that silently wrote nothing is the failure worth catching.
 
@@ -755,7 +757,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `project.save_as`: Save the project under a name
 
-MCP name `project_save_as`. Class `session`. Permissions: `write`. Since API 1. Flags: mutatesSession, idempotent.
+MCP name `project_save_as`. Class `session`. Permissions: `write`. Requires: nothing. Since API 1. Flags: mutatesSession, idempotent.
 
 Write the open session to a project of this name and carry on working in it. Use it to name a session that was never saved, or to fork one.
 
@@ -767,7 +769,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `project.open`: Open a project
 
-MCP name `project_open`. Class `session`. Permissions: `read`. Since API 1. Flags: mutatesSession, destructive.
+MCP name `project_open`. Class `session`. Permissions: `read`. Requires: nothing. Since API 1. Flags: mutatesSession, destructive.
 
 Load a project by name, replacing the session. Anything unsaved is lost. Reports what came back -- parameters, routes, tracks, whether audio and a scene resolved -- and any load warnings, because a project whose scene is missing still 'opens' and the warnings are how you find out.
 
@@ -781,7 +783,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `render.probe`: Look at the frame
 
-MCP name `render_probe`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `render_probe`. Class `read`. Permissions: none. Requires: `composition`. Since API 1. Flags: readOnly, idempotent.
 
 What the camera can currently see, as numbers: which nodes fall inside the frustum, where each sits in the frame, and how much of the height it fills. Use it to check a shot frames its subject before trusting that it does -- a camera pointed at nothing reports nothing rather than looking fine. It reads the camera the last frame used, the same as camera.get, so after moving the camera let a frame happen before asking what it sees.
 
@@ -797,7 +799,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `scene.create_node`: Create a node
 
-MCP name `scene_create_node`. Class `structural`. Permissions: `read`. Since API 1. Flags: mutatesProject, idempotent, undoable.
+MCP name `scene_create_node`. Class `structural`. Permissions: `read`. Requires: `composition`. Since API 1. Flags: mutatesProject, idempotent, undoable.
 
 Put an object in the scene: a glTF asset by file, or an empty Group to parent things to. The asset path is resolved against the folders this session may read, so a model that is not reachable is refused here rather than becoming a node that renders nothing.
 
@@ -815,7 +817,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `scene.delete_node`: Delete a node
 
-MCP name `scene_delete_node`. Class `structural`. Permissions: none. Since API 1. Flags: mutatesProject, idempotent, undoable.
+MCP name `scene_delete_node`. Class `structural`. Permissions: none. Requires: `composition`. Since API 1. Flags: mutatesProject, idempotent, undoable.
 
 Remove a node from the scene. Its children go with it, so deleting a group deletes what it holds -- the count is reported rather than left to be discovered.
 
@@ -827,7 +829,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `scene.set_parent`: Re-parent a node
 
-MCP name `scene_set_parent`. Class `structural`. Permissions: none. Since API 1. Flags: mutatesProject, idempotent, undoable.
+MCP name `scene_set_parent`. Class `structural`. Permissions: none. Requires: `composition`. Since API 1. Flags: mutatesProject, idempotent, undoable.
 
 Move a node under another, or to the root. The node keeps its own local transform, so it moves with its new parent rather than staying where it looked -- which is what parenting means and is worth knowing before using it to tidy a scene.
 
@@ -840,7 +842,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `scene.get_summary`: Scene summary
 
-MCP name `scene_get_summary`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `scene_get_summary`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 What is in the scene: the node list with kinds, the light count, the camera, the bounds, and the counts of meshes, entities, particles and procedural objects. Deliberately a summary -- use scene.find_nodes and scene.get_node for detail rather than asking for everything.
 
@@ -850,7 +852,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `scene.find_nodes`: Find nodes
 
-MCP name `scene_find_nodes`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `scene_find_nodes`. Class `read`. Permissions: none. Requires: `composition`. Since API 1. Flags: readOnly, idempotent.
 
 Find composition nodes by a fragment of their name or by kind. Returns canonical node names and each node's parameter prefix, which is what every other tool wants.
 
@@ -864,7 +866,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `scene.get_node`: Get a node
 
-MCP name `scene_get_node`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `scene_get_node`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 Everything about one node: transform, visibility, emissive boost, roughness scale, asset, and the parameter paths that drive it.
 
@@ -876,7 +878,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `scene.set_node_transform`: Move a node
 
-MCP name `scene_set_node_transform`. Class `instant`. Permissions: none. Since API 1. Flags: mutatesProject, idempotent, undoable.
+MCP name `scene_set_node_transform`. Class `instant`. Permissions: none. Requires: nothing. Since API 1. Flags: mutatesProject, idempotent, undoable.
 
 Set a node's position, rotation (Euler degrees) or scale. Any field may be omitted to leave it alone. This writes the node's transform parameters, so it keyframes, modulates and saves like every other value.
 
@@ -891,7 +893,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `scene.set_node_visible`: Show or hide a node
 
-MCP name `scene_set_node_visible`. Class `instant`. Permissions: none. Since API 1. Flags: mutatesProject, idempotent, undoable.
+MCP name `scene_set_node_visible`. Class `instant`. Permissions: none. Requires: nothing. Since API 1. Flags: mutatesProject, idempotent, undoable.
 
 Set a node's visibility. On a nested scene node this propagates through the whole subtree.
 
@@ -906,7 +908,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `sequence.add_marker`: Add a marker
 
-MCP name `sequence_add_marker`. Class `rebind`. Permissions: none. Since API 1. Flags: mutatesProject, idempotent, undoable.
+MCP name `sequence_add_marker`. Class `rebind`. Permissions: none. Requires: nothing. Since API 1. Flags: mutatesProject, idempotent, undoable.
 
 Put a section or cue marker on the piece. Sections are the song's structure -- INTRO, VERSE, CHORUS -- and are what a shot is placed against; cues are a point an author wants to find again. Beat markers are not authored here: they come from the analysis.
 
@@ -920,7 +922,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `sequence.add_shot`: Add a shot
 
-MCP name `sequence_add_shot`. Class `rebind`. Permissions: none. Since API 1. Flags: mutatesProject, idempotent, undoable.
+MCP name `sequence_add_shot`. Class `rebind`. Permissions: none. Requires: nothing. Since API 1. Flags: mutatesProject, idempotent, undoable.
 
 Add a shot to the piece: a span of time with one visual setup. `scene` names a scene slot the sequence already has; leaving it empty inherits the previous shot's. The camera is left to inherit unless a preset is named, because a shot with no camera holds the last one, which is what a cut between two angles of the same setup means.
 
@@ -935,7 +937,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `sequence.add_overlay`: Add a text overlay
 
-MCP name `sequence_add_overlay`. Class `rebind`. Permissions: none. Since API 1. Flags: mutatesProject, idempotent, undoable.
+MCP name `sequence_add_overlay`. Class `rebind`. Permissions: none. Requires: nothing. Since API 1. Flags: mutatesProject, idempotent, undoable.
 
 Put timed text over the frame -- a title, a lyric line, a placeholder to fill in later. This is the 2D composition layer system (ADR-083) reached through the sequence, so the text is an overlay cue that becomes a real layer on install, editable afterwards like any other.
 
@@ -951,7 +953,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `sequence.get_state`: Cinematic sequence
 
-MCP name `sequence_get_state`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `sequence_get_state`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 The music video itself: its shots and when each one cuts, the scenes they cut between, the actors and the animation clips they play, the text overlays, and the section markers of the song. Also the music's own shape -- tempo, how many beats were detected, and the beats themselves around a moment you name. This is what to read before placing or judging a shot; `sequencer.get_state` reports the baked tracks, not the piece.
 
@@ -967,7 +969,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `sequencer.get_state`: Timeline state
 
-MCP name `sequencer_get_state`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `sequencer_get_state`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 The timeline: its tracks and what each one drives, its cues, the playhead in seconds and beats, the tempo, and -- important -- any track whose target parameter does not exist. An unbound track is animation that silently does nothing, so it is always reported.
 
@@ -977,7 +979,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `sequencer.add_keyframe`: Add a keyframe
 
-MCP name `sequencer_add_keyframe`. Class `rebind`. Permissions: none. Since API 1. Flags: mutatesProject, idempotent, undoable.
+MCP name `sequencer_add_keyframe`. Class `rebind`. Permissions: none. Requires: nothing. Since API 1. Flags: mutatesProject, idempotent, undoable.
 
 Key a parameter at a time, creating the track if it does not exist. Times are seconds by default, or beats -- use beats when the move has to land on the music, and read the tempo from sequencer.get_state rather than converting by hand. The target parameter must already exist: a track naming an unknown parameter animates nothing, so this refuses it.
 
@@ -995,7 +997,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `sequencer.remove_track`: Remove a track
 
-MCP name `sequencer_remove_track`. Class `rebind`. Permissions: none. Since API 1. Flags: mutatesProject, destructive, idempotent, undoable.
+MCP name `sequencer_remove_track`. Class `rebind`. Permissions: none. Requires: nothing. Since API 1. Flags: mutatesProject, destructive, idempotent, undoable.
 
 Delete a timeline track and every key on it.
 
@@ -1008,7 +1010,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `sequencer.set_playhead`: Move the playhead
 
-MCP name `sequencer_set_playhead`. Class `session`. Permissions: none. Since API 1. Flags: mutatesSession, idempotent.
+MCP name `sequencer_set_playhead`. Class `session`. Permissions: none. Requires: nothing. Since API 1. Flags: mutatesSession, idempotent.
 
 Seek the transport to a time in seconds. Use this to look at a moment in the piece before or after changing it.
 
@@ -1018,11 +1020,25 @@ Seek the transport to a time in seconds. Use this to look at a moment in the pie
 
 Output: not yet described (listed in `schemas/tools-without-output-schema.json`).
 
+## session
+
+### `session.info`: Session information
+
+MCP name `session_info`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
+
+Who this session is and what it may do: the client, the permissions (read roots, write roots, whether the open project's folder is writable, GPU, child processes), the engine and API versions, the project's state, the open transaction, and for every tool whether it is supported (in this build), available (usable in this host now: its hooks installed, a composition when it needs one) and permitted (allowed by these permissions). Pass `tools` for the three answers on named tools.
+
+| Input | Type | Required | Range | Description |
+|---|---|---|---|---|
+| `tools` | array of string |  |  | Tools to answer supported/available/permitted for, by name |
+
+Output schema: `{"additionalProperties":true,"properties":{"client":{"description":"{kind, name, version}"},"permissions":{"description":"The session's fixed permissions"},"policy":{"description":"authoring or live","enum":["authoring","live"],"type":"string"},"project":{"description":"{state, file, folder, writable, hasComposition}"},"rollbackPoints":{"description":"Snapshots this session holds","type":"integer"},"session":{"description":"The session's id in this process","type":"integer"},"showRunning":{"description":"A live host is running a show now","type":"boolean"},"state":{"description":"ready or closing","type":"string"},"toolDetail":{"description":"Per named tool, when `tools` was passed","items":{"description":"{name, supported, available, permitted, reasons}"},"type":"array"},"tools":{"description":"{supported, available, permitted, unavailable[], notPermitted[]}"},"transaction":{"description":"The open explicit transaction, or null"},"transactionSink":{"description":"What backs a transaction","type":"string"},"version":{"description":"api::version(): engine, revision, api level, formats"}},"type":"object"}`
+
 ## signal
 
 ### `signal.list`: List signals
 
-MCP name `signal_list`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
+MCP name `signal_list`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 Every named control signal on the bus and its current value: audio bands, tempo, beat phase, musical events, time, MIDI/OSC control channels and any LFO or macro sources. These are the sources a modulation route can be built from -- use the exact names here.
 
@@ -1034,11 +1050,61 @@ Every named control signal on the bus and its current value: audio bands, tempo,
 
 Output: not yet described (listed in `schemas/tools-without-output-schema.json`).
 
+## transaction
+
+### `transaction.begin`: Begin a transaction
+
+MCP name `transaction_begin`. Class `session`. Permissions: none. Requires: nothing. Since API 1. Flags: mutatesSession.
+
+Open an explicit transaction: the calls that name its id are rolled back together by transaction.rollback, or kept as one change (in Studio, one undo) by transaction.commit. One per session; a second begin is refused. While it is open, a mutating call that does not name it is refused. A call that cannot be undone (project saves, imports) is refused inside it unless the call passes irreversible: accept, which makes the transaction partial.
+
+| Input | Type | Required | Range | Description |
+|---|---|---|---|---|
+| `label` | string |  |  | What the transaction is for; an undo menu shows it |
+
+Output schema: `{"additionalProperties":true,"properties":{"backedBy":{"description":"What backs it: project snapshot, or undo history","type":"string"},"calls":{"description":"Calls made inside it","type":"integer"},"changedTargets":{"description":"commit: parameter values that changed","items":{"description":"parameter path","type":"string"},"type":"array"},"createdFiles":{"description":"Files its calls created","items":{"description":"path","type":"string"},"type":"array"},"editState":{"description":"commit: the editor history state it produced, 0 for none","type":"integer"},"files":{"description":"rollback: {deleted, restored, kept}"},"id":{"description":"The transaction's id, e.g. txn-3","type":"string"},"irreversible":{"description":"Tools it accepted that a rollback cannot reach","items":{"description":"tool name","type":"string"},"type":"array"},"label":{"description":"What it is for","type":"string"},"notRestorable":{"description":"commit: {tools, files} a later undo will not reach"},"notRestored":{"description":"rollback: {tools, files} it could not put back"},"partial":{"description":"A call it accepted as irreversible is outside what it can roll back","type":"boolean"},"rollbackPoint":{"description":"The snapshot id it restores on rollback, or null"},"state":{"description":"open, committed, rolled-back, or none (status with nothing open)","enum":["open","committed","rolled-back","none"],"type":"string"}},"type":"object"}`
+
+### `transaction.commit`: Commit a transaction
+
+MCP name `transaction_commit`. Class `session`. Permissions: none. Requires: nothing. Since API 1. Flags: mutatesSession.
+
+Close the open transaction, keeping its changes. Reports the parameter values that changed and what a later undo cannot reach (the irreversible calls it accepted).
+
+| Input | Type | Required | Range | Description |
+|---|---|---|---|---|
+| `id` | string | yes |  | The id transaction.begin returned |
+
+Output schema: `{"additionalProperties":true,"properties":{"backedBy":{"description":"What backs it: project snapshot, or undo history","type":"string"},"calls":{"description":"Calls made inside it","type":"integer"},"changedTargets":{"description":"commit: parameter values that changed","items":{"description":"parameter path","type":"string"},"type":"array"},"createdFiles":{"description":"Files its calls created","items":{"description":"path","type":"string"},"type":"array"},"editState":{"description":"commit: the editor history state it produced, 0 for none","type":"integer"},"files":{"description":"rollback: {deleted, restored, kept}"},"id":{"description":"The transaction's id, e.g. txn-3","type":"string"},"irreversible":{"description":"Tools it accepted that a rollback cannot reach","items":{"description":"tool name","type":"string"},"type":"array"},"label":{"description":"What it is for","type":"string"},"notRestorable":{"description":"commit: {tools, files} a later undo will not reach"},"notRestored":{"description":"rollback: {tools, files} it could not put back"},"partial":{"description":"A call it accepted as irreversible is outside what it can roll back","type":"boolean"},"rollbackPoint":{"description":"The snapshot id it restores on rollback, or null"},"state":{"description":"open, committed, rolled-back, or none (status with nothing open)","enum":["open","committed","rolled-back","none"],"type":"string"}},"type":"object"}`
+
+### `transaction.rollback`: Roll back a transaction
+
+MCP name `transaction_rollback`. Class `session`. Permissions: none. Requires: nothing. Since API 1. Flags: mutatesSession.
+
+Close the open transaction, putting the project back as it was at begin: parameters, routes, presets, the timeline, the composition and the sequence. Files its calls created are deleted unless the project or scene still names them, another transaction uses them, or they are render outputs; files it replaced get their previous contents back. Reports what it could not restore.
+
+| Input | Type | Required | Range | Description |
+|---|---|---|---|---|
+| `id` | string | yes |  | The id transaction.begin returned |
+
+Output schema: `{"additionalProperties":true,"properties":{"backedBy":{"description":"What backs it: project snapshot, or undo history","type":"string"},"calls":{"description":"Calls made inside it","type":"integer"},"changedTargets":{"description":"commit: parameter values that changed","items":{"description":"parameter path","type":"string"},"type":"array"},"createdFiles":{"description":"Files its calls created","items":{"description":"path","type":"string"},"type":"array"},"editState":{"description":"commit: the editor history state it produced, 0 for none","type":"integer"},"files":{"description":"rollback: {deleted, restored, kept}"},"id":{"description":"The transaction's id, e.g. txn-3","type":"string"},"irreversible":{"description":"Tools it accepted that a rollback cannot reach","items":{"description":"tool name","type":"string"},"type":"array"},"label":{"description":"What it is for","type":"string"},"notRestorable":{"description":"commit: {tools, files} a later undo will not reach"},"notRestored":{"description":"rollback: {tools, files} it could not put back"},"partial":{"description":"A call it accepted as irreversible is outside what it can roll back","type":"boolean"},"rollbackPoint":{"description":"The snapshot id it restores on rollback, or null"},"state":{"description":"open, committed, rolled-back, or none (status with nothing open)","enum":["open","committed","rolled-back","none"],"type":"string"}},"type":"object"}`
+
+### `transaction.status`: Transaction status
+
+MCP name `transaction_status`. Class `read`. Permissions: none. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
+
+The open transaction (calls, whether it is partial, the files it created), or state none.
+
+| Input | Type | Required | Range | Description |
+|---|---|---|---|---|
+| `id` | string |  |  | Optional: the id to check; omit for the open one |
+
+Output schema: `{"additionalProperties":true,"properties":{"backedBy":{"description":"What backs it: project snapshot, or undo history","type":"string"},"calls":{"description":"Calls made inside it","type":"integer"},"changedTargets":{"description":"commit: parameter values that changed","items":{"description":"parameter path","type":"string"},"type":"array"},"createdFiles":{"description":"Files its calls created","items":{"description":"path","type":"string"},"type":"array"},"editState":{"description":"commit: the editor history state it produced, 0 for none","type":"integer"},"files":{"description":"rollback: {deleted, restored, kept}"},"id":{"description":"The transaction's id, e.g. txn-3","type":"string"},"irreversible":{"description":"Tools it accepted that a rollback cannot reach","items":{"description":"tool name","type":"string"},"type":"array"},"label":{"description":"What it is for","type":"string"},"notRestorable":{"description":"commit: {tools, files} a later undo will not reach"},"notRestored":{"description":"rollback: {tools, files} it could not put back"},"partial":{"description":"A call it accepted as irreversible is outside what it can roll back","type":"boolean"},"rollbackPoint":{"description":"The snapshot id it restores on rollback, or null"},"state":{"description":"open, committed, rolled-back, or none (status with nothing open)","enum":["open","committed","rolled-back","none"],"type":"string"}},"type":"object"}`
+
 ## world
 
 ### `world.list_recipes`: List world recipes
 
-MCP name `world_list_recipes`. Class `read`. Permissions: `read`. Since API 1. Flags: readOnly, idempotent.
+MCP name `world_list_recipes`. Class `read`. Permissions: `read`. Requires: nothing. Since API 1. Flags: readOnly, idempotent.
 
 The world recipes this session can reach, by name. A recipe is a seed, an extent, an asset library and a set of ecology weights; generating one fills a world with what the library allows. Read this before generating rather than guessing a name.
 
@@ -1048,7 +1114,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 ### `world.generate`: Generate a world
 
-MCP name `world_generate`. Class `structural`. Permissions: `read`. Since API 1. Flags: mutatesProject, destructive, undoable.
+MCP name `world_generate`. Class `structural`. Permissions: `read`. Requires: nothing. Since API 1. Flags: mutatesProject, destructive, undoable.
 
 Compose a world from a recipe and install it into the scene, replacing whatever ecology the terrain had. This is the same path as the Generate World button. Reports what was placed, which is the answer worth reading: a recipe whose library has nothing the weights ask for composes successfully and puts nothing in the world.
 

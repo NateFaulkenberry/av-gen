@@ -52,9 +52,10 @@ ai::ToolCall call(std::string id, std::string name, json args) {
 struct Session {
     app::Engine engine{app::EngineMode::Offline};
     app::JobSystem jobs{2};
-    ai::ControlPlane plane{engine, &jobs};
+    ai::ControlPlane plane;
 
-    Session() {
+    explicit Session(api::SessionOptions options = ai::studioSessionOptions())
+        : plane(engine, &jobs, std::move(options)) {
         // Tests must never write to a developer's real keychain.
         plane.setCredentialStore(std::make_unique<ai::MemoryCredentialStore>());
     }
@@ -390,7 +391,6 @@ TEST_CASE("Tools only ever run on the thread that pumps", "[integration][ai][thr
     // The §38 guarantee, asserted rather than asserted-about: a tool body that ran on the
     // orchestrator's worker would be a data race against the frame loop, so the queue is the only
     // path and this checks that nothing bypasses it.
-    Session s;
     const std::thread::id pumpThread = std::this_thread::get_id();
     std::atomic<bool> sawWrongThread{false};
 
@@ -407,7 +407,11 @@ TEST_CASE("Tools only ever run on the thread that pumps", "[integration][ai][thr
         }
         return ai::ToolResult::ok(json::object(), "probed");
     };
-    s.plane.tools().add(std::move(probe));
+    // ADR-2153: the registry is the session's and immutable once it exists, so the probe joins it at
+    // creation rather than being added afterwards.
+    api::SessionOptions options = ai::studioSessionOptions();
+    options.extraTools.push_back(std::move(probe));
+    Session s(std::move(options));
 
     s.script({
         turn("Probing.", {call("c1", "test.probe", json::object()),

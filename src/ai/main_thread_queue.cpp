@@ -146,6 +146,11 @@ void MainThreadQueue::shutdown() {
     done_.notify_all();
 }
 
+bool MainThreadQueue::running() const {
+    const std::lock_guard lock(mutex_);
+    return !stopped_;
+}
+
 std::size_t MainThreadQueue::pending() const {
     const std::lock_guard lock(mutex_);
     return queue_.size();

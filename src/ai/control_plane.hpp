@@ -3,9 +3,11 @@
 // The AI control plane (ADR-094): the one object the application owns, and the seam every other
 // part of AV Gen sees.
 //
-// It holds the tool registry, the provider registry, the credential store, the snapshot store, the
-// transaction sink, the main-thread queue and the current task -- and it makes the two guarantees
-// the brief cares most about:
+// It holds the provider registry, the credential store, the current task, and the `api::Session` the
+// assistant runs on (ADR-2153) -- with its host, whose queue is the only way into engine state. The
+// tool registry, the snapshot store and the transaction sink are the session's: Studio's assistant is
+// a client of the same Session an external client would use. It makes the two guarantees the brief
+// cares most about:
 //
 //   - **AI is optional.** Construct it with no provider configured and everything works: the panel
 //     says "AI assistant is not configured", the tool registry is fully populated and testable, a
@@ -26,6 +28,7 @@
 #include "ai/provider.hpp"
 #include "ai/tool_api.hpp"
 #include "ai/transaction.hpp"
+#include "api/session.hpp"
 
 #include <memory>
 #include <optional>
@@ -73,11 +76,16 @@ struct ProviderStatus {
     bool lastTestOk = false;
 };
 
+// What Studio's assistant runs as (ADR-2153): ClientKind::Studio, the open project's folder readable
+// and writable (owner decision 1), child processes allowed (the live profiler, as before), no other
+// roots. `Application::initControlPlane` adds the editor's read and write roots to this.
+[[nodiscard]] api::SessionOptions studioSessionOptions();
+
 class ControlPlane {
 public:
     // `jobs` may be null (a headless session or a test), in which case `submit()` refuses and a
-    // caller drives `runTaskBlocking` itself.
-    ControlPlane(app::Engine& engine, app::JobSystem* jobs);
+    // caller drives `runTaskBlocking` itself. `options` are the session's, fixed from here on.
+    ControlPlane(app::Engine& engine, app::JobSystem* jobs, api::SessionOptions options = studioSessionOptions());
     ~ControlPlane();
     ControlPlane(const ControlPlane&) = delete;
     ControlPlane& operator=(const ControlPlane&) = delete;
@@ -105,27 +113,26 @@ public:
     void setProvider(std::shared_ptr<Provider> provider);
 
     // ---- the tool surface ----------------------------------------------------------------------
-    [[nodiscard]] const ToolRegistry& tools() const { return tools_; }
-    [[nodiscard]] ToolRegistry& tools() { return tools_; }
-    [[nodiscard]] SnapshotStore& snapshots() { return snapshots_; }
+    // The session's registry: immutable, the same one every client of this session sees.
+    [[nodiscard]] const ToolRegistry& tools() const { return session_->tools(); }
+    [[nodiscard]] api::Session& session() { return *session_; }
+    [[nodiscard]] api::LocalHost& host() { return host_; }
+    [[nodiscard]] SnapshotStore& snapshots() { return session_->snapshots(); }
     // The undo seam. Replacing the default snapshot sink with one backed by the editor's undo
     // stack is the whole of the reconciliation §26 asks for.
     void setTransactionSink(TransactionSink* sink);
-    [[nodiscard]] TransactionSink& transactionSink() const { return *activeSink_; }
+    [[nodiscard]] TransactionSink& transactionSink() const { return session_->transactionSink(); }
 
-    void setPerformanceSource(PerformanceSource source);
+    // The host's hooks, installed into every call's context by the session.
+    void setPerformanceSource(PerformanceSource source) { host_.setPerformanceSource(std::move(source)); }
     // ADR-765: the host's recorder, for `director.record_plan`. Unset: the tool says it is unavailable.
-    void setRecordingHook(RecordingHook hook);
+    void setRecordingHook(RecordingHook hook) { host_.setRecordingHook(std::move(hook)); }
     // ADR-767: the host's watcher, for `director.watch_events`.
-    void setWatchHook(WatchHook hook);
+    void setWatchHook(WatchHook hook) { host_.setWatchHook(std::move(hook)); }
     // ADR-931: the host's evaluator, for `director.evaluate`. Unset: the tool says it is unavailable.
-    void setEvaluationHook(EvaluationHook hook);
+    void setEvaluationHook(EvaluationHook hook) { host_.setEvaluationHook(std::move(hook)); }
     // ADR-1106: the host's live profiler, for `performance.profile_scene`.
-    void setProfileHook(ProfileHook hook);
-    // Where projects live, for the project life-cycle tools.
-    void setProjectsRoot(std::filesystem::path root);
-    // Directories the assistant may read content from.
-    void setContentRoots(std::vector<std::filesystem::path> roots);
+    void setProfileHook(ProfileHook hook) { host_.setProfileHook(std::move(hook)); }
 
     // ---- running a task -------------------------------------------------------------------------
     // Submits to the job system and returns immediately. Null when a task is already running or
@@ -162,13 +169,12 @@ public:
 
 private:
     app::JobSystem* jobs_;
-    ToolRegistry tools_;
     ProviderRegistry providerRegistry_;
     std::unique_ptr<CredentialStore> credentials_;
-    SnapshotStore snapshots_;
-    std::unique_ptr<SnapshotTransactionSink> defaultSink_;
-    TransactionSink* activeSink_ = nullptr;
-    MainThreadQueue queue_;
+    // Declared in this order: the host owns the queue the session marshals onto, and the orchestrator
+    // is a client of the session. Destroyed the other way round.
+    api::LocalHost host_;
+    std::unique_ptr<api::Session> session_;
     Orchestrator orchestrator_;
     AiSettings settings_;
     std::string unconfiguredReason_ = "no provider configured";

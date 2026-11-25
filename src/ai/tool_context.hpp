@@ -17,6 +17,7 @@
 //     A tool that reports the value it was asked for rather than the value that landed is how a
 //     clamp, an automated override or a Replace-mode route becomes invisible.
 
+#include "api/path_policy.hpp"
 #include "core/error.hpp"
 
 #include <atomic>
@@ -39,7 +40,13 @@ namespace avgen::app {
 class Engine;
 } // namespace avgen::app
 
+namespace avgen::api {
+class Session;
+} // namespace avgen::api
+
 namespace avgen::ai {
+
+class SnapshotStore;
 
 // ---- cancellation (§28) -------------------------------------------------------------------------
 
@@ -205,48 +212,59 @@ public:
     void setCancelToken(CancelToken token) { cancel_ = std::move(token); }
     [[nodiscard]] bool cancelled() const { return cancel_.cancelled(); }
 
-    // Where projects live. Supplied by the host rather than derived here, for two reasons: this
-    // file is in `avgen_core` and the real answer comes from SDL's preferences directory, which is
-    // in the platform layer; and a test needs to point it at a temporary directory.
-    //
-    // It exists at all because a tool that took a path would let an agent write anywhere on the
-    // machine. The project tools take a *name* and resolve it under this root, so the blast radius
-    // of a bad argument is one directory the user already owns.
-    void setProjectsRoot(std::filesystem::path root) { projectsRoot_ = std::move(root); }
-    [[nodiscard]] const std::filesystem::path& projectsRoot() const { return projectsRoot_; }
-    [[nodiscard]] bool hasProjectsRoot() const { return !projectsRoot_.empty(); }
+    // ADR-2153: where a client-supplied path may resolve, and the one way it is resolved. Set by the
+    // session from its fixed permissions; a context nobody configured refuses every path, which is the
+    // honest answer for a caller that was never told where it may read or write. Tools never resolve a
+    // path themselves: `paths().forRead` / `forWrite`, so every tool refuses with the same codes and a
+    // relative path means the same folder in every one of them.
+    void setPaths(api::PathPolicy policy) { paths_ = std::move(policy); }
+    [[nodiscard]] const api::PathPolicy& paths() const { return paths_; }
 
-    // Directories the assistant may *read* content from: the example and recipe folders, the open
-    // project's own folder, and wherever the host decides a person keeps files they might import.
-    //
-    // Reading is not writing, and the two get different answers on purpose. `projectsRoot()` is one
-    // directory the tools write into; these are several the tools read from, and a path that is not
-    // under one of them is refused. Without this an `import` tool would be an arbitrary-file-read
-    // primitive handed to a language model.
-    void setContentRoots(std::vector<std::filesystem::path> roots) { contentRoots_ = std::move(roots); }
-    [[nodiscard]] const std::vector<std::filesystem::path>& contentRoots() const { return contentRoots_; }
+    // The session this call runs in (null for a bare context, as in a test that drives the registry
+    // directly). The session tools (`session.*`, `transaction.*`) need it; engine tools do not.
+    void setSession(api::Session* session) { session_ = session; }
+    [[nodiscard]] api::Session* session() const { return session_; }
 
-    // Resolves `path` against the content roots, or nothing when it escapes all of them. Symlinks
-    // and `..` are resolved *before* the check (`weakly_canonical`), because a prefix test on an
-    // unresolved path is not a containment test -- "<root>/../../etc/passwd" starts with the root.
-    [[nodiscard]] std::optional<std::filesystem::path> resolveContent(const std::filesystem::path& path) const {
-        std::error_code ec;
-        const std::filesystem::path full = std::filesystem::weakly_canonical(path, ec);
-        if (ec) {
-            return std::nullopt;
-        }
-        for (const std::filesystem::path& root : contentRoots_) {
-            const std::filesystem::path base = std::filesystem::weakly_canonical(root, ec);
-            if (ec) {
-                continue;
-            }
-            const auto rel = full.lexically_relative(base);
-            if (!rel.empty() && *rel.begin() != "..") {
-                return full;
-            }
-        }
-        return std::nullopt;
+    // The session's own rollback points (`project.create_snapshot` and friends). Per session since
+    // ADR-2153: two sessions never see each other's ids. Null when nobody provided one; the snapshot
+    // tools then refuse with FailedPrecondition rather than keep a process-wide store.
+    void setSnapshots(SnapshotStore* store) { snapshots_ = store; }
+    [[nodiscard]] SnapshotStore* snapshots() const { return snapshots_; }
+
+    // ---- files a call wrote (ADR-2153, the compensation log) --------------------------------------
+    // A tool that writes a file says so here; the session decides what a rollback does about it. A
+    // tool never deletes its own partial output on failure any more -- the session does, by the same
+    // rules for every tool (api/compensation.hpp).
+    enum class FileRole : std::uint8_t {
+        ProjectAsset,    // a copy made into the project (an import): a rollback may delete it
+        ProjectDocument, // a small file the project keeps (the asset manifest)
+        RenderOutput,    // an artefact: a rollback never deletes it
+    };
+    struct FileEvent {
+        enum class Kind : std::uint8_t {
+            Created,     // did not exist before the call
+            Replaced,    // existed; `previous` holds its bytes, so a rollback can put them back
+            Overwritten, // existed; its previous bytes were not kept (a rollback cannot restore it)
+            Used,        // an existing file the call now depends on (a duplicate import, a node's model)
+        };
+        Kind kind = Kind::Created;
+        std::filesystem::path path;
+        FileRole role = FileRole::ProjectAsset;
+        std::string previous;
+    };
+    void noteCreatedFile(std::filesystem::path path, FileRole role = FileRole::ProjectAsset) {
+        files_.push_back(FileEvent{FileEvent::Kind::Created, std::move(path), role, {}});
     }
+    void noteReplacedFile(std::filesystem::path path, std::string previous, FileRole role = FileRole::ProjectDocument) {
+        files_.push_back(FileEvent{FileEvent::Kind::Replaced, std::move(path), role, std::move(previous)});
+    }
+    void noteOverwrittenFile(std::filesystem::path path, FileRole role = FileRole::ProjectAsset) {
+        files_.push_back(FileEvent{FileEvent::Kind::Overwritten, std::move(path), role, {}});
+    }
+    void noteUsedFile(std::filesystem::path path) {
+        files_.push_back(FileEvent{FileEvent::Kind::Used, std::move(path), FileRole::ProjectAsset, {}});
+    }
+    [[nodiscard]] const std::vector<FileEvent>& files() const { return files_; }
 
     void setPerformanceSource(PerformanceSource source) { performance_ = std::move(source); }
 
@@ -306,8 +324,10 @@ public:
 private:
     app::Engine* engine_ = nullptr;
     CancelToken cancel_;
-    std::filesystem::path projectsRoot_;
-    std::vector<std::filesystem::path> contentRoots_;
+    api::PathPolicy paths_;
+    api::Session* session_ = nullptr;
+    SnapshotStore* snapshots_ = nullptr;
+    std::vector<FileEvent> files_;
     PerformanceSource performance_;
     RecordingHook recordingHook_;
     std::shared_ptr<RecordingHandle> deferred_;

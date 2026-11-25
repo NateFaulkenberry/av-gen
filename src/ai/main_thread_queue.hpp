@@ -80,7 +80,7 @@ public:
     void shutdown();
 
     [[nodiscard]] std::size_t pending() const;
-    [[nodiscard]] bool running() const { return !stopped_; }
+    [[nodiscard]] bool running() const; // guarded: a session asks it from whichever thread closes it
 
 private:
     struct Item {

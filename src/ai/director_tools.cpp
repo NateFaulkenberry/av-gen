@@ -330,6 +330,7 @@ void registerDirectorTools(ToolRegistry& registry) {
     ToolAnnotations records = proposes;
     records.deterministic = false; // what the characters do while recorded is theirs
     records.executionClass = ExecutionClass::Job; // plays the project from zero on a scratch copy
+    records.requirements = {"recording"};         // ADR-2153: the host's recorder
     add(registry, "director.record_plan", "Record a plan's live performances",
         "Bake a plan whose performances are live (mode goal): play the project from zero on a scratch "
         "copy, keep what each character actually did and when its events happened, check the recording "
@@ -376,7 +377,12 @@ void registerDirectorTools(ToolRegistry& registry) {
         "who, \"occurrence\": n}: the observation is attached to it for you. Takes seconds.",
         schema::object({{"untilSeconds", {{"type", "number"}, {"description", "how far to watch; default: the whole piece, at most 240 s"}}}},
                        {}),
-        inspect(), [](const json& args, ToolContext& ctx) -> ToolResult {
+        [] {
+            ToolAnnotations a = inspect();
+            a.requirements = {"watch"}; // ADR-2153: the host's watcher
+            return a;
+        }(),
+        [](const json& args, ToolContext& ctx) -> ToolResult {
             if (!ctx.watchHook()) {
                 return ToolResult::failure(ToolErrorCode::Unavailable,
                                            "watching is not available in this session (the host installed no watcher)");
@@ -402,6 +408,7 @@ void registerDirectorTools(ToolRegistry& registry) {
     evaluates.idempotent = false;
     evaluates.executionClass = ExecutionClass::Job;
     evaluates.permissions = {"subprocess"}; // the render and the Critic run as child processes (ADR-931)
+    evaluates.requirements = {"evaluation"}; // ADR-2153: the host's evaluator
     add(registry, "director.evaluate", "Evaluate a plan with the quality evaluator",
         "Render a span of the film with a plan in it -- a candidate you have not proposed (\"plan\"), or a "
         "revision the project already holds (\"planId\") -- on a scratch copy, and ask the Creative Critic "

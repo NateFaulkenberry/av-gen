@@ -53,6 +53,10 @@ enum class ToolErrorCode : std::uint8_t {
     Conflict,         // the change would be overwritten by automation or a route, or a name collides
     Cancelled,
     Internal,
+    // ADR-2153 (the Session). Appended, so the earlier values keep their numbers.
+    PermissionDenied,   // the session's permissions forbid it: a path outside the roots, a write it may not make
+    FailedPrecondition, // the session is not in the state this needs: no project, a transaction already open
+    Busy,               // valid, but not now: refused while a live show runs; `details.retryAfterMs` when known
 };
 [[nodiscard]] const char* toolErrorCodeName(ToolErrorCode code);
 // One sentence per code: what it means and what a client should do about it. Published in the
@@ -63,7 +67,8 @@ enum class ToolErrorCode : std::uint8_t {
 inline constexpr ToolErrorCode kAllToolErrorCodes[] = {
     ToolErrorCode::InvalidArguments, ToolErrorCode::NotFound,    ToolErrorCode::OutOfRange,
     ToolErrorCode::Unsupported,      ToolErrorCode::Unavailable, ToolErrorCode::Conflict,
-    ToolErrorCode::Cancelled,        ToolErrorCode::Internal,
+    ToolErrorCode::Cancelled,        ToolErrorCode::Internal,    ToolErrorCode::PermissionDenied,
+    ToolErrorCode::FailedPrecondition, ToolErrorCode::Busy,
 };
 
 struct ToolError {
@@ -72,6 +77,10 @@ struct ToolError {
     // What the caller could do instead. Not decoration: this is the difference between an agent
     // that recovers and one that repeats the same failing call.
     std::string recovery;
+    // ADR-2153: null, or an object with whichever of these apply -- `pointer` (a JSON pointer into the
+    // arguments or a document), `path` (a file the call named), `field`, `findings` (an array) and
+    // `retryAfterMs` (a Busy refusal that knows when to come back).
+    nlohmann::json details;
 };
 
 struct ToolResult {
@@ -82,7 +91,8 @@ struct ToolResult {
 
     [[nodiscard]] static ToolResult ok(nlohmann::json value, std::string summary = {});
     [[nodiscard]] static ToolResult failure(ToolErrorCode code, std::string message,
-                                            std::string recovery = {});
+                                            std::string recovery = {}, nlohmann::json details = nullptr);
+    [[nodiscard]] static ToolResult failure(ToolError error);
     // The form the model sees. Compact on purpose (§39): no pretty printing, no echoed arguments.
     [[nodiscard]] nlohmann::json toJson() const;
 };
@@ -102,6 +112,12 @@ enum class ExecutionClass : std::uint8_t { Read, Instant, Rebind, Structural, Se
 // "write" (writes files), "subprocess" (starts a child process), "gpu" (starts GPU work).
 inline constexpr std::string_view kToolPermissions[] = {"read", "write", "subprocess", "gpu"};
 
+// What the HOST must provide before a tool can do anything useful (ADR-2153): a composition loaded, or
+// one of the hooks a host installs (`ToolContext::setPerformanceSource`, the recording, watch, evaluation
+// and profile hooks). A closed vocabulary, checked at registration. It is what lets a session answer
+// "available" per tool from what is actually installed, rather than inferring it from "supported".
+inline constexpr std::string_view kToolRequirements[] = {"composition", "performance", "recording",
+                                                         "watch",       "evaluation",  "profile"};
 struct ToolAnnotations {
     bool readOnly = false;
     bool mutatesProject = false;
@@ -133,6 +149,7 @@ struct ToolAnnotations {
     // Unset means derived; see ExecutionClass. Set only for the stated exceptions.
     std::optional<ExecutionClass> executionClass;
     std::vector<std::string> permissions; // from kToolPermissions; empty: none beyond calling
+    std::vector<std::string> requirements; // from kToolRequirements; empty: works in any host (ADR-2153)
 
     [[nodiscard]] ExecutionClass effectiveExecutionClass() const;
     [[nodiscard]] nlohmann::json toJson() const;
@@ -183,6 +200,13 @@ public:
     // throws must not take the orchestrator's worker thread with it.
     [[nodiscard]] ToolResult invoke(std::string_view name, const nlohmann::json& args,
                                     ToolContext& ctx) const;
+    // The body alone, for a caller that has already validated `args` against `tool`'s schema on its
+    // own thread (`api::Session::call`, ADR-2153). A throw still comes back as `Internal`.
+    [[nodiscard]] static ToolResult run(const Tool& tool, const nlohmann::json& args, ToolContext& ctx);
+    // The refusal `invoke` gives for an unknown name or an argument that does not match the schema;
+    // empty when the call may run. Pure: safe on any thread.
+    [[nodiscard]] static std::optional<ToolError> checkArguments(const Tool& tool, const nlohmann::json& args);
+    [[nodiscard]] static ToolError unknownTool(std::string_view name);
 
 private:
     std::vector<Tool> tools_;

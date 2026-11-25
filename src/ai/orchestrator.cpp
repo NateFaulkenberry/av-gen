@@ -3,6 +3,7 @@
 #include "ai/director_tools.hpp"
 #include "directing/compiler.hpp"
 
+#include "api/session.hpp"
 #include "app/engine.hpp"
 #include "core/log.hpp"
 
@@ -145,67 +146,54 @@ void AgentTask::finish(TaskOutcome outcome) {
 
 // ---- Orchestrator ----------------------------------------------------------------------------------
 
-Orchestrator::Orchestrator(app::Engine& engine, const ToolRegistry& tools, MainThreadQueue& queue)
-    : engine_(&engine), tools_(&tools), queue_(&queue) {}
+Orchestrator::Orchestrator(api::Session& session) : session_(&session) {}
 
-ToolResult Orchestrator::invokeOnMainThread(const ToolCall& call, AgentTask& task,
-                                            ChangeLog& changes) {
-    ToolResult result;
-    std::shared_ptr<RecordingHandle> deferred;
-    std::shared_ptr<DeferredResult> answer;
-    const bool ran = queue_->run(
-        [&] {
-            ToolContext ctx(*engine_);
-            ctx.setCancelToken(task.cancel());
-            if (!projectsRoot_.empty()) {
-                ctx.setProjectsRoot(projectsRoot_);
-            }
-            if (!contentRoots_.empty()) {
-                ctx.setContentRoots(contentRoots_);
-            }
-            if (performance_) {
-                ctx.setPerformanceSource(performance_);
-            }
-            if (recordingHook_) {
-                ctx.setRecordingHook(recordingHook_);
-            }
-            if (watchHook_) {
-                ctx.setWatchHook(watchHook_);
-            }
-            if (evaluationHook_) {
-                ctx.setEvaluationHook(evaluationHook_);
-            }
-            if (profileHook_) {
-                ctx.setProfileHook(profileHook_); // ADR-1106
-            }
-            ctx.setObservation(task.observation());
-            ctx.onProgress = [&task, &call](float fraction, const std::string& note) {
-                Activity a;
-                a.kind = ActivityKind::ToolProgress;
-                a.title = call.name;
-                a.detail = note;
-                a.progress = fraction;
-                task.append(std::move(a));
-            };
-            result = tools_->invoke(call.name, call.arguments, ctx);
-            // The change log is merged out here rather than inside the tool, so a tool body never
-            // has to know it is running inside a transaction.
-            for (const ChangeRecord& record : ctx.changes().records()) {
-                changes.note(record.target, record.detail, record.clamped);
-            }
-            if (ctx.proposal()) {
-                task.setProposal(*ctx.proposal());
-            }
-            deferred = ctx.deferredProposal();
-            answer = ctx.deferredResult();
-        },
-        task.cancel());
-    if (!ran) {
+ToolResult Orchestrator::invoke(const ToolCall& call, AgentTask& task, ChangeLog& changes,
+                                const std::string& transaction) {
+    // The task owns its transaction (ADR-2153). A model that tried to open, close or abandon it would
+    // take the task's rollback away from it, so those tools are refused here rather than passed on.
+    if (call.name.rfind("transaction.", 0) == 0) {
+        return ToolResult::failure(ToolErrorCode::FailedPrecondition,
+                                   fmt::format("'{}' is not available to the assistant: its task already runs in "
+                                               "one transaction",
+                                               call.name),
+                                   "make the changes; the task commits or rolls them back as one");
+    }
+    api::CallOptions options;
+    options.cancel = task.cancel();
+    if (!transaction.empty()) {
+        options.transaction = transaction;
+    }
+    // A task has always been able to mix an undoable edit with a save or an import. It still can; the
+    // transaction is marked partial and says what its rollback cannot reach.
+    options.irreversible = api::Irreversible::Accept;
+    options.onProgress = [&task, &call](float fraction, const std::string& note) {
+        Activity a;
+        a.kind = ActivityKind::ToolProgress;
+        a.title = call.name;
+        a.detail = note;
+        a.progress = fraction;
+        task.append(std::move(a));
+    };
+    api::CallArtifacts artifacts;
+    artifacts.observation = task.observation();
+    const api::CallResult called = session_->call(call.name, call.arguments, options, &artifacts);
+    if (!called.success && called.error && called.error->code == ToolErrorCode::Cancelled) {
         return ToolResult::failure(ToolErrorCode::Cancelled,
-                                   fmt::format("'{}' did not run: the task was cancelled or the "
-                                               "application did not service it in time",
+                                   fmt::format("'{}' did not run: the task was cancelled or the application did not "
+                                               "service it in time",
                                                call.name));
     }
+    // The change log is merged out here rather than inside the tool, so a tool body never has to know
+    // it is running inside a transaction.
+    for (const ChangeRecord& record : called.changes) {
+        changes.note(record.target, record.detail, record.clamped);
+    }
+    if (artifacts.proposal) {
+        task.setProposal(*artifacts.proposal);
+    }
+    const std::shared_ptr<RecordingHandle>& deferred = artifacts.deferredProposal;
+    const std::shared_ptr<DeferredResult>& answer = artifacts.deferredResult;
     if (answer) {
         // ADR-767: the tool started work that answers (a watch). Waited for here, off the main thread.
         std::string last;
@@ -228,7 +216,7 @@ ToolResult Orchestrator::invokeOnMainThread(const ToolCall& call, AgentTask& tas
             return ToolResult::failure(ToolErrorCode::Internal, value.error().message);
         }
         // ADR-931: what the answer means for the project (an evaluation is kept), on the main thread.
-        (void)queue_->run([&] { answer->settle(*engine_, *value); }, CancelToken{});
+        (void)session_->onHost([&](app::Engine& engine) { answer->settle(engine, *value); });
         if (value->contains("observation")) {
             task.setObservation((*value)["observation"]);
         }
@@ -261,7 +249,7 @@ ToolResult Orchestrator::invokeOnMainThread(const ToolCall& call, AgentTask& tas
             return ToolResult::failure(ToolErrorCode::Internal, "recording failed: " + plan.error().message);
         }
         std::optional<Result<ToolContext::Proposal>> proposed;
-        (void)queue_->run([&] { proposed = proposalFor(*engine_, *plan); }, CancelToken{});
+        (void)session_->onHost([&](app::Engine& engine) { proposed = proposalFor(engine, *plan); });
         if (!proposed || !*proposed) {
             return ToolResult::failure(ToolErrorCode::Internal,
                                        proposed ? "the recording cannot be proposed: " + proposed->error().message
@@ -272,7 +260,7 @@ ToolResult Orchestrator::invokeOnMainThread(const ToolCall& call, AgentTask& tas
                            {"diff", (*proposed)->diff}};
         return ToolResult::ok(out, fmt::format("recorded '{}'; proposed for approval", (*proposed)->planId));
     }
-    return result;
+    return called.toToolResult();
 }
 
 void Orchestrator::run(AgentTask& task) {
@@ -310,78 +298,74 @@ void Orchestrator::run(AgentTask& task) {
 
     // Context, gathered on the main thread because it reads engine state (§38).
     nlohmann::json ambient = nlohmann::json::object();
-    const bool gathered = queue_->run([&] { ambient = ambientContext(*engine_); }, task.cancel());
+    const bool gathered = session_->onHost([&](app::Engine& engine) { ambient = ambientContext(engine); }, task.cancel());
     if (!gathered) {
         fail("cancelled before the task started", true);
         return;
     }
 
+    const ToolRegistry& tools = session_->tools();
     CompletionRequest request;
     request.model = model_;
-    request.system = systemPrompt(*tools_);
+    request.system = systemPrompt(tools);
     request.temperature = temperature_;
     request.cancel = task.cancel();
-    request.tools.reserve(tools_->size());
-    for (const Tool* tool : tools_->all()) {
+    request.tools.reserve(tools.size());
+    for (const Tool* tool : tools.all()) {
         request.tools.push_back(&tool->definition);
     }
     request.messages.push_back(Message::user(composeUserTurn(
         task.briefing().empty() ? task.prompt() : task.prompt() + "\n\n" + task.briefing(), ambient)));
 
-    // The transaction opens lazily, on the first tool that says it mutates the project. An
-    // inspection-only task should cost nothing, and a snapshot taken for one would be noise in the
-    // rollback list.
-    std::unique_ptr<Transaction> transaction;
+    // The transaction opens lazily, on the first tool that says it mutates the project: the session's
+    // `transaction.begin`, captured on the host thread like every call. An inspection-only task costs
+    // nothing, and a snapshot taken for one would be noise in the rollback list.
+    std::string transaction;
     ChangeLog changes;
-    nlohmann::json before;
     const auto openTransaction = [&] {
-        if (transaction || sink_ == nullptr || !sink_->available()) {
+        if (!transaction.empty()) {
             return;
         }
-        // Captured before the sink opens, so the diff is measured against the same instant the
-        // rollback point is -- and both on the thread that pumps. The sink reads the whole engine
-        // (a snapshot; since ADR-752 every domain `EditCapture` measures), and a sink opened from
-        // this worker would read it while the frame loop writes it.
-        (void)queue_->run(
-            [&] {
-                before = SnapshotStore::captureDocument(*engine_);
-                transaction = std::make_unique<Transaction>(*sink_, task.prompt());
-            },
-            task.cancel());
-        if (!transaction) {
-            return; // cancelled or the queue shut down before it opened; no tool will run either
+        api::CallOptions options;
+        options.cancel = task.cancel();
+        const api::CallResult begun = session_->call("transaction.begin", nlohmann::json{{"label", task.prompt()}}, options);
+        if (!begun.success) {
+            // Cancelled or the host stopped before it opened (no tool will run either), or the session has
+            // no way to roll back -- the task then runs without one, as it always has.
+            if (begun.error && begun.error->code != ToolErrorCode::Cancelled) {
+                log::warn("ai: {} runs without a transaction: {}", task.id(), begun.summary);
+            }
+            return;
+        }
+        transaction = begun.result.at("id").get<std::string>();
+        if (const auto point = begun.result.find("rollbackPoint"); point != begun.result.end() && point->is_string()) {
+            outcome.snapshotId = point->get<std::string>();
         }
         Activity a;
         a.kind = ActivityKind::TransactionOpened;
         a.title = "Rollback point taken";
-        a.detail = std::string(sink_->kind());
+        a.detail = begun.result.value("backedBy", std::string{});
         task.append(std::move(a));
     };
 
-    // Commit or roll back on the pumping thread, for the reason the open is there. A FRESH cancel
-    // token, deliberately: a cancelled task is exactly the one whose rollback must still run, and
-    // the task's own token would make the queue refuse it. If the queue is already shut down the
-    // application is tearing the engine down; touching it from here would be the race this exists
-    // to prevent, so the transaction is abandoned instead and says so.
-    const auto closeOnMainThread = [&](bool commit) {
-        if (!transaction || !transaction->open()) {
-            return;
+    // Commit or roll back on the host thread, through the session. A FRESH cancel token, deliberately: a
+    // cancelled task is exactly the one whose rollback must still run, and the task's own token would make
+    // the queue refuse it. If the host has stopped servicing calls, the application is tearing the engine
+    // down; the session abandons the transaction when it closes rather than touch the engine from here.
+    const auto closeTransaction = [&](bool commit) -> nlohmann::json {
+        if (transaction.empty()) {
+            return nullptr;
         }
-        const bool ran = queue_->run(
-            [&] {
-                if (commit) {
-                    transaction->commit();
-                    outcome.editState = sink_->committedEditState();
-                } else {
-                    transaction->rollback();
-                }
-            },
-            CancelToken{});
-        if (!ran) {
-            log::warn("ai: {} could not {} its transaction: the application stopped servicing it",
-                      task.id(), commit ? "commit" : "roll back");
-            transaction->abandon();
+        const api::CallResult closed =
+            session_->call(commit ? "transaction.commit" : "transaction.rollback", nlohmann::json{{"id", transaction}});
+        if (!closed.success) {
+            log::warn("ai: {} could not {} its transaction: {}", task.id(), commit ? "commit" : "roll back",
+                      closed.summary);
+            transaction.clear();
+            return nullptr;
         }
+        transaction.clear();
+        return closed.result;
     };
 
     std::string finalText;
@@ -409,8 +393,8 @@ void Orchestrator::run(AgentTask& task) {
         auto response = provider_->complete(request);
         if (!response) {
             task.setState(TaskState::RollingBack);
-            if (transaction) {
-                closeOnMainThread(false);
+            if (!transaction.empty()) {
+                (void)closeTransaction(false);
                 outcome.rolledBack = true;
                 Activity a;
                 a.kind = ActivityKind::TransactionRolledBack;
@@ -467,7 +451,7 @@ void Orchestrator::run(AgentTask& task) {
                 task.append(std::move(a));
                 break;
             }
-            const Tool* definition = tools_->find(call.name);
+            const Tool* definition = tools.find(call.name);
             if (definition != nullptr && definition->definition.annotations.mutatesProject) {
                 openTransaction();
             }
@@ -481,7 +465,7 @@ void Orchestrator::run(AgentTask& task) {
                 task.append(std::move(a));
             }
             const auto callBegan = std::chrono::steady_clock::now();
-            ToolResult result = invokeOnMainThread(call, task, changes);
+            ToolResult result = invoke(call, task, changes, transaction);
             const double durationMs =
                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() -
                                                           callBegan)
@@ -514,8 +498,8 @@ void Orchestrator::run(AgentTask& task) {
 
     if (task.cancel().cancelled()) {
         task.setState(TaskState::RollingBack);
-        if (transaction) {
-            closeOnMainThread(false);
+        if (!transaction.empty()) {
+            (void)closeTransaction(false);
             outcome.rolledBack = true;
             Activity a;
             a.kind = ActivityKind::TransactionRolledBack;
@@ -528,21 +512,16 @@ void Orchestrator::run(AgentTask& task) {
         return;
     }
 
-    // §18 and §33: read the resulting state back rather than trusting the tool reports. This is
-    // the diff between the snapshot taken at the start and the project now, which is also how "73
+    // §18 and §33: read the resulting state back rather than trusting the tool reports. The commit
+    // measures the diff between the document at begin and the project now, which is also how "73
     // underlying modifications" becomes a sentence a person can read.
     task.setState(TaskState::Validating);
-    if (transaction) {
-        (void)queue_->run(
-            [&] {
-                const nlohmann::json after = SnapshotStore::captureDocument(*engine_);
-                outcome.changedTargets = SnapshotStore::changedParameters(before, after);
-            },
-            task.cancel());
-        if (auto* snapshotSink = dynamic_cast<SnapshotTransactionSink*>(sink_)) {
-            outcome.snapshotId = snapshotSink->openSnapshotId();
+    if (!transaction.empty()) {
+        const nlohmann::json committed = closeTransaction(true);
+        if (committed.is_object()) {
+            outcome.changedTargets = committed.value("changedTargets", std::vector<std::string>{});
+            outcome.editState = committed.value("editState", std::uint64_t{0});
         }
-        closeOnMainThread(true);
         Activity a;
         a.kind = ActivityKind::TransactionCommitted;
         a.title = "Committed";
@@ -590,22 +569,29 @@ bool Orchestrator::approve(AgentTask& task) {
     TaskOutcome outcome = task.outcome();
     task.setState(TaskState::Committing);
     // One transaction: the history sink makes the install one undo, labelled with the request; the
-    // snapshot underneath makes a failed commit leave nothing behind.
-    std::unique_ptr<Transaction> transaction;
-    if (sink_ != nullptr && sink_->available()) {
-        transaction = std::make_unique<Transaction>(*sink_, task.prompt());
+    // snapshot underneath makes a failed commit leave nothing behind. The session's own, opened and
+    // closed here on the host thread (the calls run inline).
+    std::string transaction;
+    if (const api::CallResult begun = session_->call("transaction.begin", nlohmann::json{{"label", task.prompt()}});
+        begun.success) {
+        transaction = begun.result.at("id").get<std::string>();
     }
-    auto committed = proposal ? commitProposal(*engine_, *proposal)
-                              : Result<CommitReport>(std::unexpected(Error{"there is no proposal to approve"}));
+    std::optional<Result<CommitReport>> committed;
+    if (!session_->onHost([&](app::Engine& engine) {
+            committed = proposal ? commitProposal(engine, *proposal)
+                                 : Result<CommitReport>(std::unexpected(Error{"there is no proposal to approve"}));
+        })) {
+        committed = Result<CommitReport>(std::unexpected(Error{"the application did not service the approval"}));
+    }
     Activity a;
-    a.kind = committed ? ActivityKind::TransactionCommitted : ActivityKind::TransactionRolledBack;
-    if (!committed) {
-        if (transaction) {
-            transaction->rollback();
+    a.kind = *committed ? ActivityKind::TransactionCommitted : ActivityKind::TransactionRolledBack;
+    if (!*committed) {
+        if (!transaction.empty()) {
+            (void)session_->call("transaction.rollback", nlohmann::json{{"id", transaction}});
             outcome.rolledBack = true;
         }
         outcome.success = false;
-        outcome.error = committed.error().message;
+        outcome.error = committed->error().message;
         a.title = "Not applied";
         a.detail = outcome.error;
         a.success = false;
@@ -613,15 +599,17 @@ bool Orchestrator::approve(AgentTask& task) {
         task.finish(std::move(outcome));
         return true;
     }
-    if (transaction) {
-        transaction->commit();
-        outcome.editState = sink_->committedEditState();
+    if (!transaction.empty()) {
+        const api::CallResult closed = session_->call("transaction.commit", nlohmann::json{{"id", transaction}});
+        if (closed.success) {
+            outcome.editState = closed.result.value("editState", std::uint64_t{0});
+        }
     }
     outcome.success = true;
     outcome.error.clear();
     a.title = "Applied";
-    a.detail = fmt::format("plan '{}' revision {}: {} piece(s) of content, verified", committed->planId,
-                           committed->revision, committed->produced);
+    a.detail = fmt::format("plan '{}' revision {}: {} piece(s) of content, verified", (*committed)->planId,
+                           (*committed)->revision, (*committed)->produced);
     task.append(std::move(a));
     task.finish(std::move(outcome));
     return true;

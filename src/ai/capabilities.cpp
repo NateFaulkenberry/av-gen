@@ -54,6 +54,15 @@ const std::vector<DomainCapability> kDomains = {
     {"project", "Project and rollback",
      "Project state, and snapshots of the parameter domain used as the transaction primitive.",
      true, {}},
+    // ADR-2153: the Session's own tools.
+    {"session", "The session",
+     "Who this session is and what it may do: the client, its permissions, the versions, the project's state, "
+     "the open transaction, and per tool whether it is supported, available in this host and permitted.",
+     true, {}},
+    {"transaction", "Transactions",
+     "Explicit transactions: begin, commit (one undo in Studio), roll back (the project document and the files "
+     "its calls created), status. Irreversible calls inside one are refused unless accepted.",
+     true, {}},
 
     // ---- what this build deliberately does not expose -------------------------------------------
     // ADR-2152 (C3): the old text said node creation and deletion were not exposed because a rollback

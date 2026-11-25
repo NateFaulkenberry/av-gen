@@ -22,6 +22,12 @@
 //
 // ## Transactions and the loop
 //
+// The orchestrator is a client of `api::Session` like any other (ADR-2153): every tool call is
+// `session.call`, and the task's transaction is the session's explicit transaction --
+// `transaction.begin` on the first mutating tool, `transaction.commit` or `transaction.rollback` at
+// the end. Its calls pass `Irreversible::Accept`, because an assistant task has always been able to mix
+// a parameter edit with a save or an import; the transaction is then partial, and says so.
+//
 // One transaction per task, opened before the first tool that mutates anything and closed once.
 // Not one per tool call: the user asked for one thing, and undoing "make the scene cinematic"
 // halfway is not an outcome anybody wants. It is opened lazily so a purely inspective task ("what
@@ -55,6 +61,10 @@
 namespace avgen::app {
 class Engine;
 } // namespace avgen::app
+
+namespace avgen::api {
+class Session;
+} // namespace avgen::api
 
 namespace avgen::ai {
 
@@ -212,32 +222,23 @@ private:
 
 class Orchestrator {
 public:
-    Orchestrator(app::Engine& engine, const ToolRegistry& tools, MainThreadQueue& queue);
+    // Every engine access goes through `session`: tool calls through `call`, the ambient context and
+    // the approval install through `onHost`.
+    explicit Orchestrator(api::Session& session);
 
     void setProvider(std::shared_ptr<Provider> provider) { provider_ = std::move(provider); }
     [[nodiscard]] const std::shared_ptr<Provider>& provider() const { return provider_; }
-    void setTransactionSink(TransactionSink* sink) { sink_ = sink; }
-    void setPerformanceSource(PerformanceSource source) { performance_ = std::move(source); }
-    void setRecordingHook(RecordingHook hook) { recordingHook_ = std::move(hook); }
-    void setWatchHook(WatchHook hook) { watchHook_ = std::move(hook); }
-    void setEvaluationHook(EvaluationHook hook) { evaluationHook_ = std::move(hook); } // ADR-931
-    void setProfileHook(ProfileHook hook) { profileHook_ = std::move(hook); }          // ADR-1106
-    // Where `project.create` / `open` / `save_as` resolve a name. Empty means those tools refuse,
-    // which is the right default: a session that never says where projects live should not have
-    // one guessed for it.
-    void setProjectsRoot(std::filesystem::path root) { projectsRoot_ = std::move(root); }
-    void setContentRoots(std::vector<std::filesystem::path> roots) { contentRoots_ = std::move(roots); }
     void setLimits(TaskLimits limits) { limits_ = limits; }
     [[nodiscard]] const TaskLimits& limits() const { return limits_; }
     void setModel(std::string model) { model_ = std::move(model); }
     void setTemperature(double temperature) { temperature_ = temperature; }
 
     // Runs a whole task on the calling thread, to completion or to `AwaitingApproval`. **Worker
-    // threads only** -- it blocks on the network and on the main-thread queue. `task` is written
+    // threads only** -- it blocks on the network and on the host thread's queue. `task` is written
     // throughout so a UI can watch.
     void run(AgentTask& task);
 
-    // The person's decision on a task in `AwaitingApproval`. **Main thread only**: approving
+    // The person's decision on a task in `AwaitingApproval`. **Main (host) thread only**: approving
     // installs the plan's content, which is the engine's to change. Approving re-compiles the plan
     // against the project as it is NOW and refuses if the result differs from what was shown (the
     // project changed underneath the proposal); otherwise it installs it inside one transaction --
@@ -248,21 +249,11 @@ public:
     bool reject(AgentTask& task, std::string reason = "rejected");
 
 private:
-    [[nodiscard]] ToolResult invokeOnMainThread(const ToolCall& call, AgentTask& task,
-                                                ChangeLog& changes);
+    [[nodiscard]] ToolResult invoke(const ToolCall& call, AgentTask& task, ChangeLog& changes,
+                                    const std::string& transaction);
 
-    app::Engine* engine_;
-    const ToolRegistry* tools_;
-    MainThreadQueue* queue_;
+    api::Session* session_;
     std::shared_ptr<Provider> provider_;
-    TransactionSink* sink_ = nullptr;
-    PerformanceSource performance_;
-    RecordingHook recordingHook_;
-    WatchHook watchHook_;
-    EvaluationHook evaluationHook_;
-    ProfileHook profileHook_;
-    std::filesystem::path projectsRoot_;
-    std::vector<std::filesystem::path> contentRoots_;
     TaskLimits limits_;
     std::string model_;
     double temperature_ = 0.4;

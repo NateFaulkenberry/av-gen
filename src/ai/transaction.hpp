@@ -21,20 +21,22 @@
 //
 // ## What a snapshot covers, exactly
 //
-// Parameter *base* values, modulation routes, presets, and the timeline. Nothing else.
+// `captureDocument` takes: parameter *base* values (every serialised parameter, without a basis),
+// modulation routes, presets, the timeline, the composition (`Composition::toJson`, so a node a tool
+// created or deleted comes back as it was) and the sequence (shots, markers, overlays). That is the
+// project half every undoable tool in `engine_tools.cpp` and `director_tools.cpp` writes.
 //
-// That is not a shortcut; it is the boundary of the tool surface this pass ships. Every mutating
-// tool in `engine_tools.cpp` writes a parameter base value, a modulation route, or a timeline
-// track -- so the transaction domain and the tool domain are the same set, and a rollback is
-// therefore complete rather than approximately complete.
+// It deliberately does **not** cover: the source rack, the audio, stems and feeds, the environment-map
+// path, shader layers, files on disk or the project path. A tool that touches one of those is outside
+// the snapshot, and `ToolAnnotations::undoable == false` is where it says so: `project.*`,
+// `asset.import`, `asset.import_audio`, the playhead and the live-quality and optimizer tools. A
+// rollback does not reach them; `api::Session` refuses them inside an explicit transaction unless the
+// caller accepts that (ADR-2153), and its compensation log handles the FILES they write
+// (api/compensation.hpp). docs/api/transactions.md lists, per tool, what a rollback restores.
 //
-// It deliberately does **not** cover: the source rack, composition node structure (creating or
-// deleting a node), loaded assets, the 2D layer stack, shader layers, scene states, world macros
-// or the sequence. A tool that touched any of those would be outside the transaction and a
-// rollback would leave its change behind -- so no such tool is registered. If one is added, it
-// must extend the snapshot in the same commit, and `ToolAnnotations::undoable` is where that is
-// declared: a mutating tool with `undoable == false` is a tool whose changes a rollback will not
-// reach, and `Transaction` says so rather than pretending otherwise.
+// A new tool that writes a new domain extends the snapshot in the same commit, or declares itself
+// `undoable = false`. A tool that claimed `undoable` for a domain this does not capture would make a
+// rollback silently leave its change behind.
 //
 // ## Why whole documents rather than diffs
 //
@@ -134,6 +136,9 @@ public:
     // only hands it to the host, which undoes the task through its history when that state is
     // still current. This is how "Undo this task" stops being a second undo mechanism.
     [[nodiscard]] virtual std::uint64_t committedEditState() const { return 0; }
+    // The snapshot id an open group restores on abort, or empty when the sink keeps none (ADR-2153: a
+    // transaction reports it, so `project.restore_snapshot` can reach the same point later).
+    [[nodiscard]] virtual std::string rollbackPoint() const { return {}; }
 };
 
 // The default: one snapshot at begin, restored on abort, kept on commit.
@@ -147,6 +152,7 @@ public:
     void abort() override;
     [[nodiscard]] bool available() const override { return engine_ != nullptr; }
     [[nodiscard]] std::string_view kind() const override { return "project snapshot"; }
+    [[nodiscard]] std::string rollbackPoint() const override { return openId_; }
 
     // The snapshot taken at begin(), for the summary. Empty outside a transaction.
     [[nodiscard]] const std::string& openSnapshotId() const { return openId_; }

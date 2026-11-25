@@ -14,6 +14,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -45,6 +46,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -81,6 +83,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -112,6 +115,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -148,6 +152,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -179,6 +184,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": false,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -220,6 +226,7 @@
           "read"
         ],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -253,6 +260,7 @@
           "write"
         ],
         "readOnly": false,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -291,6 +299,7 @@
           "write"
         ],
         "readOnly": false,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -324,6 +333,7 @@
           "write"
         ],
         "readOnly": false,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -362,6 +372,7 @@
           "read"
         ],
         "readOnly": false,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -400,6 +411,7 @@
           "read"
         ],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -433,6 +445,7 @@
           "read"
         ],
         "readOnly": false,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -471,6 +484,7 @@
           "read"
         ],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -515,6 +529,7 @@
           "read"
         ],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -559,6 +574,7 @@
           "read"
         ],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -601,6 +617,7 @@
           "write"
         ],
         "readOnly": false,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -639,6 +656,7 @@
           "read"
         ],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -684,6 +702,7 @@
           "write"
         ],
         "readOnly": false,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -720,6 +739,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": false,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -764,6 +784,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": false,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -812,6 +833,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": false,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -864,6 +886,9 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [
+          "composition"
+        ],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -895,6 +920,9 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [
+          "composition"
+        ],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -926,6 +954,9 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": false,
+        "requirements": [
+          "composition"
+        ],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -998,6 +1029,9 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [
+          "composition"
+        ],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -1046,6 +1080,9 @@
           "read"
         ],
         "readOnly": false,
+        "requirements": [
+          "composition"
+        ],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -1118,6 +1155,9 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": false,
+        "requirements": [
+          "composition"
+        ],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -1154,6 +1194,9 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": false,
+        "requirements": [
+          "composition"
+        ],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -1194,6 +1237,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -1225,6 +1269,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -1280,6 +1325,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -1325,6 +1371,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": false,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -1374,6 +1421,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": false,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -1413,6 +1461,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -1444,6 +1493,9 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [
+          "composition"
+        ],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -1502,6 +1554,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -1541,6 +1594,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": false,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -1610,6 +1664,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": false,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -1654,6 +1709,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -1685,6 +1741,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": false,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -1752,6 +1809,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": false,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -1809,6 +1867,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -1840,6 +1899,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": false,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -1879,6 +1939,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -1910,6 +1971,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -1952,6 +2014,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -1983,6 +2046,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": false,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -2066,6 +2130,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": false,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -2111,6 +2176,7 @@
         "mutatesSession": true,
         "permissions": [],
         "readOnly": false,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -2151,6 +2217,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -2197,6 +2264,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -2228,6 +2296,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -2274,6 +2343,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -2314,6 +2384,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": false,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -2416,6 +2487,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": false,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -2466,6 +2538,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": false,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -2506,6 +2579,9 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [
+          "performance"
+        ],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -2539,6 +2615,9 @@
           "subprocess"
         ],
         "readOnly": true,
+        "requirements": [
+          "profile"
+        ],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -2618,6 +2697,9 @@
           "subprocess"
         ],
         "readOnly": false,
+        "requirements": [
+          "profile"
+        ],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -2704,6 +2786,9 @@
           "subprocess"
         ],
         "readOnly": false,
+        "requirements": [
+          "profile"
+        ],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -2777,6 +2862,9 @@
           "subprocess"
         ],
         "readOnly": true,
+        "requirements": [
+          "profile"
+        ],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -2852,6 +2940,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -2883,6 +2972,7 @@
         "mutatesSession": true,
         "permissions": [],
         "readOnly": false,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -2947,6 +3037,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -2987,6 +3078,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -3039,6 +3131,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -3075,6 +3168,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -3111,6 +3205,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -3150,6 +3245,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -3181,6 +3277,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -3220,6 +3317,9 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [
+          "recording"
+        ],
         "requiresApproval": true,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -3259,6 +3359,9 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [
+          "watch"
+        ],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -3297,6 +3400,9 @@
           "subprocess"
         ],
         "readOnly": false,
+        "requirements": [
+          "evaluation"
+        ],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -3357,6 +3463,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": false,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -3404,6 +3511,7 @@
         "mutatesSession": false,
         "permissions": [],
         "readOnly": true,
+        "requirements": [],
         "requiresApproval": true,
         "requiresAudioThread": false,
         "requiresMainThread": true,
@@ -3431,6 +3539,564 @@
       "name": "director.propose_plan",
       "since": 1,
       "title": "Propose a Director Plan"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requirements": [],
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Who this session is and what it may do: the client, the permissions (read roots, write roots, whether the open project's folder is writable, GPU, child processes), the engine and API versions, the project's state, the open transaction, and for every tool whether it is supported (in this build), available (usable in this host now: its hooks installed, a composition when it needs one) and permitted (allowed by these permissions). Pass `tools` for the three answers on named tools.",
+      "domain": "session",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "tools": {
+            "description": "Tools to answer supported/available/permitted for, by name",
+            "items": {
+              "description": "tool name",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "session_info",
+      "name": "session.info",
+      "outputSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "client": {
+            "description": "{kind, name, version}"
+          },
+          "permissions": {
+            "description": "The session's fixed permissions"
+          },
+          "policy": {
+            "description": "authoring or live",
+            "enum": [
+              "authoring",
+              "live"
+            ],
+            "type": "string"
+          },
+          "project": {
+            "description": "{state, file, folder, writable, hasComposition}"
+          },
+          "rollbackPoints": {
+            "description": "Snapshots this session holds",
+            "type": "integer"
+          },
+          "session": {
+            "description": "The session's id in this process",
+            "type": "integer"
+          },
+          "showRunning": {
+            "description": "A live host is running a show now",
+            "type": "boolean"
+          },
+          "state": {
+            "description": "ready or closing",
+            "type": "string"
+          },
+          "toolDetail": {
+            "description": "Per named tool, when `tools` was passed",
+            "items": {
+              "description": "{name, supported, available, permitted, reasons}"
+            },
+            "type": "array"
+          },
+          "tools": {
+            "description": "{supported, available, permitted, unavailable[], notPermitted[]}"
+          },
+          "transaction": {
+            "description": "The open explicit transaction, or null"
+          },
+          "transactionSink": {
+            "description": "What backs a transaction",
+            "type": "string"
+          },
+          "version": {
+            "description": "api::version(): engine, revision, api level, formats"
+          }
+        },
+        "type": "object"
+      },
+      "since": 1,
+      "title": "Session information"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "session",
+        "expensive": false,
+        "idempotent": false,
+        "mutatesProject": false,
+        "mutatesSession": true,
+        "permissions": [],
+        "readOnly": false,
+        "requirements": [],
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Open an explicit transaction: the calls that name its id are rolled back together by transaction.rollback, or kept as one change (in Studio, one undo) by transaction.commit. One per session; a second begin is refused. While it is open, a mutating call that does not name it is refused. A call that cannot be undone (project saves, imports) is refused inside it unless the call passes irreversible: accept, which makes the transaction partial.",
+      "domain": "transaction",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "label": {
+            "description": "What the transaction is for; an undo menu shows it",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "transaction_begin",
+      "name": "transaction.begin",
+      "outputSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "backedBy": {
+            "description": "What backs it: project snapshot, or undo history",
+            "type": "string"
+          },
+          "calls": {
+            "description": "Calls made inside it",
+            "type": "integer"
+          },
+          "changedTargets": {
+            "description": "commit: parameter values that changed",
+            "items": {
+              "description": "parameter path",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "createdFiles": {
+            "description": "Files its calls created",
+            "items": {
+              "description": "path",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "editState": {
+            "description": "commit: the editor history state it produced, 0 for none",
+            "type": "integer"
+          },
+          "files": {
+            "description": "rollback: {deleted, restored, kept}"
+          },
+          "id": {
+            "description": "The transaction's id, e.g. txn-3",
+            "type": "string"
+          },
+          "irreversible": {
+            "description": "Tools it accepted that a rollback cannot reach",
+            "items": {
+              "description": "tool name",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "label": {
+            "description": "What it is for",
+            "type": "string"
+          },
+          "notRestorable": {
+            "description": "commit: {tools, files} a later undo will not reach"
+          },
+          "notRestored": {
+            "description": "rollback: {tools, files} it could not put back"
+          },
+          "partial": {
+            "description": "A call it accepted as irreversible is outside what it can roll back",
+            "type": "boolean"
+          },
+          "rollbackPoint": {
+            "description": "The snapshot id it restores on rollback, or null"
+          },
+          "state": {
+            "description": "open, committed, rolled-back, or none (status with nothing open)",
+            "enum": [
+              "open",
+              "committed",
+              "rolled-back",
+              "none"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "since": 1,
+      "title": "Begin a transaction"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "session",
+        "expensive": false,
+        "idempotent": false,
+        "mutatesProject": false,
+        "mutatesSession": true,
+        "permissions": [],
+        "readOnly": false,
+        "requirements": [],
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Close the open transaction, keeping its changes. Reports the parameter values that changed and what a later undo cannot reach (the irreversible calls it accepted).",
+      "domain": "transaction",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "The id transaction.begin returned",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "mcpName": "transaction_commit",
+      "name": "transaction.commit",
+      "outputSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "backedBy": {
+            "description": "What backs it: project snapshot, or undo history",
+            "type": "string"
+          },
+          "calls": {
+            "description": "Calls made inside it",
+            "type": "integer"
+          },
+          "changedTargets": {
+            "description": "commit: parameter values that changed",
+            "items": {
+              "description": "parameter path",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "createdFiles": {
+            "description": "Files its calls created",
+            "items": {
+              "description": "path",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "editState": {
+            "description": "commit: the editor history state it produced, 0 for none",
+            "type": "integer"
+          },
+          "files": {
+            "description": "rollback: {deleted, restored, kept}"
+          },
+          "id": {
+            "description": "The transaction's id, e.g. txn-3",
+            "type": "string"
+          },
+          "irreversible": {
+            "description": "Tools it accepted that a rollback cannot reach",
+            "items": {
+              "description": "tool name",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "label": {
+            "description": "What it is for",
+            "type": "string"
+          },
+          "notRestorable": {
+            "description": "commit: {tools, files} a later undo will not reach"
+          },
+          "notRestored": {
+            "description": "rollback: {tools, files} it could not put back"
+          },
+          "partial": {
+            "description": "A call it accepted as irreversible is outside what it can roll back",
+            "type": "boolean"
+          },
+          "rollbackPoint": {
+            "description": "The snapshot id it restores on rollback, or null"
+          },
+          "state": {
+            "description": "open, committed, rolled-back, or none (status with nothing open)",
+            "enum": [
+              "open",
+              "committed",
+              "rolled-back",
+              "none"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "since": 1,
+      "title": "Commit a transaction"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "session",
+        "expensive": false,
+        "idempotent": false,
+        "mutatesProject": false,
+        "mutatesSession": true,
+        "permissions": [],
+        "readOnly": false,
+        "requirements": [],
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Close the open transaction, putting the project back as it was at begin: parameters, routes, presets, the timeline, the composition and the sequence. Files its calls created are deleted unless the project or scene still names them, another transaction uses them, or they are render outputs; files it replaced get their previous contents back. Reports what it could not restore.",
+      "domain": "transaction",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "The id transaction.begin returned",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "mcpName": "transaction_rollback",
+      "name": "transaction.rollback",
+      "outputSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "backedBy": {
+            "description": "What backs it: project snapshot, or undo history",
+            "type": "string"
+          },
+          "calls": {
+            "description": "Calls made inside it",
+            "type": "integer"
+          },
+          "changedTargets": {
+            "description": "commit: parameter values that changed",
+            "items": {
+              "description": "parameter path",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "createdFiles": {
+            "description": "Files its calls created",
+            "items": {
+              "description": "path",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "editState": {
+            "description": "commit: the editor history state it produced, 0 for none",
+            "type": "integer"
+          },
+          "files": {
+            "description": "rollback: {deleted, restored, kept}"
+          },
+          "id": {
+            "description": "The transaction's id, e.g. txn-3",
+            "type": "string"
+          },
+          "irreversible": {
+            "description": "Tools it accepted that a rollback cannot reach",
+            "items": {
+              "description": "tool name",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "label": {
+            "description": "What it is for",
+            "type": "string"
+          },
+          "notRestorable": {
+            "description": "commit: {tools, files} a later undo will not reach"
+          },
+          "notRestored": {
+            "description": "rollback: {tools, files} it could not put back"
+          },
+          "partial": {
+            "description": "A call it accepted as irreversible is outside what it can roll back",
+            "type": "boolean"
+          },
+          "rollbackPoint": {
+            "description": "The snapshot id it restores on rollback, or null"
+          },
+          "state": {
+            "description": "open, committed, rolled-back, or none (status with nothing open)",
+            "enum": [
+              "open",
+              "committed",
+              "rolled-back",
+              "none"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "since": 1,
+      "title": "Roll back a transaction"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requirements": [],
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "The open transaction (calls, whether it is partial, the files it created), or state none.",
+      "domain": "transaction",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "Optional: the id to check; omit for the open one",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "transaction_status",
+      "name": "transaction.status",
+      "outputSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "backedBy": {
+            "description": "What backs it: project snapshot, or undo history",
+            "type": "string"
+          },
+          "calls": {
+            "description": "Calls made inside it",
+            "type": "integer"
+          },
+          "changedTargets": {
+            "description": "commit: parameter values that changed",
+            "items": {
+              "description": "parameter path",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "createdFiles": {
+            "description": "Files its calls created",
+            "items": {
+              "description": "path",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "editState": {
+            "description": "commit: the editor history state it produced, 0 for none",
+            "type": "integer"
+          },
+          "files": {
+            "description": "rollback: {deleted, restored, kept}"
+          },
+          "id": {
+            "description": "The transaction's id, e.g. txn-3",
+            "type": "string"
+          },
+          "irreversible": {
+            "description": "Tools it accepted that a rollback cannot reach",
+            "items": {
+              "description": "tool name",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "label": {
+            "description": "What it is for",
+            "type": "string"
+          },
+          "notRestorable": {
+            "description": "commit: {tools, files} a later undo will not reach"
+          },
+          "notRestored": {
+            "description": "rollback: {tools, files} it could not put back"
+          },
+          "partial": {
+            "description": "A call it accepted as irreversible is outside what it can roll back",
+            "type": "boolean"
+          },
+          "rollbackPoint": {
+            "description": "The snapshot id it restores on rollback, or null"
+          },
+          "state": {
+            "description": "open, committed, rolled-back, or none (status with nothing open)",
+            "enum": [
+              "open",
+              "committed",
+              "rolled-back",
+              "none"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "since": 1,
+      "title": "Transaction status"
     }
   ],
   "version": 1

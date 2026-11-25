@@ -67,6 +67,7 @@ public:
     [[nodiscard]] std::string_view kind() const override { return "undo history"; }
     // The history state the last commit produced, or 0 when it pushed nothing.
     [[nodiscard]] std::uint64_t committedEditState() const override { return committedState_; }
+    [[nodiscard]] std::string rollbackPoint() const override { return fallback_->rollbackPoint(); }
 
 private:
     Engine* engine_;

@@ -1358,13 +1358,17 @@ Application::~Application() {
     step("window_");
 }
 
-void Application::initControlPlane() {
+void Application::initControlPlane(api::SessionOptions session) {
     if (auto loaded = AppSettings::load(settingsPath_); !loaded) {
         log::warn("settings: {}", loaded.error().message);
     } else {
         settings_ = std::move(*loaded);
     }
-    ai_ = std::make_unique<ai::ControlPlane>(*engine_, jobs_.get());
+    // ADR-2153: the assistant is a client of an `api::Session`, with permissions fixed here. The open
+    // project's folder is readable and writable whichever project is open (owner decision 1), so a
+    // project opened after this -- File > Open, a recent file, `project.open` -- needs no refresh.
+    session.permissions.liveControl = liveControlAllowed_;
+    ai_ = std::make_unique<ai::ControlPlane>(*engine_, jobs_.get(), std::move(session));
     // ADR-101: an assistant's edit lands in the same history as a person's, so Cmd+Z takes back
     // "the last thing that happened" rather than "the last thing *I* did". The snapshot sink stays
     // underneath -- it is what makes a task abortable, which is a different promise from undoable.
@@ -1528,6 +1532,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             .oscFlag = options.oscPort.has_value() || options.oscBind.has_value(),
             .midiFlag = options.midi.has_value(),
             .noOsc = options.noOsc});
+        liveControlAllowed_ = live.osc || live.midi;
         if (options.oscBind) {
             if (auto r = engine_->control().setOscBind(*options.oscBind); !r) {
                 return std::unexpected(r.error());
@@ -1547,7 +1552,9 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         // or, on a machine where that cannot be read, from AVGEN_AI_<PROVIDER>_KEY.
         settingsPath_ = AppSettings::pathIn(platform::preferencesDirectory());
         jobs_ = std::make_unique<JobSystem>(2);
-        initControlPlane();
+        // Today's headless roots: none. The open project's folder is the one place it reads and writes
+        // (`--ai-script` saving the project it was given), and every other path tool says how to give it more.
+        initControlPlane(ai::studioSessionOptions());
         // No theme here. `imgui_` is only constructed alongside the window, further down, so in a
         // headless run this called a method on a null unique_ptr and took down every `--headless`
         // render, the `--render` batch path and `tools/review_frames.py` with it. There is also
@@ -1738,28 +1745,19 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         // empty queue check -- ADR-065's rule that an optional subsystem must not degrade normal
         // operation when idle.
         settingsPath_ = AppSettings::pathIn(prefs);
-        initControlPlane();
-        // Where an assistant may make a project. The preferences directory rather than anywhere the
-        // model names: the project tools take a *name* and resolve it under this root, so one bad
-        // argument makes a folder here instead of writing across the machine. A session with no
-        // preferences directory installs nothing and those tools refuse, which is the honest
-        // failure -- better than defaulting to the working directory and surprising somebody.
-        // What the assistant may *read*: the example and recipe folders it ships with, and the open
-        // project's own directory. Reading is bounded separately from writing and more widely, but
-        // it is still bounded -- without a list, an import tool is an arbitrary-file-read primitive
-        // handed to a language model.
         {
+            api::SessionOptions session = ai::studioSessionOptions();
+            session.policy = api::HostPolicy::Live;
+            // What the assistant may *read*: the example and recipe folders it ships with, the source
+            // assets, and (by the session's rule) the open project's own folder. Reading is bounded
+            // separately from writing and more widely, but it is still bounded -- without a list, an
+            // import tool is an arbitrary-file-read primitive handed to a language model.
             std::vector<std::filesystem::path> roots = exampleSearchDirs(executablePath);
             roots.push_back(std::filesystem::path(AVGEN_SOURCE_DIR) / "assets");
-            if (!engine_->projectPath().empty()) {
-                roots.push_back(engine_->projectPath().parent_path());
-            }
-            // Where a person keeps the file they are about to point at. Deliberate, and the
-            // narrowest set that makes "import the track on my desktop" work at all: Desktop and
-            // Downloads, read only, and nothing else of the home directory. An assistant cannot
-            // write to either -- the only directory these tools write into is the projects root
-            // above -- and `resolveContent` resolves `..` and symlinks before deciding a path is
-            // inside one, so a name cannot climb out of them.
+            // Where a person keeps the file they are about to point at. Deliberate, and the narrowest
+            // set that makes "import the track on my desktop" work at all: Desktop and Downloads, read
+            // only, and nothing else of the home directory. The session's PathPolicy resolves `..` and
+            // symlinks before deciding a path is inside one, so a name cannot climb out of them.
             if (const char* home = std::getenv("HOME"); home != nullptr && *home != '\0') {
                 const std::filesystem::path homeDir(home);
                 for (const char* folder : {"Desktop", "Downloads"}) {
@@ -1770,21 +1768,40 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
                     }
                 }
             }
-            ai_->setContentRoots(roots);
-            log::info("ai: {} content root(s) readable", roots.size());
-        }
-        if (!prefs.empty()) {
-            const std::filesystem::path projects = prefs / "projects";
-            std::error_code projectsEc;
-            std::filesystem::create_directories(projects, projectsEc);
-            if (!projectsEc) {
-                ai_->setProjectsRoot(projects);
-                log::info("ai: projects folder {}", projects.string());
-            } else {
-                log::warn("ai: cannot use a projects folder at {}: {}", projects.string(),
-                          projectsEc.message());
+            for (std::filesystem::path& root : roots) {
+                std::error_code absEc;
+                root = std::filesystem::absolute(root, absEc).lexically_normal();
             }
+            session.permissions.readRoots = roots;
+            log::info("ai: {} content root(s) readable", roots.size());
+            // Where an assistant may make a project by name: the preferences directory rather than
+            // anywhere the model names, so one bad argument makes a folder here instead of writing across
+            // the machine. With no preferences directory there is no write root beyond the open project's
+            // folder, and the name-based project tools refuse with what to change.
+            if (!prefs.empty()) {
+                const std::filesystem::path projects = prefs / "projects";
+                std::error_code projectsEc;
+                std::filesystem::create_directories(projects, projectsEc);
+                if (!projectsEc) {
+                    session.permissions.writeRoots.push_back(std::filesystem::absolute(projects, projectsEc));
+                    log::info("ai: projects folder {}", projects.string());
+                } else {
+                    log::warn("ai: cannot use a projects folder at {}: {}", projects.string(),
+                              projectsEc.message());
+                }
+            }
+            initControlPlane(std::move(session));
         }
+        // Owner decision 3: while the transport plays, the editor is running a show, and a client other
+        // than its own assistant is refused structural edits, jobs, project calls and seeks. Studio has
+        // no external client yet; the predicate is what one would be refused by.
+        ai_->host().setShowPredicate([this] { return engine_ != nullptr && engine_->isPlaying(); },
+                                     [this]() -> std::optional<double> {
+                                         if (engine_ == nullptr || !engine_->hasAudio()) {
+                                             return std::nullopt;
+                                         }
+                                         return std::max(engine_->durationSeconds() - engine_->positionSeconds(), 0.0);
+                                     });
         // Performance is renderer state, and `src/ai/` lives in avgen_core which cannot see the
         // renderer. So the application -- which owns both -- fills in a plain snapshot, and a
         // session without a renderer simply installs nothing and the tool says so honestly.

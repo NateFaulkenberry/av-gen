@@ -31,8 +31,9 @@
 
 namespace avgen::api {
 
-// The registry every client sees: the engine tools and the Director tools. Needs no engine; the
-// engine arrives per call through ToolContext.
+// The registry every client sees: the engine tools, the Director tools and the session tools
+// (`api::registerAllTools`, which every Session uses). Needs no engine; the engine arrives per call
+// through ToolContext.
 [[nodiscard]] ai::ToolRegistry makeCatalogueRegistry();
 
 // A tool name as MCP clients accept it (`^[a-zA-Z0-9_-]{1,64}$`): `parameter.set` -> `parameter_set`.

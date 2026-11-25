@@ -19,6 +19,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <expected>
+#include <iterator>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -360,6 +362,12 @@ ToolAnnotations needs(ToolAnnotations a, std::vector<std::string> permissions) {
     return a;
 }
 
+// ADR-2153: what the host must provide (kToolRequirements), so a session answers "available" per tool.
+ToolAnnotations requiring(ToolAnnotations a, std::vector<std::string> requirements) {
+    a.requirements = std::move(requirements);
+    return a;
+}
+
 // A project name, used as a directory name. Refused rather than sanitised when it would escape the
 // projects root: an agent that asked for "../../etc" has made a mistake worth reporting, and
 // quietly rewriting it to something safe teaches it nothing and hides the bug.
@@ -388,6 +396,22 @@ void add(ToolRegistry& r, std::string name, std::string title, std::string descr
 }
 
 json noArgs() { return schema::object(json::object()); }
+
+// The snapshot store is the session's (ADR-2153). A context nobody gave one has nowhere to keep a rollback
+// point, and says so rather than keeping one for the whole process.
+ToolResult noSnapshots() {
+    return ToolResult::failure(ToolErrorCode::FailedPrecondition, "this call has no session to keep rollback points in",
+                               "call it through a session");
+}
+
+// The folder a bare project name lives in (the first write root), or the refusal.
+std::expected<std::filesystem::path, ToolError> projectsFolder(const ToolContext& ctx) {
+    const std::filesystem::path root = ctx.paths().firstWriteRoot();
+    if (root.empty()) {
+        return std::unexpected(api::noRootsRefusal("write projects into"));
+    }
+    return root;
+}
 
 // ================================================================================================
 // capability.*
@@ -449,7 +473,7 @@ void registerCapabilityTools(ToolRegistry& registry) {
 // project.*
 // ================================================================================================
 
-void registerProjectTools(ToolRegistry& registry, SnapshotStore& snapshots) {
+void registerProjectTools(ToolRegistry& registry) {
     add(registry, "project.get_state", "Project state",
         "High-level state of the open project: file, scene, audio, transport, and how much of each "
         "kind of thing exists. Start here; it is cheap and it tells you what to ask about next.",
@@ -504,22 +528,28 @@ void registerProjectTools(ToolRegistry& registry, SnapshotStore& snapshots) {
             a.readOnly = true;
             return a;
         }(),
-        [&snapshots](const json& args, ToolContext& ctx) -> ToolResult {
+        [](const json& args, ToolContext& ctx) -> ToolResult {
+            if (ctx.snapshots() == nullptr) {
+                return noSnapshots();
+            }
             const auto& snapshot =
-                snapshots.capture(ctx.engine(), args.value("label", std::string("manual")));
+                ctx.snapshots()->capture(ctx.engine(), args.value("label", std::string("manual")));
             return ToolResult::ok(snapshot.describe(), "snapshot " + snapshot.id);
         });
 
     add(registry, "project.list_snapshots", "List rollback points",
         "The snapshots taken this session, oldest first.", noArgs(), readOnly(),
-        [&snapshots](const json&, ToolContext&) -> ToolResult {
+        [](const json&, ToolContext& ctx) -> ToolResult {
+            if (ctx.snapshots() == nullptr) {
+                return noSnapshots();
+            }
             json list = json::array();
-            for (const ProjectSnapshot& s : snapshots.all()) {
+            for (const ProjectSnapshot& s : ctx.snapshots()->all()) {
                 list.push_back(s.describe());
             }
             json out;
             out["snapshots"] = std::move(list);
-            return ToolResult::ok(std::move(out), fmt::format("{} snapshot(s)", snapshots.size()));
+            return ToolResult::ok(std::move(out), fmt::format("{} snapshot(s)", ctx.snapshots()->size()));
         });
 
     add(registry, "project.restore_snapshot", "Restore rollback point",
@@ -532,10 +562,13 @@ void registerProjectTools(ToolRegistry& registry, SnapshotStore& snapshots) {
             a.executionClass = ExecutionClass::Structural; // the whole composition is reinstalled
             return a;
         }(),
-        [&snapshots](const json& args, ToolContext& ctx) -> ToolResult {
+        [](const json& args, ToolContext& ctx) -> ToolResult {
+            if (ctx.snapshots() == nullptr) {
+                return noSnapshots();
+            }
             const std::string id = args.at("id").get<std::string>();
             const json before = SnapshotStore::captureDocument(ctx.engine());
-            if (auto r = snapshots.restore(ctx.engine(), id); !r) {
+            if (auto r = ctx.snapshots()->restore(ctx.engine(), id); !r) {
                 return ToolResult::failure(ToolErrorCode::NotFound, r.error().message,
                                            "call project.list_snapshots for valid ids");
             }
@@ -564,22 +597,20 @@ void registerParameterTools(ToolRegistry& registry) {
     // session and the snapshot tools could roll one back, and nothing could make one or keep it.
     //
     // Every one takes a **name**, never a path. A tool that took a path would let one bad argument
-    // write anywhere on the machine; a name resolves under `ToolContext::projectsRoot()`, so the
+    // write anywhere on the machine; a name resolves under the session's first write root (ADR-2153), so the
     // worst a wrong answer does is make a directory in a folder the user already owns.
     add(registry, "project.list", "List projects",
         "Every project in the projects folder, by name. Use this before opening one rather than "
         "guessing a name.",
         noArgs(), needs(readOnly(), {"read"}),
         [](const json&, ToolContext& ctx) -> ToolResult {
-            if (!ctx.hasProjectsRoot()) {
-                return ToolResult::failure(ToolErrorCode::Unavailable,
-                                           "no projects folder is configured in this session",
-                                           "projects cannot be listed, created or opened by name "
-                                           "until the host sets one");
+            const auto root = projectsFolder(ctx);
+            if (!root) {
+                return ToolResult::failure(root.error());
             }
             json names = json::array();
             std::error_code ec;
-            for (const auto& entry : std::filesystem::directory_iterator(ctx.projectsRoot(), ec)) {
+            for (const auto& entry : std::filesystem::directory_iterator(*root, ec)) {
                 if (!entry.is_directory(ec)) {
                     continue;
                 }
@@ -590,7 +621,7 @@ void registerParameterTools(ToolRegistry& registry) {
                 names.push_back(name);
             }
             const auto count = names.size();
-            return ToolResult::ok(json{{"root", ctx.projectsRoot().string()},
+            return ToolResult::ok(json{{"root", root->string()},
                                        {"projects", std::move(names)}},
                                   fmt::format("{} project(s)", count));
         });
@@ -607,11 +638,15 @@ void registerParameterTools(ToolRegistry& registry) {
                                            fmt::format("'{}' is not a usable project name", name),
                                            "use a plain name with no slashes or leading dots");
             }
-            if (!ctx.hasProjectsRoot()) {
-                return ToolResult::failure(ToolErrorCode::Unavailable,
-                                           "no projects folder is configured in this session");
+            const auto root = projectsFolder(ctx);
+            if (!root) {
+                return ToolResult::failure(root.error());
             }
-            const std::filesystem::path dir = ctx.projectsRoot() / name;
+            const auto dirChecked = ctx.paths().forWrite((*root / name).string());
+            if (!dirChecked) {
+                return ToolResult::failure(dirChecked.error());
+            }
+            const std::filesystem::path dir = *dirChecked;
             const std::filesystem::path file = dir / (name + ".json");
             std::error_code ec;
             if (std::filesystem::exists(file, ec)) {
@@ -645,10 +680,13 @@ void registerParameterTools(ToolRegistry& registry) {
         [](const json&, ToolContext& ctx) -> ToolResult {
             app::Engine& engine = ctx.engine();
             if (engine.projectPath().empty()) {
-                return ToolResult::failure(ToolErrorCode::InvalidArguments,
+                return ToolResult::failure(ToolErrorCode::FailedPrecondition,
                                            "this session has no project file yet",
                                            "use project.create to start one, or project.save_as to "
                                            "name this session");
+            }
+            if (auto refused = ctx.paths().projectWriteRefusal()) {
+                return ToolResult::failure(std::move(*refused));
             }
             const std::filesystem::path file = engine.projectPath();
             if (auto r = engine.saveProject(file); !r) {
@@ -673,11 +711,15 @@ void registerParameterTools(ToolRegistry& registry) {
                 return ToolResult::failure(ToolErrorCode::InvalidArguments,
                                            fmt::format("'{}' is not a usable project name", name));
             }
-            if (!ctx.hasProjectsRoot()) {
-                return ToolResult::failure(ToolErrorCode::Unavailable,
-                                           "no projects folder is configured in this session");
+            const auto root = projectsFolder(ctx);
+            if (!root) {
+                return ToolResult::failure(root.error());
             }
-            const std::filesystem::path dir = ctx.projectsRoot() / name;
+            const auto dirChecked = ctx.paths().forWrite((*root / name).string());
+            if (!dirChecked) {
+                return ToolResult::failure(dirChecked.error());
+            }
+            const std::filesystem::path dir = *dirChecked;
             const std::filesystem::path file = dir / (name + ".json");
             std::error_code ec;
             std::filesystem::create_directories(dir, ec);
@@ -704,17 +746,20 @@ void registerParameterTools(ToolRegistry& registry) {
                 return ToolResult::failure(ToolErrorCode::InvalidArguments,
                                            fmt::format("'{}' is not a usable project name", name));
             }
-            if (!ctx.hasProjectsRoot()) {
-                return ToolResult::failure(ToolErrorCode::Unavailable,
-                                           "no projects folder is configured in this session");
+            const auto root = projectsFolder(ctx);
+            if (!root) {
+                return ToolResult::failure(root.error());
             }
-            const std::filesystem::path file = ctx.projectsRoot() / name / (name + ".json");
-            std::error_code ec;
-            if (!std::filesystem::exists(file, ec)) {
-                return ToolResult::failure(ToolErrorCode::NotFound,
-                                           fmt::format("no project called '{}'", name),
-                                           "project.list reports what is there");
+            const auto found = ctx.paths().forRead((*root / name / (name + ".json")).string());
+            if (!found) {
+                if (found.error().code == ToolErrorCode::NotFound) {
+                    return ToolResult::failure(ToolErrorCode::NotFound,
+                                               fmt::format("no project called '{}'", name),
+                                               "project.list reports what is there");
+                }
+                return ToolResult::failure(found.error());
             }
+            const std::filesystem::path file = *found;
             app::Engine& engine = ctx.engine();
             if (auto r = engine.loadProject(file); !r) {
                 return ToolResult::failure(ToolErrorCode::Unavailable, r.error().message);
@@ -752,7 +797,7 @@ void registerParameterTools(ToolRegistry& registry) {
         [](const json&, ToolContext& ctx) -> ToolResult {
             json found = json::array();
             std::error_code ec;
-            for (const std::filesystem::path& root : ctx.contentRoots()) {
+            for (const std::filesystem::path& root : ctx.paths().searchRoots()) {
                 if (!std::filesystem::is_directory(root, ec)) {
                     continue;
                 }
@@ -788,7 +833,7 @@ void registerParameterTools(ToolRegistry& registry) {
             }
             std::error_code ec;
             std::filesystem::path file;
-            for (const std::filesystem::path& root : ctx.contentRoots()) {
+            for (const std::filesystem::path& root : ctx.paths().searchRoots()) {
                 if (!std::filesystem::is_directory(root, ec)) {
                     continue;
                 }
@@ -856,8 +901,8 @@ void registerParameterTools(ToolRegistry& registry) {
     // ---- bringing media in ------------------------------------------------------------------------
     //
     // Reading a file the user points at is a different question from writing one, and it gets a
-    // different answer: `ToolContext::resolveContent` bounds it to the directories the host listed,
-    // with `..` and symlinks resolved *before* the containment test. Without that an import tool is
+    // different answer: `ToolContext::paths()` (the session's PathPolicy, ADR-2153) bounds it to the
+    // directories the session was given, with `..` and symlinks resolved *before* the containment test. Without that an import tool is
     // an arbitrary-file-read primitive handed to a language model.
     add(registry, "asset.list", "List available assets",
         "List stable asset IDs visible to this session, including built-in and project-owned assets.",
@@ -865,7 +910,7 @@ void registerParameterTools(ToolRegistry& registry) {
                         {"limit", schema::integer("Maximum results (default 100)", 1, kMaxLimit)}}),
         needs(readOnly(), {"read"}),
         [](const json& args, ToolContext& ctx) -> ToolResult {
-            const auto catalog = assets::catalogAssets(ctx.contentRoots(), ctx.engine().projectPath().parent_path());
+            const auto catalog = assets::catalogAssets(ctx.paths().readRoots(), ctx.paths().projectFolder());
             if (!catalog) return ToolResult::failure(ToolErrorCode::Unavailable, catalog.error().message);
             const auto found = assets::searchAssets(*catalog, args.value("query", std::string{}), limitOf(args));
             json out = json::array();
@@ -886,7 +931,7 @@ void registerParameterTools(ToolRegistry& registry) {
         [](const json& args, ToolContext& ctx) -> ToolResult {
             const std::string query = args.value("query", std::string{});
             if (query.empty()) return ToolResult::failure(ToolErrorCode::InvalidArguments, "query must not be empty");
-            const auto catalog = assets::catalogAssets(ctx.contentRoots(), ctx.engine().projectPath().parent_path());
+            const auto catalog = assets::catalogAssets(ctx.paths().readRoots(), ctx.paths().projectFolder());
             if (!catalog) return ToolResult::failure(ToolErrorCode::Unavailable, catalog.error().message);
             const auto found = assets::searchAssets(*catalog, query, limitOf(args));
             json out = json::array();
@@ -904,7 +949,7 @@ void registerParameterTools(ToolRegistry& registry) {
         needs(readOnly(), {"read"}),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             const std::string id = args.at("id").get<std::string>();
-            const auto catalog = assets::catalogAssets(ctx.contentRoots(), ctx.engine().projectPath().parent_path());
+            const auto catalog = assets::catalogAssets(ctx.paths().readRoots(), ctx.paths().projectFolder());
             if (!catalog) return ToolResult::failure(ToolErrorCode::Unavailable, catalog.error().message);
             for (const auto& asset : *catalog) {
                 if (asset.id != id) continue;
@@ -923,17 +968,22 @@ void registerParameterTools(ToolRegistry& registry) {
         [](const json& args, ToolContext& ctx) -> ToolResult {
             const std::string given = args.value("file", std::string{});
             if (given.empty()) return ToolResult::failure(ToolErrorCode::InvalidArguments, "no file named");
-            const auto source = ctx.resolveContent(given);
-            if (!source) return ToolResult::failure(ToolErrorCode::NotFound, "file is outside authorized content roots");
+            const auto source = ctx.paths().forRead(given);
+            if (!source) return ToolResult::failure(source.error());
             app::Engine& engine = ctx.engine();
             if (engine.projectPath().empty()) {
-                return ToolResult::failure(ToolErrorCode::InvalidArguments, "open or create a project before importing assets");
+                return ToolResult::failure(ToolErrorCode::FailedPrecondition, "open or create a project before importing assets",
+                                           "use project.create or project.open first");
             }
+            if (auto refused = ctx.paths().projectWriteRefusal()) return ToolResult::failure(std::move(*refused));
             const std::string type = importTypeFor(*source);
             if (type.empty()) return ToolResult::failure(ToolErrorCode::Unsupported, "supported asset types are glTF, GLB, HDR, EXR and common textures");
             auto hash = sha256File(*source);
             if (!hash) return ToolResult::failure(ToolErrorCode::Unavailable, hash.error().message);
-            const std::filesystem::path assetRoot = engine.projectPath().parent_path() / "assets" / type;
+            const std::filesystem::path projectDir = ctx.paths().projectFolder();
+            const auto assetRootChecked = ctx.paths().forWrite((projectDir / "assets" / type).string());
+            if (!assetRootChecked) return ToolResult::failure(assetRootChecked.error());
+            const std::filesystem::path assetRoot = *assetRootChecked;
             std::error_code ec;
             std::filesystem::create_directories(assetRoot, ec);
             if (ec) return ToolResult::failure(ToolErrorCode::Unavailable, "cannot create project asset directory: " + ec.message());
@@ -948,79 +998,101 @@ void registerParameterTools(ToolRegistry& registry) {
                         if (!item.is_object() || !item.contains("uri") || !item.at("uri").is_string()) continue;
                         const std::string uri = item.at("uri").get<std::string>();
                         if (uri.rfind("data:", 0) == 0 || uri.find("#") != std::string::npos) continue;
-                        const auto dependency = source->parent_path() / uri;
-                        if (!std::filesystem::is_regular_file(dependency, ec)) {
+                        // A dependency is a path the glTF names; it is read under the same rules as the file.
+                        const auto dependency = ctx.paths().forRead((source->parent_path() / uri).string());
+                        if (!dependency) {
+                            if (dependency.error().code == ToolErrorCode::NotFound) {
+                                return ToolResult::failure(ToolErrorCode::NotFound, "missing glTF dependency: " + uri);
+                            }
+                            return ToolResult::failure(dependency.error());
+                        }
+                        if (!std::filesystem::is_regular_file(*dependency, ec)) {
                             return ToolResult::failure(ToolErrorCode::NotFound, "missing glTF dependency: " + uri);
                         }
-                        dependencies.push_back(dependency);
+                        dependencies.push_back(*dependency);
                     }
                 }
             }
-            for (const auto& entry : std::filesystem::recursive_directory_iterator(engine.projectPath().parent_path() / "assets",
+            for (const auto& entry : std::filesystem::recursive_directory_iterator(projectDir / "assets",
                                                                                      std::filesystem::directory_options::skip_permission_denied, ec)) {
                 if (!entry.is_regular_file(ec)) continue;
                 auto existing = sha256File(entry.path());
                 if (existing && *existing == *hash) {
+                    // The project now depends on a file another import made: a rollback of that import must
+                    // not delete it from under this one (api/compensation.hpp, rule 3).
+                    ctx.noteUsedFile(entry.path());
                     return ToolResult::ok(json{{"id", "asset://project/" + type + "/" + entry.path().filename().string()},
                                                {"path", entry.path().string()}, {"source", "project"}, {"duplicate", true}},
                                           "asset already imported");
                 }
             }
-            const std::filesystem::path target = assetRoot / source->filename();
-            const bool targetExisted = std::filesystem::exists(target, ec);
-            std::vector<std::filesystem::path> createdFiles;
-            bool committed = false;
-            const auto rollback = [&] {
-                if (committed) return;
-                for (auto it = createdFiles.rbegin(); it != createdFiles.rend(); ++it) {
-                    std::error_code removeError;
-                    std::filesystem::remove(*it, removeError);
+            // Every file written is reported to the session's compensation log, which deletes or restores it
+            // when this call fails or its transaction rolls back (ADR-2153). The tool keeps no rollback of
+            // its own.
+            const auto copyInto = [&](const std::filesystem::path& from, const std::filesystem::path& to) -> bool {
+                const bool existed = std::filesystem::exists(to, ec);
+                std::filesystem::copy_file(from, to, std::filesystem::copy_options::overwrite_existing, ec);
+                if (ec) return false;
+                if (existed) {
+                    ctx.noteOverwrittenFile(to);
+                } else {
+                    ctx.noteCreatedFile(to);
                 }
+                return true;
             };
-            std::filesystem::copy_file(*source, target, std::filesystem::copy_options::overwrite_existing, ec);
-            if (ec) return ToolResult::failure(ToolErrorCode::Unavailable, "cannot copy asset: " + ec.message());
-            if (!targetExisted) createdFiles.push_back(target);
+            const std::filesystem::path target = assetRoot / source->filename();
+            if (!copyInto(*source, target)) return ToolResult::failure(ToolErrorCode::Unavailable, "cannot copy asset: " + ec.message());
             std::vector<std::string> copied;
             copied.push_back(target.string());
             for (const auto& dependency : dependencies) {
-                    const std::filesystem::path dependencyTarget = assetRoot / dependency.filename();
-                    const bool dependencyExisted = std::filesystem::exists(dependencyTarget, ec);
-                    std::filesystem::copy_file(dependency, dependencyTarget, std::filesystem::copy_options::overwrite_existing, ec);
-                    if (ec) { rollback(); return ToolResult::failure(ToolErrorCode::Unavailable, "cannot copy glTF dependency: " + ec.message()); }
-                    if (!dependencyExisted) createdFiles.push_back(dependencyTarget);
-                    copied.push_back(dependencyTarget.string());
+                const std::filesystem::path dependencyTarget = assetRoot / dependency.filename();
+                if (!copyInto(dependency, dependencyTarget)) {
+                    return ToolResult::failure(ToolErrorCode::Unavailable, "cannot copy glTF dependency: " + ec.message());
+                }
+                copied.push_back(dependencyTarget.string());
             }
             const std::string id = "asset://project/" + type + "/" + target.stem().string();
-            const std::filesystem::path manifestPath = engine.projectPath().parent_path() / "assets" / "manifest.json";
+            const std::filesystem::path manifestPath = projectDir / "assets" / "manifest.json";
             json manifest = json::object();
             manifest["format"] = "avgen-project-assets";
             manifest["version"] = 1;
             manifest["assets"] = json::array();
-            std::ifstream manifestIn(manifestPath);
-            if (manifestIn) {
-                json existing = json::parse(manifestIn, nullptr, false);
-                if (!existing.is_discarded() && existing.is_object() && existing["assets"].is_array()) {
-                    manifest = std::move(existing);
+            std::string previousManifest;
+            const bool manifestExisted = std::filesystem::exists(manifestPath, ec);
+            {
+                std::ifstream manifestIn(manifestPath, std::ios::binary);
+                if (manifestIn) {
+                    previousManifest.assign(std::istreambuf_iterator<char>(manifestIn), std::istreambuf_iterator<char>());
+                    json existing = json::parse(previousManifest, nullptr, false);
+                    if (!existing.is_discarded() && existing.is_object() && existing["assets"].is_array()) {
+                        manifest = std::move(existing);
+                    }
                 }
             }
+            const std::string relative = std::filesystem::relative(target, projectDir).generic_string();
             bool replaced = false;
             for (auto& entry : manifest["assets"]) {
                 if (entry.is_object() && entry.value("id", std::string{}) == id) {
-                    entry = json{{"id", id}, {"type", type}, {"path", std::filesystem::relative(target, engine.projectPath().parent_path()).generic_string()},
-                                 {"sha256", *hash}};
+                    entry = json{{"id", id}, {"type", type}, {"path", relative}, {"sha256", *hash}};
                     replaced = true;
                 }
             }
             if (!replaced) {
-                manifest["assets"].push_back(json{{"id", id}, {"type", type},
-                                                    {"path", std::filesystem::relative(target, engine.projectPath().parent_path()).generic_string()},
-                                                    {"sha256", *hash}});
+                manifest["assets"].push_back(json{{"id", id}, {"type", type}, {"path", relative}, {"sha256", *hash}});
             }
             const std::filesystem::path manifestTemp = manifestPath.string() + ".tmp";
             { std::ofstream out(manifestTemp, std::ios::trunc); out << manifest.dump(2) << '\n'; }
             std::filesystem::rename(manifestTemp, manifestPath, ec);
-            if (ec) { rollback(); return ToolResult::failure(ToolErrorCode::Unavailable, "cannot update project asset manifest: " + ec.message()); }
-            committed = true;
+            if (ec) {
+                std::error_code removeError;
+                std::filesystem::remove(manifestTemp, removeError);
+                return ToolResult::failure(ToolErrorCode::Unavailable, "cannot update project asset manifest: " + ec.message());
+            }
+            if (manifestExisted) {
+                ctx.noteReplacedFile(manifestPath, std::move(previousManifest));
+            } else {
+                ctx.noteCreatedFile(manifestPath, ToolContext::FileRole::ProjectDocument);
+            }
             return ToolResult::ok(json{{"id", id}, {"source", "project"}, {"type", type},
                                        {"path", target.string()}, {"sha256", *hash}, {"copied", copied}},
                                   "asset imported into project");
@@ -1049,7 +1121,8 @@ void registerParameterTools(ToolRegistry& registry) {
             };
             json found = json::array();
             std::error_code ec;
-            for (const std::filesystem::path& root : ctx.contentRoots()) {
+            const std::vector<std::filesystem::path> searched = ctx.paths().searchRoots();
+            for (const std::filesystem::path& root : searched) {
                 if (!std::filesystem::is_directory(root, ec) || found.size() >= limit) {
                     continue;
                 }
@@ -1076,7 +1149,7 @@ void registerParameterTools(ToolRegistry& registry) {
             }
             const auto count = found.size();
             json roots = json::array();
-            for (const auto& r : ctx.contentRoots()) {
+            for (const auto& r : searched) {
                 roots.push_back(r.string());
             }
             return ToolResult::ok(json{{"files", std::move(found)}, {"searched", std::move(roots)}},
@@ -1098,12 +1171,9 @@ void registerParameterTools(ToolRegistry& registry) {
             if (given.empty()) {
                 return ToolResult::failure(ToolErrorCode::InvalidArguments, "no file named");
             }
-            const auto resolved = ctx.resolveContent(given);
+            const auto resolved = ctx.paths().forRead(given);
             if (!resolved) {
-                return ToolResult::failure(
-                    ToolErrorCode::NotFound,
-                    fmt::format("'{}' is not inside a folder this session may read", given),
-                    "asset.list_importable reports what is reachable");
+                return ToolResult::failure(resolved.error());
             }
             std::error_code ec;
             if (!std::filesystem::is_regular_file(*resolved, ec)) {
@@ -1113,23 +1183,35 @@ void registerParameterTools(ToolRegistry& registry) {
             app::Engine& engine = ctx.engine();
             if (engine.projectPath().empty()) {
                 return ToolResult::failure(
-                    ToolErrorCode::InvalidArguments,
+                    ToolErrorCode::FailedPrecondition,
                     "this session has no project to import into",
                     "use project.create first: the copy goes beside the project file, and without "
                     "one there is nowhere for it to live");
             }
-            const std::filesystem::path audioDir = engine.projectPath().parent_path() / "audio";
-            std::filesystem::create_directories(audioDir, ec);
-            const std::filesystem::path target = audioDir / resolved->filename();
+            if (auto refused = ctx.paths().projectWriteRefusal()) {
+                return ToolResult::failure(std::move(*refused));
+            }
+            const auto audioDir = ctx.paths().forWrite((ctx.paths().projectFolder() / "audio").string());
+            if (!audioDir) {
+                return ToolResult::failure(audioDir.error());
+            }
+            std::filesystem::create_directories(*audioDir, ec);
+            const std::filesystem::path target = *audioDir / resolved->filename();
+            const bool existed = std::filesystem::exists(target, ec);
             std::filesystem::copy_file(*resolved, target,
                                        std::filesystem::copy_options::overwrite_existing, ec);
             if (ec) {
                 return ToolResult::failure(ToolErrorCode::Unavailable,
                                            fmt::format("cannot copy into the project: {}", ec.message()));
             }
+            if (existed) {
+                ctx.noteOverwrittenFile(target);
+            } else {
+                // A failed decode below is a failed call, so the session's compensation log removes the copy.
+                ctx.noteCreatedFile(target);
+            }
             const auto duration = engine.loadAudio(target);
             if (!duration) {
-                std::filesystem::remove(target, ec); // do not leave a copy of a file that will not decode
                 return ToolResult::failure(ToolErrorCode::Unsupported, duration.error().message,
                                            "the file was copied in and removed again; nothing in the "
                                            "project points at it");
@@ -1338,7 +1420,7 @@ void registerParameterTools(ToolRegistry& registry) {
         "The entities in the scene: what each one drives, the behaviours it runs, how many reactions "
         "it carries, and the profile it was built from. Reactions are what a music field scales, so "
         "an entity with none is one a field cannot affect.",
-        noArgs(), readOnly(),
+        noArgs(), requiring(readOnly(), {"composition"}),
         [](const json&, ToolContext& ctx) -> ToolResult {
             const scene::Composition* comp = ctx.engine().composition();
             if (comp == nullptr) {
@@ -1368,7 +1450,7 @@ void registerParameterTools(ToolRegistry& registry) {
         "entities it governs, and -- the part worth reading -- whether it follows something baked or "
         "something live. A field on a baked actor is a pure function of time and survives a scrub "
         "exactly; one on a live entity does not (ADR-091).",
-        noArgs(), readOnly(),
+        noArgs(), requiring(readOnly(), {"composition"}),
         [](const json&, ToolContext& ctx) -> ToolResult {
             const scene::Composition* comp = ctx.engine().composition();
             if (comp == nullptr) {
@@ -1411,7 +1493,7 @@ void registerParameterTools(ToolRegistry& registry) {
                         {"falloff", schema::string("constant, linear, smooth (default) or inverseSquare")},
                         {"tags", schema::array(schema::string("tag"),
                                                "Entity tags or profile names it governs; empty means all")}}),
-        as(mutating(), ExecutionClass::Structural),
+        requiring(as(mutating(), ExecutionClass::Structural), {"composition"}),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             scene::Composition* comp = ctx.engine().composition();
             if (comp == nullptr) {
@@ -1493,7 +1575,7 @@ void registerParameterTools(ToolRegistry& registry) {
         schema::object({{"node", schema::string("Ask about one node; omit for everything visible")},
                         {"aspect", schema::number("Frame aspect ratio (default 16:9)")},
                         {"limit", schema::integer("Maximum nodes reported (default 40)", 1, kMaxLimit)}}),
-        readOnly(),
+        requiring(readOnly(), {"composition"}),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             app::Engine& engine = ctx.engine();
             scene::Composition* comp = engine.composition();
@@ -1630,7 +1712,7 @@ void registerParameterTools(ToolRegistry& registry) {
                         {"position", schema::array(schema::number("metres"), "World position", 3, 3)},
                         {"scale", schema::number("Uniform scale (default 1)")},
                         {"rotationDegrees", schema::array(schema::number("degrees"), "Euler XYZ", 3, 3)}}),
-        needs(as(mutating(), ExecutionClass::Structural), {"read"}),
+        requiring(needs(as(mutating(), ExecutionClass::Structural), {"read"}), {"composition"}),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             app::Engine& engine = ctx.engine();
             scene::Composition* comp = engine.composition();
@@ -1672,12 +1754,9 @@ void registerParameterTools(ToolRegistry& registry) {
                     return ToolResult::failure(ToolErrorCode::InvalidArguments,
                                                "a gltf node needs an asset");
                 }
-                const auto resolved = ctx.resolveContent(asset);
+                const auto resolved = ctx.paths().forRead(asset);
                 if (!resolved) {
-                    return ToolResult::failure(
-                        ToolErrorCode::NotFound,
-                        fmt::format("'{}' is not inside a folder this session may read", asset),
-                        "asset.list_importable reports the models that are reachable");
+                    return ToolResult::failure(resolved.error());
                 }
                 std::error_code ec;
                 if (!std::filesystem::is_regular_file(*resolved, ec)) {
@@ -1685,6 +1764,7 @@ void registerParameterTools(ToolRegistry& registry) {
                                                fmt::format("'{}' is not a file", resolved->string()));
                 }
                 node.asset = *resolved;
+                ctx.noteUsedFile(*resolved); // a node made from an import depends on it (compensation rule 3)
             }
             const std::string parent = args.value("parent", std::string{});
             if (!parent.empty()) {
@@ -1731,7 +1811,8 @@ void registerParameterTools(ToolRegistry& registry) {
     add(registry, "scene.delete_node", "Delete a node",
         "Remove a node from the scene. Its children go with it, so deleting a group deletes what it "
         "holds -- the count is reported rather than left to be discovered.",
-        schema::object({{"name", schema::string("Node name")}}), as(mutating(), ExecutionClass::Structural),
+        schema::object({{"name", schema::string("Node name")}}),
+        requiring(as(mutating(), ExecutionClass::Structural), {"composition"}),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             scene::Composition* comp = ctx.engine().composition();
             if (comp == nullptr) {
@@ -1778,7 +1859,7 @@ void registerParameterTools(ToolRegistry& registry) {
         "means and is worth knowing before using it to tidy a scene.",
         schema::object({{"name", schema::string("Node to move")},
                         {"parent", schema::string("New parent; empty moves it to the root")}}),
-        as(mutating(), ExecutionClass::Structural),
+        requiring(as(mutating(), ExecutionClass::Structural), {"composition"}),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             app::Engine& engine = ctx.engine();
             scene::Composition* comp = engine.composition();
@@ -2076,7 +2157,7 @@ void registerSceneTools(ToolRegistry& registry) {
                                                 {"gltf", "orb", "grid", "particles", "scene",
                                                  "procedural", "field", "spline", "sdf", "terrain"})},
                         {"limit", schema::integer("Maximum results", 1, kMaxLimit)}}),
-        readOnly(),
+        requiring(readOnly(), {"composition"}),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             auto* comp = ctx.engine().composition();
             if (comp == nullptr) {
@@ -3326,7 +3407,7 @@ void registerPerformanceTools(ToolRegistry& registry) {
         "draw calls, triangles, visible and culled instances, light count and per-pass GPU time. "
         "Read this before and after any change made under a frame-rate constraint. If no renderer "
         "is attached to this session the result says so rather than reporting zeros.",
-        noArgs(), readOnly(),
+        noArgs(), requiring(readOnly(), {"performance"}),
         [](const json&, ToolContext& ctx) -> ToolResult {
             const PerformanceSnapshot snapshot = ctx.performance();
             if (!snapshot.available) {
@@ -3374,6 +3455,7 @@ void registerPerformanceTools(ToolRegistry& registry) {
     profiles.idempotent = false;
     profiles.executionClass = ExecutionClass::Job;
     profiles.permissions = {"subprocess"};
+    profiles.requirements = {"profile"};
     add(registry, "performance.profile_scene", "Profile the scene for live performance",
         "Run the live scene profiler (avgen --live-profile) on a scratch copy of the project, in a child process, and "
         "return its record (schema avgen.liveprofile/1): frame statistics against the target's budget, the critical path "
@@ -3462,6 +3544,7 @@ void registerPerformanceTools(ToolRegistry& registry) {
     ToolAnnotations optimizes = sessionWrite();
     optimizes.executionClass = ExecutionClass::Job; // a child process (avgen --live-profile)
     optimizes.permissions = {"subprocess"};
+    optimizes.requirements = {"profile"};
     optimizes.expensive = true;
     optimizes.idempotent = false;
     add(registry, "performance.optimize_scene", "Optimize the scene for a frame rate",
@@ -3604,14 +3687,11 @@ void registerPerformanceTools(ToolRegistry& registry) {
 // ================================================================================================
 
 void registerEngineTools(ToolRegistry& registry) {
-    // The snapshot store lives for the process: `project.create_snapshot` and
-    // `project.restore_snapshot` have to agree on the same ids across calls, and a store owned by
-    // the registry would be destroyed with it. One per process is right -- snapshots are session
-    // state, and there is one engine per process.
-    static SnapshotStore snapshots;
-
+    // No store here (ADR-2153): the snapshot tools reach their session's own through
+    // `ToolContext::snapshots()`, so one immutable registry serves every session and two sessions
+    // never see each other's rollback points.
     registerCapabilityTools(registry);
-    registerProjectTools(registry, snapshots);
+    registerProjectTools(registry);
     registerParameterTools(registry);
     registerSceneTools(registry);
     registerCameraTools(registry);

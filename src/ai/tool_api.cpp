@@ -66,11 +66,14 @@ const char* toolErrorCodeName(ToolErrorCode code) {
     case ToolErrorCode::Conflict: return "CONFLICT";
     case ToolErrorCode::Cancelled: return "CANCELLED";
     case ToolErrorCode::Internal: return "INTERNAL";
+    case ToolErrorCode::PermissionDenied: return "PERMISSION_DENIED";
+    case ToolErrorCode::FailedPrecondition: return "FAILED_PRECONDITION";
+    case ToolErrorCode::Busy: return "BUSY";
     }
     return "INTERNAL";
 }
 
-static_assert(std::size(kAllToolErrorCodes) == static_cast<std::size_t>(ToolErrorCode::Internal) + 1,
+static_assert(std::size(kAllToolErrorCodes) == static_cast<std::size_t>(ToolErrorCode::Busy) + 1,
               "kAllToolErrorCodes must list every ToolErrorCode");
 
 const char* toolErrorCodeMeaning(ToolErrorCode code) {
@@ -96,6 +99,17 @@ const char* toolErrorCodeMeaning(ToolErrorCode code) {
         return "The call was cancelled, or the host did not service it in time. Nothing further was applied.";
     case ToolErrorCode::Internal:
         return "An engine fault. Report it with the message; the project was not necessarily modified.";
+    case ToolErrorCode::PermissionDenied:
+        return "This session's permissions forbid the call: a path outside its read or write roots, a write into a "
+               "project it may only read, or a child process it may not start. Retrying unchanged will not help; "
+               "the recovery text names what to change, and details.path names the path when there is one.";
+    case ToolErrorCode::FailedPrecondition:
+        return "The session is not in the state the call needs: no project is open, there is no composition, or a "
+               "transaction is already open (or not open). Put the session in that state first; the recovery text "
+               "says how.";
+    case ToolErrorCode::Busy:
+        return "The call is valid but cannot run now: the host is running a live show, or the work it needs is "
+               "taken. Retry later; details.retryAfterMs says when, if the host knows.";
     }
     return "";
 }
@@ -130,12 +144,17 @@ ToolResult ToolResult::ok(nlohmann::json value, std::string summary) {
     return r;
 }
 
-ToolResult ToolResult::failure(ToolErrorCode code, std::string message, std::string recovery) {
+ToolResult ToolResult::failure(ToolErrorCode code, std::string message, std::string recovery,
+                               nlohmann::json details) {
+    return failure(ToolError{code, std::move(message), std::move(recovery), std::move(details)});
+}
+
+ToolResult ToolResult::failure(ToolError error) {
     ToolResult r;
     r.success = false;
     r.value = nlohmann::json::object();
-    r.summary = message;
-    r.error = ToolError{code, std::move(message), std::move(recovery)};
+    r.summary = error.message;
+    r.error = std::move(error);
     return r;
 }
 
@@ -152,6 +171,9 @@ nlohmann::json ToolResult::toJson() const {
         e["message"] = error->message;
         if (!error->recovery.empty()) {
             e["recovery"] = error->recovery;
+        }
+        if (error->details.is_object() && !error->details.empty()) {
+            e["details"] = error->details;
         }
         j["error"] = std::move(e);
     }
@@ -176,6 +198,7 @@ nlohmann::json ToolAnnotations::toJson() const {
     j["deterministic"] = deterministic;
     j["executionClass"] = executionClassName(effectiveExecutionClass());
     j["permissions"] = permissions;
+    j["requirements"] = requirements;
     return j;
 }
 
@@ -231,6 +254,12 @@ void ToolRegistry::add(Tool tool) {
                                    p + "'");
         }
     }
+    for (const std::string& r : a.requirements) {
+        if (std::find(std::begin(kToolRequirements), std::end(kToolRequirements), r) == std::end(kToolRequirements)) {
+            throw std::logic_error("ToolRegistry::add: tool '" + tool.definition.name + "' names unknown requirement '" +
+                                   r + "'");
+        }
+    }
     if (tool.definition.since < 1) {
         throw std::logic_error("ToolRegistry::add: tool '" + tool.definition.name + "' has no API level ('since')");
     }
@@ -273,32 +302,28 @@ std::vector<std::string> ToolRegistry::domains() const {
     return out;
 }
 
-ToolResult ToolRegistry::invoke(std::string_view name, const nlohmann::json& args,
-                                ToolContext& ctx) const {
-    const Tool* tool = find(name);
-    if (tool == nullptr) {
-        return ToolResult::failure(ToolErrorCode::NotFound,
-                                   fmt::format("no tool named '{}'", name),
-                                   "call capability.list_tools for the available tool names");
-    }
+ToolError ToolRegistry::unknownTool(std::string_view name) {
+    return ToolError{ToolErrorCode::NotFound, fmt::format("no tool named '{}'", name),
+                     "call capability.list_tools for the available tool names", nullptr};
+}
+
+std::optional<ToolError> ToolRegistry::checkArguments(const Tool& tool, const nlohmann::json& args) {
     const nlohmann::json& effective = args.is_null() ? nlohmann::json::object() : args;
     if (!effective.is_object()) {
-        return ToolResult::failure(ToolErrorCode::InvalidArguments,
-                                   "arguments must be a JSON object",
-                                   "pass an object whose keys match the tool's input schema");
+        return ToolError{ToolErrorCode::InvalidArguments, "arguments must be a JSON object",
+                         "pass an object whose keys match the tool's input schema", nullptr};
     }
-    if (auto error = validateAgainstSchema(tool->definition.inputSchema, effective)) {
-        ToolResult r;
-        r.success = false;
-        r.summary = error->message;
-        r.error = std::move(error);
-        return r;
-    }
+    return validateAgainstSchema(tool.definition.inputSchema, effective);
+}
+
+ToolResult ToolRegistry::run(const Tool& tool, const nlohmann::json& args, ToolContext& ctx) {
+    const nlohmann::json& effective = args.is_null() ? nlohmann::json::object() : args;
+    const std::string& name = tool.definition.name;
     // A tool body that throws must not take the orchestrator's worker with it. Engine code signals
     // programming errors with exceptions (core/error.hpp), and a model can reach a code path an
     // author never did.
     try {
-        return tool->execute(effective, ctx);
+        return tool.execute(effective, ctx);
     } catch (const std::exception& e) {
         log::error("ai: tool '{}' threw: {}", name, e.what());
         return ToolResult::failure(ToolErrorCode::Internal,
@@ -309,6 +334,18 @@ ToolResult ToolRegistry::invoke(std::string_view name, const nlohmann::json& arg
         return ToolResult::failure(ToolErrorCode::Internal,
                                    fmt::format("tool '{}' failed with an unknown exception", name));
     }
+}
+
+ToolResult ToolRegistry::invoke(std::string_view name, const nlohmann::json& args,
+                                ToolContext& ctx) const {
+    const Tool* tool = find(name);
+    if (tool == nullptr) {
+        return ToolResult::failure(unknownTool(name));
+    }
+    if (auto error = checkArguments(*tool, args)) {
+        return ToolResult::failure(std::move(*error));
+    }
+    return run(*tool, args, ctx);
 }
 
 // ---- schema validation --------------------------------------------------------------------------

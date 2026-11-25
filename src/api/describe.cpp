@@ -1,4 +1,5 @@
 #include "api/describe.hpp"
+#include "api/session.hpp"
 
 #include "ai/director_tools.hpp"
 #include "ai/engine_tools.hpp"
@@ -188,8 +189,7 @@ json sceneSchema() {
 
 ai::ToolRegistry makeCatalogueRegistry() {
     ai::ToolRegistry registry;
-    ai::registerEngineTools(registry);
-    ai::registerDirectorTools(registry);
+    registerAllTools(registry); // the engine, Director and session tools: what every Session holds
     return registry;
 }
 
@@ -292,8 +292,11 @@ std::string toolsMarkdown(const json& catalogue) {
     md += fmt::format("API level {}, engine {}. Machine-readable form: `schemas/tool-catalogue.json`; the error codes are "
                       "in [errors.md](errors.md).\n\n",
                       catalogue.at("api").get<int>(), catalogue.at("engine").get<std::string>());
-    md += "Every tool returns the same envelope: `{success, result}` or `{success: false, error: {code, message, "
-          "recovery}}`. Arguments are validated against the input schema before the tool runs.\n\n";
+    md += "Every call through a session returns the same envelope (ADR-2153): `{success, result, summary, changes, "
+          "warnings, transaction, job}`, and on failure `error: {code, message, recovery, details?}` with `result` "
+          "null. Arguments are validated against the input schema before the tool runs. **Requirements** are what the "
+          "host must provide for a tool to be available (a composition, or a host hook); `session.info` answers "
+          "supported, available and permitted per tool.\n\n";
     md += "**Execution class** says how a call is scheduled: `read` (no change), `instant` (a value, applied at the next "
           "frame), `rebind` (a route, key or shot added or removed), `structural` (the composition is rebuilt), "
           "`session` (changes the session, not the project: open, save, import, seek) and `job` (seconds to minutes: a "
@@ -320,15 +323,19 @@ std::string toolsMarkdown(const json& catalogue) {
             for (const json& p : a.at("permissions")) {
                 perms += (perms.empty() ? "" : ", ") + ("`" + p.get<std::string>() + "`");
             }
+            std::string needs;
+            for (const json& r : a.value("requirements", json::array())) {
+                needs += (needs.empty() ? "" : ", ") + ("`" + r.get<std::string>() + "`");
+            }
             std::string flagText;
             for (const std::string& f : flags) {
                 flagText += (flagText.empty() ? "" : ", ") + f;
             }
             md += fmt::format("\n### `{}`: {}\n\n", t.at("name").get<std::string>(), t.at("title").get<std::string>());
-            md += fmt::format("MCP name `{}`. Class `{}`. Permissions: {}. Since API {}. Flags: {}.\n\n",
+            md += fmt::format("MCP name `{}`. Class `{}`. Permissions: {}. Requires: {}. Since API {}. Flags: {}.\n\n",
                               t.at("mcpName").get<std::string>(), a.at("executionClass").get<std::string>(),
-                              perms.empty() ? std::string("none") : perms, t.at("since").get<int>(),
-                              flagText.empty() ? std::string("none") : flagText);
+                              perms.empty() ? std::string("none") : perms, needs.empty() ? std::string("nothing") : needs,
+                              t.at("since").get<int>(), flagText.empty() ? std::string("none") : flagText);
             md += t.at("description").get<std::string>() + "\n\n";
             const json& in = t.at("inputSchema");
             const json props = in.value("properties", json::object());
@@ -361,9 +368,10 @@ std::string errorsMarkdown(const json& errors) {
     std::string md;
     md += "# AV Gen error codes\n\n";
     md += std::string(kGeneratedNote) + "\n\n";
-    md += fmt::format("API level {}. A failed call returns `{{success: false, error: {{code, message, recovery}}}}`. "
-                      "The set of codes is closed: a client can branch on every one of them. `recovery` says what to do "
-                      "instead.\n\n",
+    md += fmt::format("API level {}. A failed call returns `{{success: false, error: {{code, message, recovery, "
+                      "details?}}}}`. The set of codes is closed: a client can branch on every one of them. `recovery` "
+                      "says what to do instead; `details`, when present, carries `pointer`, `path`, `field`, `findings` "
+                      "or `retryAfterMs`.\n\n",
                       errors.at("api").get<int>());
     md += "| Code | Meaning |\n|---|---|\n";
     for (const json& c : errors.at("codes")) {

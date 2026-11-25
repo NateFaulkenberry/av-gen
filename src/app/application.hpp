@@ -874,6 +874,7 @@ private:
     // else happens on a job worker. Reset first in the destructor, because it cancels the running
     // task and waits for it, and the panel holds a raw pointer to it.
     std::unique_ptr<ai::ControlPlane> ai_;
+    bool liveControlAllowed_ = false; // ADR-2133's decision, recorded in the assistant's session permissions
     AppSettings settings_;
     std::filesystem::path settingsPath_;
     void saveSettings();
@@ -891,7 +892,7 @@ private:
     // The per-instance LOD rung behind `DebugViewOptions::lod`, read from the cull pass's own
     // `lodIndex` buffer. Empty unless the overlay is on: it is a blocking readback per scattered
     // object and it belongs to the frame owner to decide when that is worth paying for.
-    void initControlPlane();
+    void initControlPlane(api::SessionOptions session);
     // ADR-1562: one frame of the startup "compiling shaders" screen (the pipeline wait hook).
     void drawCompilingScreen(const gpu::PipelineCompileProgress& progress);
     bool bootQuitRequested_ = false;
