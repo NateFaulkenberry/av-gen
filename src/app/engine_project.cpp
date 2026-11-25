@@ -370,6 +370,278 @@ Result<ParkedDirectorsCut> parkedCutFromJson(const nlohmann::json& doc,
     return cut;
 }
 
+// ---- ADR-2164: the readers a project load runs twice -- once to check, once to install ----------------------------
+//
+// Each reads only the document, so `preflightProject` can run it before the engine changes, and a value of the wrong
+// type (`"gain": "loud"`) is refused while the open project is still whole.
+
+const std::function<void(std::string)> kQuiet = [](std::string) {};
+
+// An `assets.audioClips` entry, every field but the file.
+audio::AudioClip clipFromJson(const nlohmann::json& item) {
+    audio::AudioClip clip;
+    clip.startSeconds = item.value("start", 0.0);
+    clip.inSeconds = item.value("in", 0.0);
+    clip.durationSeconds = item.value("duration", 0.0);
+    clip.gain = item.value("gain", 1.0f);
+    clip.fadeInSeconds = item.value("fadeIn", 0.0);
+    clip.fadeOutSeconds = item.value("fadeOut", 0.0);
+    clip.enabled = item.value("enabled", true);
+    clip.name = item.value("name", std::string{});
+    return clip;
+}
+
+// An `assets.stems` entry, every field but the file.
+audio::StemSource stemFromJson(const nlohmann::json& item, const std::function<void(std::string)>& warn) {
+    audio::StemSource stem;
+    stem.key = item.value("key", std::string{});
+    stem.label = item.value("label", std::string{});
+    stem.offsetSeconds = item.value("offset", 0.0);
+    // ADR-1630: what the stem is, explicit only (no role is `other`; nothing is inferred from the
+    // key or the audio). `hits` is gone: a response feed decides which stems run the causal onsets.
+    if (const auto role = item.find("role"); role != item.end()) {
+        const auto parsed = role->is_string() ? audio::sourceRoleFromName(role->get<std::string>()) : std::nullopt;
+        if (parsed) {
+            stem.role = *parsed;
+        } else {
+            warn(fmt::format("assets.stems: stem '{}': role {} is not drums, bass, synth, vocal or other; it is other",
+                             stem.key, role->dump()));
+        }
+    }
+    if (item.contains("hits")) {
+        warn(fmt::format("assets.stems: stem '{}': \"hits\" is gone (ADR-1630); a response feed "
+                         "(\"feeds\") decides which stems run the causal onsets",
+                         stem.key));
+    }
+    stem.gainDb = std::clamp(item.value("gainDb", 0.0f), analysis::kMinTrimDb, analysis::kMaxTrimDb);
+    return stem;
+}
+
+// ADR-207's `cameraShotSpans`.
+std::vector<world::ShotSpan> shotSpansFromJson(const nlohmann::json& array, const std::function<void(std::string)>& warn) {
+    std::vector<world::ShotSpan> spans;
+    if (!array.is_array()) {
+        return spans;
+    }
+    for (const auto& entry : array) {
+        if (!entry.is_object()) {
+            continue;
+        }
+        world::ShotSpan span;
+        span.start = entry.value("start", 0.0);
+        span.end = entry.value("end", 0.0);
+        span.travel = entry.value("travel", false);
+        span.spotlight = entry.value("spotlight", false);
+        // ADR-922: a span's `emphasis` is no longer a field. Files written before carry the
+        // key and it is not read -- it never was, by anything but this loader.
+        span.subject = entry.value("subject", std::string{});
+        const auto readVec = [&entry](const char* key, glm::vec3& out) {
+            if (entry.contains(key) && entry[key].is_array() && entry[key].size() == 3) {
+                out = glm::vec3(entry[key][0].get<float>(), entry[key][1].get<float>(), entry[key][2].get<float>());
+            }
+        };
+        readVec("subjectPosition", span.subjectPosition);
+        span.subjectRadius = entry.value("subjectRadius", 1.0f);
+        span.handoff = entry.value("handoff", std::string{});
+        readVec("handoffPosition", span.handoffPosition);
+        if (!(span.end > span.start)) {
+            warn("cameraShotSpans: a span with no duration was skipped");
+            continue;
+        }
+        spans.push_back(std::move(span));
+    }
+    return spans;
+}
+
+// The transport's persistent half (ADR-102, ADR-394, ADR-1783), as the document has it.
+struct TransportBlock {
+    std::optional<TransportLoop> loop;
+    bool hasTempo = false;
+    double bpm = 0.0;
+    std::string source = "user";
+    std::optional<double> anchor;
+};
+
+TransportBlock readTransport(const nlohmann::json& block) {
+    TransportBlock out;
+    if (block.contains("loop") && block["loop"].is_object()) {
+        const auto& loop = block["loop"];
+        TransportLoop parsed;
+        parsed.enabled = loop.value("enabled", false);
+        parsed.startSeconds = loop.value("start", 0.0);
+        parsed.endSeconds = loop.value("end", 0.0);
+        out.loop = parsed;
+    }
+    if (block.contains("tempo") && block["tempo"].is_object()) {
+        const auto& tempo = block["tempo"];
+        out.hasTempo = true;
+        out.bpm = tempo.value("bpm", 0.0);
+        out.source = tempo.value("source", std::string("user"));
+        if (const auto a = tempo.find("anchor"); a != tempo.end() && a->is_number()) {
+            out.anchor = a->get<double>();
+        }
+    }
+    return out;
+}
+
+// The top-level keys that only mean something against the project's own scene: written by `projectDocument` only
+// while that scene is loaded, so a scene that did not resolve keeps them as the document had them.
+constexpr std::string_view kSceneOwnedKeys[] = {"sceneNodes", "heroes", "effects", "lights", "cameraDirection",
+                                                "staging", "cameraAimFollow", "cameraContinuousTake"};
+
+// A reference as read (a path string, or an object with `path`) re-expressed for a document written in `to` rather
+// than `from`. Byte-for-byte the same when the folder is the same; an absolute path is never changed.
+nlohmann::json rebaseRef(nlohmann::json ref, const std::filesystem::path& from, const std::filesystem::path& to) {
+    const std::string given = assetRefPath(ref);
+    if (given.empty() || std::filesystem::path(given).is_absolute()) {
+        return ref;
+    }
+    std::error_code ec;
+    const auto a = std::filesystem::weakly_canonical(from, ec);
+    const auto b = std::filesystem::weakly_canonical(to, ec);
+    if (a == b) {
+        return ref;
+    }
+    setAssetRefPath(ref, relativeTo((from / given).lexically_normal(), to));
+    return ref;
+}
+
+std::string normalKey(const std::filesystem::path& p) { return p.lexically_normal().string(); }
+
+// ADR-2164: every refusal of the project loader that reads only the document, run before the loader changes
+// anything. A document that fails here leaves the open project exactly as it was. What this cannot see -- a
+// parameter value of the wrong type for a parameter the scene registers, an exception in a reader that needs the
+// engine -- is found after the reset, and `loadProject` falls back to an empty untitled project for it.
+Result<void> preflightProject(const nlohmann::json& doc) try {
+    if (const auto assets = doc.find("assets"); assets != doc.end() && assets->is_object()) {
+        if (const auto clips = assets->find("audioClips"); clips != assets->end() && clips->is_array()) {
+            for (const auto& item : *clips) {
+                if (item.is_object() && item.contains("file")) {
+                    static_cast<void>(clipFromJson(item));
+                }
+            }
+        }
+        if (const auto stems = assets->find("stems"); stems != assets->end() && stems->is_array()) {
+            for (const auto& item : *stems) {
+                if (item.is_object() && item.contains("file")) {
+                    static_cast<void>(stemFromJson(item, kQuiet));
+                }
+            }
+        }
+        if (const auto scene = assets->find("scene"); scene != assets->end() && scene->is_object()) {
+            static_cast<void>(scene->value("kind", std::string("orb")));
+        }
+    }
+    if (const auto entry = doc.find("cameraAimFollow"); entry != doc.end()) {
+        static_cast<void>(aimFollowFromJson(*entry, "cameraAimFollow", kQuiet));
+    }
+    if (const auto composition = doc.find("composition"); composition != doc.end()) {
+        comp::LayerStack scratch;
+        if (auto r = scratch.fromJson(*composition); !r) {
+            return r;
+        }
+    }
+    if (doc.contains("palette")) {
+        if (auto palette = params::Palette::fromJson(doc["palette"]); !palette) {
+            return std::unexpected(palette.error());
+        }
+    }
+    if (auto r = params::validateProjectDocument(doc); !r) {
+        return r;
+    }
+    if (doc.contains("control")) {
+        if (auto map = control::ControlMap::fromJson(doc["control"]); !map) {
+            return std::unexpected(map.error());
+        }
+        const std::string tempo = doc["control"].value("tempoSource", std::string("analysis"));
+        if (!tempoSourceFromName(tempo)) {
+            return fail("control.tempoSource '{}' unknown (analysis|midi)", tempo);
+        }
+    }
+    if (doc.contains("shaders")) {
+        const auto& shaders = doc["shaders"];
+        if (!shaders.is_array()) {
+            return fail("'shaders' must be an array");
+        }
+        for (const auto& entry : shaders) {
+            if (!entry.is_object() || !entry.contains("path")) {
+                return fail("shader entry must be an object with a 'path'");
+            }
+            static_cast<void>(entry["path"].get<std::string>());
+            if (auto stage = shaders::layerStageFromName(entry.value("stage", std::string("background"))); !stage) {
+                return std::unexpected(stage.error());
+            }
+            static_cast<void>(entry.value("enabled", true));
+        }
+    }
+    if (doc.contains("timeline")) {
+        params::Timeline scratch;
+        if (auto r = scratch.fromJson(doc["timeline"]); !r) {
+            return r;
+        }
+    }
+    if (const auto director = doc.find("autoDirector"); director != doc.end()) {
+        if (auto parsed = AutoDirectorSettings::fromJson(*director); !parsed) {
+            return std::unexpected(parsed.error());
+        }
+    }
+    if (const auto plan = doc.find("songPlan"); plan != doc.end()) {
+        if (auto parsed = songPlanFromJson(*plan); !parsed) {
+            return std::unexpected(parsed.error());
+        }
+    }
+    if (const auto spans = doc.find("cameraShotSpans"); spans != doc.end()) {
+        static_cast<void>(shotSpansFromJson(*spans, kQuiet));
+    }
+    if (const auto parked = doc.find("parkedDirector"); parked != doc.end()) {
+        if (auto cut = parkedCutFromJson(*parked, kQuiet); !cut) {
+            return std::unexpected(cut.error());
+        }
+    }
+    if (doc.contains("states")) {
+        StateMachine scratch;
+        if (auto r = scratch.fromJson(doc["states"]); !r) {
+            return r;
+        }
+    }
+    if (doc.contains("worldMacros")) {
+        if (!doc["worldMacros"].is_array()) {
+            return fail("'worldMacros' must be an array");
+        }
+        for (const auto& mj : doc["worldMacros"]) {
+            if (auto m = WorldMacro::fromJson(mj); !m) {
+                return std::unexpected(m.error());
+            }
+        }
+    }
+    if (doc.contains("director")) {
+        if (auto director = WorldDirector::fromJson(doc["director"]); !director) {
+            return std::unexpected(director.error());
+        }
+    }
+    if (doc.contains("render")) {
+        if (auto r = RenderSettings::fromJson(doc["render"]); !r) {
+            return std::unexpected(r.error());
+        }
+    }
+    if (doc.contains("pathtrace")) {
+        if (auto r = PathTraceSettings::fromJson(doc["pathtrace"]); !r) {
+            return std::unexpected(r.error());
+        }
+    }
+    if (doc.contains("transport") && doc["transport"].is_object()) {
+        static_cast<void>(readTransport(doc["transport"]));
+    }
+    if (doc.contains("sequence")) {
+        if (auto parsed = seq::Sequence::fromJson(doc["sequence"]); !parsed) {
+            return fail("project sequence: {}", parsed.error().message);
+        }
+    }
+    return {};
+} catch (const nlohmann::json::exception& e) {
+    return fail("{}", e.what());
+}
+
 } // namespace
 
 // ---- the project document -- what a save writes, and what it compares against -----------------
@@ -392,6 +664,23 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
                 entry[key] = value;
             }
         }
+    }
+    // ADR-2164: a layer that did not load is kept where it was in the list, as written -- unless the session has
+    // since added that file itself.
+    for (std::size_t k = 0; k < kept_.shaders.size(); ++k) {
+        const auto& [index, raw] = kept_.shaders[k];
+        const bool readded = std::any_of(shaderLayers_.layers().begin(), shaderLayers_.layers().end(), [&](const auto& l) {
+            return normalKey(l->path) == kept_.shaderFiles[k];
+        });
+        if (readded) {
+            continue;
+        }
+        nlohmann::json entry = raw;
+        if (entry.contains("path")) {
+            entry["path"] = rebaseRef(entry["path"], kept_.dir, dir);
+        }
+        shaders.insert(shaders.begin() + static_cast<std::ptrdiff_t>(std::min<std::size_t>(index, shaders.size())),
+                       std::move(entry));
     }
     doc["shaders"] = std::move(shaders);
     if (!timeline_.empty()) {
@@ -930,7 +1219,7 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
         nlohmann::json list = nlohmann::json::array();
         for (const audio::AudioClip& clip : audioClips_) {
             nlohmann::json item = nlohmann::json::object();
-            item["file"] = assetRefJson(clip.file, dir);
+            item["file"] = keptFileRef(clip.file, dir); // ADR-2164: a missing clip as it was written
             // Only what differs from the default, so a clip that was merely dropped on the timeline
             // reads as one line rather than as eight fields of zero.
             if (clip.startSeconds != 0.0) item["start"] = clip.startSeconds;
@@ -952,7 +1241,7 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
             nlohmann::json item = nlohmann::json::object();
             item["key"] = stem.source.key;
             item["label"] = stem.source.label;
-            item["file"] = assetRefJson(stem.source.file, dir);
+            item["file"] = keptFileRef(stem.source.file, dir); // ADR-2164
             if (stem.source.offsetSeconds != 0.0) item["offset"] = stem.source.offsetSeconds;
             if (stem.source.role != audio::SourceRole::Other) item["role"] = audio::sourceRoleName(stem.source.role); // ADR-1630
             if (stem.source.gainDb != 0.0f) item["gainDb"] = stem.source.gainDb; // ADR-1582
@@ -960,8 +1249,24 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
         }
         assets["stems"] = std::move(list);
     }
-    if (!environmentPath_.empty()) {
+    if (keptEnvironmentInForce()) {
+        assets["environment"] = rebaseRef(*kept_.environment, kept_.dir, dir); // ADR-2164: as written
+    } else if (!environmentPath_.empty()) {
         assets["environment"] = assetRefJson(environmentPath_, dir);
+    }
+    // ADR-2164: the audio this project names did not load, and nothing has been put in its place.
+    if (keptAudioInForce() && !assets.contains("audio") && !assets.contains("audioClips")) {
+        if (kept_.audioKey == "audioClips" && kept_.audio->is_array()) {
+            nlohmann::json list = *kept_.audio;
+            for (auto& item : list) {
+                if (item.is_object() && item.contains("file")) {
+                    item["file"] = rebaseRef(item["file"], kept_.dir, dir);
+                }
+            }
+            assets["audioClips"] = std::move(list);
+        } else {
+            assets[kept_.audioKey] = rebaseRef(*kept_.audio, kept_.dir, dir);
+        }
     }
     nlohmann::json sceneRef = nlohmann::json::object();
     if (auto* comp = composition()) {
@@ -976,6 +1281,17 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
     } else if (auto* gltf = gltfScene()) {
         sceneRef["kind"] = "gltf";
         sceneRef["path"] = assetRefJson(gltf->path(), dir);
+    } else if (keptSceneInForce()) {
+        // ADR-2164: the scene this project names did not load and the orb is only standing in for it.
+        sceneRef = *kept_.scene;
+        if (sceneRef.contains("path")) {
+            sceneRef["path"] = rebaseRef(sceneRef["path"], kept_.dir, dir);
+        }
+        for (const auto& [key, value] : kept_.sceneKeys.items()) {
+            if (!doc.contains(key)) {
+                doc[key] = value;
+            }
+        }
     } else {
         sceneRef["kind"] = "orb";
     }
@@ -1276,6 +1592,80 @@ Result<void> Engine::requireProjectScene() const {
                 projectSceneError_);
 }
 
+// ---- ADR-2164: the references the open project could not resolve -------------------------------------------------
+
+bool Engine::keptSceneInForce() const {
+    return kept_.scene.has_value() && sceneGeneration_ == kept_.sceneGeneration && composition() == nullptr &&
+           dynamic_cast<const scene::GltfScene*>(controller_.get()) == nullptr;
+}
+
+bool Engine::keptAudioInForce() const {
+    return kept_.audio.has_value() && audioGeneration_ == kept_.audioGeneration && audioClips_.empty() &&
+           audioPath_.empty();
+}
+
+bool Engine::keptEnvironmentInForce() const {
+    return kept_.environment.has_value() && environmentPath_ == kept_.environmentAtLoad &&
+           sceneGeneration_ == kept_.sceneGeneration;
+}
+
+nlohmann::json Engine::keptFileRef(const std::filesystem::path& file, const std::filesystem::path& dir) const {
+    if (const auto it = kept_.files.find(normalKey(file)); it != kept_.files.end()) {
+        std::error_code ec;
+        if (!std::filesystem::exists(file, ec)) {
+            return rebaseRef(it->second, kept_.dir, dir);
+        }
+    }
+    return assetRefJson(file, dir);
+}
+
+std::vector<Engine::UnresolvedReference> Engine::unresolvedReferences() const {
+    std::vector<UnresolvedReference> out;
+    const auto listed = [&](const std::string& key, bool clips) {
+        std::error_code ec;
+        if (std::filesystem::exists(key, ec)) {
+            return false;
+        }
+        if (clips) {
+            return std::any_of(audioClips_.begin(), audioClips_.end(),
+                               [&](const audio::AudioClip& c) { return normalKey(c.file) == key; });
+        }
+        return std::any_of(stems_.begin(), stems_.end(),
+                           [&](const StemState& s) { return normalKey(s.source.file) == key; });
+    };
+    for (const UnresolvedReference& r : kept_.list) {
+        bool inForce = false;
+        if (r.kind == "scene") {
+            inForce = keptSceneInForce();
+        } else if (r.kind == "audio") {
+            inForce = keptAudioInForce();
+        } else if (r.kind == "environment") {
+            inForce = keptEnvironmentInForce();
+        } else if (r.kind == "audioClip" || r.kind == "stem") {
+            const bool clip = r.kind == "audioClip";
+            if (clip && keptAudioInForce()) {
+                inForce = true; // the whole arrangement is kept
+            } else {
+                inForce = std::any_of(kept_.files.begin(), kept_.files.end(), [&](const auto& f) {
+                    return assetRefPath(f.second) == r.path && listed(f.first, clip);
+                });
+            }
+        } else if (r.kind == "shader") {
+            inForce = true;
+            for (std::size_t k = 0; k < kept_.shaders.size(); ++k) {
+                if (fmt::format("/shaders/{}/path", kept_.shaders[k].first) == r.pointer) {
+                    inForce = std::none_of(shaderLayers_.layers().begin(), shaderLayers_.layers().end(),
+                                           [&](const auto& l) { return normalKey(l->path) == kept_.shaderFiles[k]; });
+                }
+            }
+        }
+        if (inForce) {
+            out.push_back(r);
+        }
+    }
+    return out;
+}
+
 Result<void> Engine::loadProject(const std::filesystem::path& path) try {
     // ---- the stages, and what they cost -----------------------------------------------------
     //
@@ -1343,8 +1733,45 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
     for (const auto& step : migrated->steps) {
         log::info("project '{}' migrated: {}", path.filename().string(), step);
     }
+    // ADR-2164: everything that can refuse the document is asked now, while the open project is still whole. A
+    // refusal here changes nothing: not the path, not a value, not the editor's workspace (projectGeneration).
+    if (auto checked = preflightProject(doc); !checked) {
+        return fail("'{}' is not a valid project: {}", path.string(), checked.error().message);
+    }
+    Result<void> installed;
+    try {
+        installed = installProjectDocument(doc, path, stage, finishTimings);
+    } catch (const nlohmann::json::exception& e) {
+        installed = fail("'{}' is not a valid project: {}", path.string(), e.what());
+    }
+    if (!installed) {
+        // Found only after the reset (a parameter value of the wrong type for the parameter this project's scene
+        // registers, or an exception in a reader that needs the engine). The engine is half one project and half
+        // the other, and it must not stay that way under the old project's path, or the next save writes the mix
+        // over the old file (the 5,929 -> 1,059-byte run of 113/05-ui-readiness/02). A defined state instead: an
+        // empty untitled project, which has no file a save could overwrite.
+        const std::string why = installed.error().message;
+        log::error("project '{}': {}; the session now has an empty untitled project", path.filename().string(), why);
+        newProject();
+        return fail("{} -- the project could not be opened after the last one was closed, so the session now has an "
+                    "empty untitled project (nothing was saved)",
+                    why);
+    }
+    return {};
+} catch (const nlohmann::json::exception& e) {
+    // A key of the wrong type (`"format": 1`) makes `.value()`/`.get<T>()` throw; nothing above
+    // this caught it, so a damaged file terminated the application instead of failing to open
+    // (tests/integration/test_project_malformed.cpp). Before the install: nothing has changed.
+    return fail("'{}' is not a valid project: {}", path.string(), e.what());
+}
+
+Result<void> Engine::installProjectDocument(nlohmann::json& doc, const std::filesystem::path& path,
+                                            const std::function<void(int)>& stage,
+                                            const std::function<void()>& finishTimings) {
     stage(1);
     const auto dir = std::filesystem::absolute(path).parent_path();
+    kept_ = KeptReferences{}; // ADR-2164: recorded below as each reference resolves or does not
+    kept_.dir = dir;
     resetProjectBasis(); // ADR-2132: none of the last document's basis survives into this one
     projectWarnings_.clear();
     projectSceneError_.clear();
@@ -1416,6 +1843,17 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
             return *found;
         }
         return path; // still missing: the loader reports it
+    };
+    // ADR-2164: a reference that did not resolve, kept as the document had it for every save.
+    const auto unresolved = [&](std::string kind, std::string pointer, const nlohmann::json& ref, std::string reason) {
+        kept_.list.push_back(UnresolvedReference{.kind = std::move(kind),
+                                                 .pointer = std::move(pointer),
+                                                 .path = assetRefPath(ref),
+                                                 .reason = std::move(reason)});
+    };
+    const auto missing = [](const std::filesystem::path& p) {
+        std::error_code ec;
+        return p.empty() || !std::filesystem::exists(p, ec);
     };
 
     // ADR-1084: the live quality hint. Absent means the default (balanced), not the last project's.
@@ -1537,69 +1975,65 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
         if (assets->contains("audioClips") && (*assets)["audioClips"].is_array()) {
             // An arrangement wins over a single reference; they are never both written.
             std::vector<audio::AudioClip> clips;
-            for (const auto& item : (*assets)["audioClips"]) {
+            const auto& list = (*assets)["audioClips"];
+            for (std::size_t i = 0; i < list.size(); ++i) {
+                const auto& item = list[i];
                 if (!item.is_object() || !item.contains("file")) {
                     continue;
                 }
-                audio::AudioClip clip;
+                audio::AudioClip clip = clipFromJson(item);
                 clip.file = resolveAsset(item["file"], "audio clip").value_or(std::filesystem::path());
-                clip.startSeconds = item.value("start", 0.0);
-                clip.inSeconds = item.value("in", 0.0);
-                clip.durationSeconds = item.value("duration", 0.0);
-                clip.gain = item.value("gain", 1.0f);
-                clip.fadeInSeconds = item.value("fadeIn", 0.0);
-                clip.fadeOutSeconds = item.value("fadeOut", 0.0);
-                clip.enabled = item.value("enabled", true);
-                clip.name = item.value("name", std::string{});
+                if (missing(clip.file)) {
+                    unresolved("audioClip", fmt::format("/assets/audioClips/{}/file", i), item["file"], "file not found");
+                    kept_.files[normalKey(clip.file)] = item["file"];
+                }
                 clips.push_back(std::move(clip));
             }
             if (auto r = setAudioClips(std::move(clips)); !r) {
                 warn("audio: " + r.error().message);
                 // The arrangement this project names could not be built. Silence, not the last
-                // project's piece standing in for it.
+                // project's piece standing in for it -- and the whole arrangement kept as written (ADR-2164).
                 static_cast<void>(setAudioClips({}));
+                kept_.audio = list;
+                kept_.audioKey = "audioClips";
+                if (kept_.list.empty() || kept_.list.back().kind != "audioClip") {
+                    unresolved("audioClip", "/assets/audioClips", nlohmann::json(), r.error().message);
+                }
             }
         } else if (assets->contains("audio")) {
-            if (const auto audio = resolveAsset((*assets)["audio"], "audio"); audio && *audio != audioPath_) {
+            const auto audio = resolveAsset((*assets)["audio"], "audio");
+            std::string failed;
+            if (audio && *audio != audioPath_) {
                 if (auto r = loadAudio(*audio); !r) {
                     warn("audio: " + r.error().message);
                     static_cast<void>(setAudioClips({})); // as above: silence, not the last piece
+                    failed = missing(*audio) ? std::string("file not found") : r.error().message;
                 }
+            } else if (audio && missing(*audio)) {
+                failed = "file not found"; // the same path the last project played, gone since
+            }
+            if (!failed.empty()) {
+                kept_.audio = (*assets)["audio"];
+                kept_.audioKey = "audio";
+                unresolved("audio", "/assets/audio", (*assets)["audio"], failed);
             }
         }
         // ADR-1520: the analysis stems, after the mix they are checked against. A document with none has none.
         {
             std::vector<audio::StemSource> stems;
             if (const auto list = assets->find("stems"); list != assets->end() && list->is_array()) {
-                for (const auto& item : *list) {
+                for (std::size_t i = 0; i < list->size(); ++i) {
+                    const auto& item = (*list)[i];
                     if (!item.is_object() || !item.contains("file")) {
                         warn("assets.stems: an entry without a file was skipped");
                         continue;
                     }
-                    audio::StemSource stem;
+                    audio::StemSource stem = stemFromJson(item, warn);
                     stem.file = resolveAsset(item["file"], "stem").value_or(std::filesystem::path());
-                    stem.key = item.value("key", std::string{});
-                    stem.label = item.value("label", std::string{});
-                    stem.offsetSeconds = item.value("offset", 0.0);
-                    // ADR-1630: what the stem is, explicit only (no role is `other`; nothing is inferred from the
-                    // key or the audio). `hits` is gone: a response feed decides which stems run the causal onsets.
-                    if (const auto role = item.find("role"); role != item.end()) {
-                        const auto parsed = role->is_string() ? audio::sourceRoleFromName(role->get<std::string>())
-                                                              : std::nullopt;
-                        if (parsed) {
-                            stem.role = *parsed;
-                        } else {
-                            warn(fmt::format("assets.stems: stem '{}': role {} is not drums, bass, synth, vocal or other; "
-                                             "it is other",
-                                             stem.key, role->dump()));
-                        }
+                    if (missing(stem.file)) {
+                        unresolved("stem", fmt::format("/assets/stems/{}/file", i), item["file"], "file not found");
+                        kept_.files[normalKey(stem.file)] = item["file"];
                     }
-                    if (item.contains("hits")) {
-                        warn(fmt::format("assets.stems: stem '{}': \"hits\" is gone (ADR-1630); a response feed "
-                                         "(\"feeds\") decides which stems run the causal onsets",
-                                         stem.key));
-                    }
-                    stem.gainDb = std::clamp(item.value("gainDb", 0.0f), analysis::kMinTrimDb, analysis::kMaxTrimDb);
                     stems.push_back(std::move(stem));
                 }
             }
@@ -1669,19 +2103,57 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
             } else {
                 sceneFailed("unknown kind '" + kind + "'");
             }
+            if (!projectSceneError_.empty()) {
+                // ADR-2164: the scene this project names did not load. The orb stands in for it -- never the last
+                // project's world, which a failed load used to leave installed (and a save then wrote its path into
+                // this project) -- and the reference is kept as written, with the keys that only mean something
+                // against that scene, for every save until the session installs another scene.
+                if (composition() != nullptr || gltfScene() != nullptr) {
+                    loadOrbScene();
+                    compositionPath_.clear();
+                }
+                kept_.scene = sceneRef;
+                for (const std::string_view key : kSceneOwnedKeys) {
+                    if (const auto it = doc.find(std::string(key)); it != doc.end()) {
+                        kept_.sceneKeys[std::string(key)] = *it;
+                    }
+                }
+                const bool byPath = sceneRef.contains("path");
+                const std::filesystem::path given =
+                    byPath ? resolveFrom(assetRefPath(sceneRef["path"]), dir) : std::filesystem::path();
+                unresolved("scene", byPath ? "/assets/scene/path" : "/assets/scene",
+                           byPath ? sceneRef["path"] : nlohmann::json(),
+                           byPath && missing(given) ? std::string("file not found") : projectSceneError_);
+            }
         }
         stage(4);
         std::optional<std::filesystem::path> env;
         if (assets->contains("environment")) {
             env = resolveAsset((*assets)["environment"], "environment");
         }
+        bool environmentLoaded = false;
         if (env) {
+            std::string failed;
             if (*env != environmentPath_) {
                 if (auto r = loadEnvironment(*env); !r) {
                     warn("environment: " + r.error().message);
+                    failed = missing(*env) ? std::string("file not found") : r.error().message;
+                } else {
+                    environmentLoaded = true;
                 }
+            } else if (missing(*env)) {
+                failed = "file not found";
+            } else {
+                environmentLoaded = true;
             }
-        } else if (sceneEnvironment.empty() && !environmentPath_.empty()) {
+            if (!failed.empty()) {
+                // ADR-2164: kept as written. And the last project's environment does not stand in for it: with no
+                // scene environment underneath, the project has none.
+                kept_.environment = (*assets)["environment"];
+                unresolved("environment", "/assets/environment", (*assets)["environment"], failed);
+            }
+        }
+        if (!environmentLoaded && sceneEnvironment.empty() && !environmentPath_.empty()) {
             environmentPath_.clear();
             controller_->scene().environment.environmentMap = scene::kInvalidTexture;
             if (auto* comp = composition()) {
@@ -1690,11 +2162,16 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
         }
     }
     // Shader layer paths are project-relative on disk (and relinked like other assets).
+    // ADR-2164: each entry as written, beside the file it resolved to, so one that does not load is kept.
+    std::vector<std::tuple<std::size_t, nlohmann::json, std::filesystem::path>> shaderEntries;
     if (doc.contains("shaders") && doc["shaders"].is_array()) {
-        for (auto& entry : doc["shaders"]) {
+        for (std::size_t i = 0; i < doc["shaders"].size(); ++i) {
+            auto& entry = doc["shaders"][i];
             if (entry.is_object() && entry.contains("path") && entry["path"].is_string()) {
+                const nlohmann::json asRead = entry;
                 if (const auto shaderPath = resolveAsset(entry, "shader")) {
                     entry["path"] = shaderPath->string();
+                    shaderEntries.emplace_back(i, asRead, *shaderPath);
                 }
             }
         }
@@ -1913,6 +2390,16 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
         if (auto r = shaderLayers_.fromJson(doc["shaders"]); !r) {
             return r;
         }
+        for (const auto& [index, asRead, file] : shaderEntries) {
+            const bool installed = std::any_of(shaderLayers_.layers().begin(), shaderLayers_.layers().end(),
+                                               [&](const auto& layer) { return normalKey(layer->path) == normalKey(file); });
+            if (!installed) {
+                kept_.shaders.emplace_back(index, asRead);
+                kept_.shaderFiles.push_back(normalKey(file));
+                unresolved("shader", fmt::format("/shaders/{}/path", index), asRead,
+                           missing(file) ? std::string("file not found") : std::string("the shader did not load"));
+            }
+        }
         // ADR-358. A shader layer's ISF inputs ARE parameters -- `ShaderLayerSet::registerInputs`
         // adds one per input under "shader/<layer>/<input>" -- but they do not exist until the
         // line above has run, and `params::loadProject` ran twenty-five lines up. So every
@@ -2036,40 +2523,8 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
     // ADR-207, and cleared when absent for the same reason the aim-follow table is: a project with
     // no cut must not inherit the last one's, or a world effect would fire against a schedule for a
     // film this scene has never been in.
-    {
-        std::vector<world::ShotSpan> spans;
-        if (doc.contains("cameraShotSpans") && doc["cameraShotSpans"].is_array()) {
-            for (const auto& entry : doc["cameraShotSpans"]) {
-                if (!entry.is_object()) {
-                    continue;
-                }
-                world::ShotSpan span;
-                span.start = entry.value("start", 0.0);
-                span.end = entry.value("end", 0.0);
-                span.travel = entry.value("travel", false);
-                span.spotlight = entry.value("spotlight", false);
-                // ADR-922: a span's `emphasis` is no longer a field. Files written before carry the
-                // key and it is not read -- it never was, by anything but this loader.
-                span.subject = entry.value("subject", std::string{});
-                const auto readVec = [&entry](const char* key, glm::vec3& out) {
-                    if (entry.contains(key) && entry[key].is_array() && entry[key].size() == 3) {
-                        out = glm::vec3(entry[key][0].get<float>(), entry[key][1].get<float>(),
-                                        entry[key][2].get<float>());
-                    }
-                };
-                readVec("subjectPosition", span.subjectPosition);
-                span.subjectRadius = entry.value("subjectRadius", 1.0f);
-                span.handoff = entry.value("handoff", std::string{});
-                readVec("handoffPosition", span.handoffPosition);
-                if (!(span.end > span.start)) {
-                    warn("cameraShotSpans: a span with no duration was skipped");
-                    continue;
-                }
-                spans.push_back(std::move(span));
-            }
-        }
-        shotSpans_ = std::move(spans);
-    }
+    shotSpans_ = doc.contains("cameraShotSpans") ? shotSpansFromJson(doc["cameraShotSpans"], warn)
+                                                 : std::vector<world::ShotSpan>{};
     // ADR-582, and cleared when absent for the same reason: a project with nothing parked must not
     // inherit the last one's parked cut, or "Resume director" would restore another film's camera.
     // A project saved before this block existed has none, and opens exactly as it always did.
@@ -2147,22 +2602,16 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
     tempoOverride_ = {};
     beatAnchor_.reset();
     if (doc.contains("transport") && doc["transport"].is_object()) {
-        const auto& block = doc["transport"];
-        if (block.contains("loop") && block["loop"].is_object()) {
-            const auto& loop = block["loop"];
-            TransportLoop parsed;
-            parsed.enabled = loop.value("enabled", false);
-            parsed.startSeconds = loop.value("start", 0.0);
-            parsed.endSeconds = loop.value("end", 0.0);
-            transport_.setLoop(parsed);
+        const TransportBlock block = readTransport(doc["transport"]);
+        if (block.loop) {
+            transport_.setLoop(*block.loop);
         }
-        if (block.contains("tempo") && block["tempo"].is_object()) {
-            const auto& tempo = block["tempo"];
-            const double bpm = tempo.value("bpm", 0.0);
+        if (block.hasTempo) {
+            const double bpm = block.bpm;
             // Provenance round-trips with the value. A file that somehow records a non-user
             // provenance here is not honoured: only a decision is persisted, so anything else
             // would be a measurement masquerading as one.
-            const auto source = audio::tempoProvenanceFromToken(tempo.value("source", "user"));
+            const auto source = audio::tempoProvenanceFromToken(block.source);
             if (source == audio::TempoProvenance::UserOverride && bpm >= audio::kMinPlausibleBpm &&
                 bpm <= audio::kMaxPlausibleBpm) {
                 tempoOverride_ = audio::AudioTempo{.available = true,
@@ -2170,15 +2619,15 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
                                                    .source = audio::TempoProvenance::UserOverride,
                                                    .confidence = 1.0};
                 // ADR-1783: the marked beat, which makes the override the file's beat clock.
-                if (const auto a = tempo.find("anchor"); a != tempo.end() && a->is_number()) {
-                    if (const double anchor = a->get<double>(); std::isfinite(anchor) && anchor >= 0.0) {
+                if (block.anchor) {
+                    if (const double anchor = *block.anchor; std::isfinite(anchor) && anchor >= 0.0) {
                         beatAnchor_ = anchor;
                     } else {
                         log::warn("project beat anchor {:g} ignored: not a time in the project", anchor);
                     }
                 }
             } else if (bpm != 0.0) {
-                log::warn("project tempo {:g} ({}) ignored", bpm, tempo.value("source", "user"));
+                log::warn("project tempo {:g} ({}) ignored", bpm, block.source);
             }
         }
     }
@@ -2275,17 +2724,20 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
     // that was read is not the document this engine would write, by between 279 and 19,798 JSON
     // paths depending on the project, and a baseline taken from it would report every project dirty
     // the instant it opened. The comment on `compareWithSaved` has the measurement.
+    // ADR-2164: what the load left in place of each reference it kept; a later change to it ends the keeping.
+    kept_.sceneGeneration = sceneGeneration_;
+    kept_.audioGeneration = audioGeneration_;
+    kept_.environmentAtLoad = environmentPath_;
+    if (!kept_.list.empty()) {
+        log::warn("project: {} reference(s) did not resolve; each is kept as written and saved unchanged",
+                  kept_.list.size());
+    }
     resetProjectRevisions(); // ADR-2154
     markProjectSaved();
     log::info("project '{}' loaded: {} parameters, {} routes, {} sources, {} presets, {} timeline tracks, {} cues, {} warning(s)",
               path.filename().string(), params_.size(), modulator_.routes().size(), sources_.sources().size(),
               presets_.presets().size(), timeline_.tracks().size(), timeline_.cues().size(), projectWarnings_.size());
     return {};
-} catch (const nlohmann::json::exception& e) {
-    // A key of the wrong type (`"format": 1`) makes `.value()`/`.get<T>()` throw; nothing above
-    // this caught it, so a damaged file terminated the application instead of failing to open
-    // (tests/integration/test_project_malformed.cpp).
-    return fail("'{}' is not a valid project: {}", path.string(), e.what());
 }
 
 void Engine::newProject() {
@@ -2346,6 +2798,7 @@ void Engine::newProject() {
     projectPath_.clear();
     projectWarnings_.clear();
     projectSceneError_.clear();
+    kept_ = KeptReferences{}; // ADR-2164
     transport_.clearLoop();
     refreshTransport();
     transport_.stop();

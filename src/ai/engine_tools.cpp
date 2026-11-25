@@ -1144,8 +1144,17 @@ void registerParameterTools(ToolRegistry& registry) {
             }
             const std::filesystem::path file = target->file;
             app::Engine& engine = ctx.engine();
+            const auto generation = engine.projectGeneration();
             if (auto r = engine.loadProject(file); !r) {
-                return ToolResult::failure(ToolErrorCode::Unavailable, r.error().message);
+                // ADR-2164: a refusal found before the load changed anything leaves the open project as it was; one
+                // found after it leaves an empty untitled project, never the old path on a half-loaded one.
+                const bool previousLost = engine.projectGeneration() != generation;
+                return ToolResult::failure(
+                    ToolErrorCode::Unavailable, r.error().message,
+                    previousLost ? "the session now has an empty untitled project; fix the file and open it again, or "
+                                   "open another project"
+                                 : "nothing changed: the project that was open is still open, unchanged",
+                    json{{"path", file.string()}, {"previousLost", previousLost}});
             }
             json out;
             out["name"] = target->name;
@@ -1158,6 +1167,14 @@ void registerParameterTools(ToolRegistry& registry) {
             if (!engine.projectWarnings().empty()) {
                 out["warnings"] = engine.projectWarnings();
                 out["warningNote"] = "the project opened, but these assets did not resolve";
+            }
+            // ADR-2164: each reference that did not resolve, structured; every save keeps them as written.
+            if (const auto unresolved = engine.unresolvedReferences(); !unresolved.empty()) {
+                json list = json::array();
+                for (const auto& u : unresolved) {
+                    list.push_back({{"kind", u.kind}, {"pointer", u.pointer}, {"path", u.path}, {"reason", u.reason}});
+                }
+                out["unresolved"] = std::move(list);
             }
             return ToolResult::ok(std::move(out), fmt::format("opened '{}'", target->name));
         });

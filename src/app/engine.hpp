@@ -74,6 +74,7 @@
 #include <array>
 #include <cstdint>
 #include <limits>
+#include <map>
 #include <set>
 #include <span>
 #include <string>
@@ -310,6 +311,19 @@ public:
     // world -- an offline render, a queue job, a headless run. The editor still opens a project whose scene
     // failed (it says so in the status bar and lets the author fix it); nothing that writes frames does.
     [[nodiscard]] Result<void> requireProjectScene() const;
+    // ADR-2164: a reference the open project names that did not resolve when it was opened -- the file is missing,
+    // or it is there and its loader refused it. Each one is kept as the document had it and written back unchanged
+    // by every save (never replaced with the orb, never dropped), until the session puts something else in its
+    // place: a scene, audio or environment loaded, a clip, stem or shader layer replaced. `kind` is one of scene,
+    // audio, audioClip, environment, stem, shader; `pointer` is its JSON pointer in the project document; `path` is
+    // the path as the document wrote it.
+    struct UnresolvedReference {
+        std::string kind;
+        std::string pointer;
+        std::string path;
+        std::string reason;
+    };
+    [[nodiscard]] std::vector<UnresolvedReference> unresolvedReferences() const;
 
     // ---- route and parameter liveness (ADR-902) ------------------------------------------------
     // What the liveness rules read about this engine's project -- its bus, parameters, sources,
@@ -1337,6 +1351,16 @@ private:
     // Shared by loadComposition and setCompositionJson: detach, swap, attach, reapply.
     [[nodiscard]] Result<void> installComposition(std::unique_ptr<scene::Composition> composition);
     void installController(std::unique_ptr<scene::SceneController> controller);
+    // ADR-2164: everything of `loadProject` after the checks -- the reset and the install. Fails only on what the
+    // checks could not see; `loadProject` then falls back to `newProject()`.
+    [[nodiscard]] Result<void> installProjectDocument(nlohmann::json& doc, const std::filesystem::path& path,
+                                                      const std::function<void(int)>& stage,
+                                                      const std::function<void()>& finishTimings);
+    // ADR-2164: what `projectDocument` writes for a reference that did not resolve (unresolvedReferences()).
+    [[nodiscard]] bool keptSceneInForce() const;
+    [[nodiscard]] bool keptAudioInForce() const;
+    [[nodiscard]] bool keptEnvironmentInForce() const;
+    [[nodiscard]] nlohmann::json keptFileRef(const std::filesystem::path& file, const std::filesystem::path& dir) const;
     Result<void> reapplyEnvironment();
     void updateTimeSignals(const FrameTime& time, bool newAnalysisFrame);
     void addDefaultPostRoutes();
@@ -1609,6 +1633,28 @@ private:
     void noteBindingProblem(std::string message);
     std::vector<std::string> projectWarnings_;
     std::string projectSceneError_;
+    // ADR-2164: the references the open project names that did not resolve, as the document had them. `dir` is
+    // the folder their relative paths are relative to; a save elsewhere rebases them. Each whole-reference record
+    // (scene, audio, environment) is in force only while the engine still holds what the load left there -- the
+    // generations say so -- and the per-file ones (clips, stems, shaders) while that file is still listed and
+    // still missing.
+    struct KeptReferences {
+        std::filesystem::path dir;
+        std::vector<UnresolvedReference> list;
+        std::optional<nlohmann::json> scene;            // `assets.scene` as read
+        nlohmann::json sceneKeys = nlohmann::json::object(); // the scene's own top-level keys the document had
+        std::uint64_t sceneGeneration = 0;
+        std::optional<nlohmann::json> audio;            // `assets.audio` or `assets.audioClips` as read
+        std::string audioKey;
+        std::uint64_t audioGeneration = 0;
+        std::optional<nlohmann::json> environment;      // `assets.environment` as read
+        std::filesystem::path environmentAtLoad;
+        std::map<std::string, nlohmann::json> files;    // a clip's or stem's resolved file -> its reference as read
+        std::vector<std::pair<std::size_t, nlohmann::json>> shaders; // index in `shaders` -> the entry as read
+        std::vector<std::string> shaderFiles;           // their resolved paths
+    };
+    KeptReferences kept_;
+    std::uint64_t audioGeneration_ = 0; // ADR-2164: bumped whenever the audio arrangement is replaced
     // ADR-902. At the end of a project load: every dead or hazardous route, track and effect,
     // logged once (the modulator's log-once set, shared with its bind), and every dead one added to
     // projectWarnings_ -- a binding that does nothing belongs where a person looks.

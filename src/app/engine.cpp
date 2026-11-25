@@ -2669,6 +2669,7 @@ Result<double> Engine::loadAudio(const std::filesystem::path& path) {
 }
 
 Result<void> Engine::setAudioClips(std::vector<audio::AudioClip> clips) {
+    ++audioGeneration_; // ADR-2164: the arrangement is replaced, so a kept unresolved audio reference no longer applies
     audioClips_ = std::move(clips);
     return rebuildAudio();
 }
@@ -3799,6 +3800,7 @@ Result<void> Engine::adoptAudioInput(std::unique_ptr<audio::AudioInput> input) {
     rebuildChannelAnalysis({}); // a new device: nothing carries over
     audioFile_.reset();
     audioPath_.clear();
+    ++audioGeneration_; // ADR-2164
     clock_.music.reset();
     clock_.hasFrame = false;
     clock_.beatPhase = 0.0;

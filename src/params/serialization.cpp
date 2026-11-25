@@ -771,6 +771,42 @@ Result<void> loadProject(const json& original, ParameterSet& params, Modulator& 
     return {};
 }
 
+Result<void> validateProjectDocument(const json& original) {
+    json doc = original;
+    if (auto migration = migrateProject(doc); !migration) {
+        return std::unexpected(migration.error());
+    }
+    if (const auto sourcesJson = doc.find("sources"); sourcesJson != doc.end()) {
+        signals::SignalBus scratchBus;
+        ParameterSet scratchParams;
+        signals::SourceRack scratch;
+        scratch.attach(scratchBus, scratchParams);
+        if (auto parsed = scratch.fromJson(*sourcesJson); !parsed) {
+            return parsed;
+        }
+    }
+    if (const auto presetsJson = doc.find("presets"); presetsJson != doc.end()) {
+        PresetBank scratch;
+        if (auto parsed = scratch.fromJson(*presetsJson); !parsed) {
+            return parsed;
+        }
+    }
+    if (const auto parameters = doc.find("parameters"); parameters != doc.end() && !parameters->is_object()) {
+        return fail("'parameters' must be an object");
+    }
+    if (const auto routesJson = doc.find("routes"); routesJson != doc.end()) {
+        if (!routesJson->is_array()) {
+            return fail("'routes' must be an array");
+        }
+        for (std::size_t i = 0; i < routesJson->size(); ++i) {
+            if (auto route = routeFromJson((*routesJson)[i]); !route) {
+                return fail("routes[{}]: {}", i, route.error().message);
+            }
+        }
+    }
+    return {};
+}
+
 Result<void> saveProjectFile(const std::filesystem::path& path, const ParameterSet& params,
                              const Modulator& modulator, const signals::SourceRack* sources,
                              const PresetBank* presets) {

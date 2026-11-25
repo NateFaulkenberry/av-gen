@@ -3183,6 +3183,11 @@ void Application::performOpen(const std::filesystem::path& path) {
             panel_->setStatus(r.error().message);
         }
         projectSwitch_.cancelExpected(); // a lab whose fixture failed to open leaves no overlays behind
+        // ADR-2164: a project open that fails either changed nothing (the title is already right) or left an empty
+        // untitled project (the message shown above says so, and serviceProjectSwitch resets the workspace when the
+        // project generation moved); the title follows the engine either way, so it never names a file the session
+        // no longer has open.
+        refreshWindowTitle();
         return;
     }
     if (panel_) {

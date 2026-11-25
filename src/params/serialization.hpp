@@ -109,6 +109,12 @@ nlohmann::json saveProject(const ParameterSet& params, const Modulator& modulato
 Result<void> loadProject(const nlohmann::json& doc, ParameterSet& params, Modulator& modulator,
                          signals::SourceRack* sources = nullptr, PresetBank* presets = nullptr);
 
+// ADR-2164: every refusal of `loadProject` that does not depend on which parameters are registered -- the sources,
+// the presets, the shape of `parameters`, the routes -- checked on scratch objects, so a project load can refuse a
+// document before it changes anything. A parameter value of the wrong type for its parameter is the one refusal
+// this cannot see: whether a path names a registered parameter depends on the scene the load installs.
+Result<void> validateProjectDocument(const nlohmann::json& doc);
+
 Result<void> saveProjectFile(const std::filesystem::path& path, const ParameterSet& params,
                              const Modulator& modulator, const signals::SourceRack* sources = nullptr,
                              const PresetBank* presets = nullptr);

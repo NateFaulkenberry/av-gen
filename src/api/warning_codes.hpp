@@ -86,8 +86,10 @@ inline constexpr std::array<FindingCodeInfo, 16> kFindingCodes = {{
     {FindingCode::ProjectWarning, "project.warning", FindingSeverity::Warning,
      "A load warning with no more specific code (Engine::projectWarnings); the message is the engine's."},
     {FindingCode::AssetMissing, "asset.missing", FindingSeverity::Error,
-     "A file the document names does not exist where it resolves (a node's asset, the project's audio, scene, "
-     "environment or a stem). A node whose asset is missing is skipped at load and kept on save (ADR-2151)."},
+     "A file the document names does not resolve: it does not exist where it resolves, or (for a project's scene, "
+     "audio, environment, audio clip, stem or shader layer) it exists and its loader refused it. A node whose asset "
+     "is missing is skipped at load and kept on save (ADR-2151); a project reference that did not resolve is kept "
+     "as written by every save (ADR-2164, Engine::unresolvedReferences)."},
     {FindingCode::AssetRelinked, "asset.relinked", FindingSeverity::Warning,
      "A file the project names was missing and was found elsewhere under the project folder by name, size and "
      "content hash; the load used that one. Saving the project writes the new path."},

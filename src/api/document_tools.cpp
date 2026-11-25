@@ -422,7 +422,9 @@ void projectAssetRefs(const json& doc, std::vector<std::pair<std::string, std::s
             const json& clip = a.at("audioClips")[i];
             const json& ref = clip.is_object() && clip.contains("file") ? clip.at("file") : clip;
             if (std::string p = pathOf(ref); !p.empty()) {
-                out.emplace_back(fmt::format("/assets/audioClips/{}", i), p);
+                out.emplace_back(clip.is_object() && clip.contains("file") ? fmt::format("/assets/audioClips/{}/file", i)
+                                                                           : fmt::format("/assets/audioClips/{}", i),
+                                 p);
             }
         }
     }
@@ -481,11 +483,24 @@ json validateProjectFile(const fs::path& file, const std::string& displayFile) {
         findings.push_back({FindingCode::ProjectParse, "", r.error().message, "project"});
     } else {
         const std::vector<std::string>& warnings = engine.projectWarnings();
+        // ADR-2164: every reference the load could not resolve -- the engine's own list, which a save keeps as
+        // written -- is an error with its pointer.
+        std::set<std::string> reported;
+        for (const app::Engine::UnresolvedReference& u : engine.unresolvedReferences()) {
+            reported.insert(u.pointer);
+            findings.push_back({FindingCode::AssetMissing, u.pointer,
+                                fmt::format("{} '{}' did not resolve ({}); it is kept as written on save", u.kind,
+                                            u.path, u.reason),
+                                "project"});
+        }
         // Asset references: a missing file the loader relinked is reported as relinked, not missing.
         const fs::path dir = fs::absolute(file).parent_path();
         std::vector<std::pair<std::string, std::string>> refs;
         projectAssetRefs(doc, refs);
         for (const auto& [pointer, given] : refs) {
+            if (reported.contains(pointer)) {
+                continue;
+            }
             const fs::path p(given);
             const fs::path resolved = p.is_absolute() ? p : dir / p;
             std::error_code ec;
