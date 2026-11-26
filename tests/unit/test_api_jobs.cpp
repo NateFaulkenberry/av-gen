@@ -345,7 +345,9 @@ TEST_CASE("gpu lock: interoperates with tools/gpu-lock.sh in both directions", "
     REQUIRE(std::system(bg.c_str()) == 0);
     api::GpuLock lock(dir, "cpp");
     const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-    while (!fs::exists(dir / "pid") && std::chrono::steady_clock::now() < until) {
+    // The script writes `pid`, then `holder`: wait for both, or the holder can be read before it exists.
+    while (!(fs::exists(dir / "pid") && fs::exists(dir / "holder") && fs::file_size(dir / "holder") > 0) &&
+           std::chrono::steady_clock::now() < until) {
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
     CHECK(lock.tryAcquire() == api::GpuLockAttempt::Busy);
@@ -609,4 +611,31 @@ TEST_CASE("engine host jobs: no GPU half, and the live policy, refuse render job
         CHECK(r.error->code == ai::ToolErrorCode::Busy);
     }
     CHECK((*session)->call("job.list").success); // reads stay available
+}
+
+TEST_CASE("engine host jobs: a cancelled sequence in a reused folder lists only its own frames", "[api][jobs]") {
+    // UI-readiness audit (job and result lifecycle): finishActive listed every frame_%06d file in the range, so an
+    // earlier render's frames were reported, with their sha256s, as a cancelled job's output.
+    Rig rig("reuse");
+    const json first = rig.wait(rig.start(json{{"range", "0:1"}, {"fps", 10}, {"output", "png"}, {"path", "renders/r"}}));
+    REQUIRE(first.at("state") == "succeeded");
+    REQUIRE(first.at("outputs").size() == 10);
+    // The earlier render's files are old.
+    for (const json& o : first.at("outputs")) {
+        const fs::path f = o.at("path").get<std::string>();
+        fs::last_write_time(f, fs::last_write_time(f) - std::chrono::hours(1));
+    }
+    const std::string again = rig.start(json{{"range", "0:1"}, {"fps", 10}, {"output", "png"}, {"path", "renders/r"}});
+    for (int i = 0; i < 4; ++i) {
+        (void)rig.host->stepJobs();
+    }
+    REQUIRE(rig.call("job.cancel", json{{"id", again}}).success);
+    const json cancelled = rig.wait(again);
+    REQUIRE(cancelled.at("state") == "cancelled");
+    const std::size_t hashed = cancelled.at("result").at("frameHashes").size();
+    CHECK(hashed < 10);
+    CHECK(cancelled.at("outputs").size() <= hashed); // never the earlier render's leftovers
+    for (const json& o : cancelled.at("outputs")) {
+        CHECK(o.at("frame").get<std::uint64_t>() < hashed);
+    }
 }

@@ -49,6 +49,9 @@ struct EngineHost::Pending {
     RenderRequest request;
     std::unique_ptr<GpuRenderJob> job;
     Clock::time_point submitted = Clock::now();
+    // When the job was accepted, on the file system's clock: a frame file older than this is not this job's
+    // output, even if it has this job's name (a reused output folder).
+    fs::file_time_type acceptedOnDisk = fs::file_time_type::clock::now();
     Clock::time_point loadBegan{};
     Clock::time_point lockWaitBegan{};
     Clock::time_point startBegan{};
@@ -439,9 +442,12 @@ void EngineHost::finishActive() {
         std::error_code ignored;
         fs::remove_all(q.outputDir, ignored);
     } else {
-        for (std::uint64_t i = 0; i < g.framesTotal; ++i) {
+        // Only the frames THIS job rendered (hashed) and wrote (on disk since it was accepted). A cancelled or
+        // failed sequence in a reused folder must not list, with their sha256s, frames an earlier render left there.
+        const std::uint64_t rendered = std::min<std::uint64_t>(g.framesTotal, out.frameHashes.size());
+        for (std::uint64_t i = 0; i < rendered; ++i) {
             const fs::path f = q.outputDir / framePath(i, q.format);
-            if (fs::exists(f, ec)) {
+            if (fs::exists(f, ec) && fs::last_write_time(f, ec) >= a.acceptedOnDisk && !ec) {
                 outputs.push_back(fileEntry(f, i));
             }
         }
