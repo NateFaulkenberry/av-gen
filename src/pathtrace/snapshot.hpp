@@ -10,15 +10,16 @@
 // This is NOT a second scene graph. It has no hierarchy, no parameters, no update, and nothing ever
 // reads it back into the scene. It is the input to one render and is thrown away.
 
+#include "pathtrace/environment.hpp"
+#include "scene/material_program.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_types.hpp"
-#include "pathtrace/environment.hpp"
 #include "scene/sky.hpp"
+#include "spatial/point_cloud.hpp"
 
 #include <glm/glm.hpp>
 
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 namespace avgen::pathtrace {
@@ -103,6 +104,19 @@ struct TriangleMesh {
     std::string entityName;            // for diagnostics only
     std::uint32_t entityIndex = 0;     // index into the source Scene::entities
 
+    // ---- what the surface's material program and emission lanes read (ADR-2246) ----------------------------------
+    // The `localPosition` material input, per vertex: the mesh's own space BEFORE skinning and the entity transform for
+    // an entity (pbr_skinned.wgsl keeps bind space so a pattern travels with the surface), and the raw source-mesh
+    // position BEFORE `sourceTransform` for a procedural source (procedural.wgsl `out.localPos = in.position`).
+    std::vector<glm::vec3> localPositions;
+    // Index into `Snapshot::programs`, or -1: the program `material.program` names, resolved once.
+    int program = -1;
+    // ADR-903/905: the object's emission lane, applied after the program and the texture (pbr_shade.wgsl
+    // `emissionLane`). No longer folded into `material.emissiveIntensity`, because the lane must act on what a
+    // program emits, not on the factor the program replaces.
+    float emissionGain = 1.0f;
+    float emissionHue = 0.0f;
+
     [[nodiscard]] std::size_t triangleCount() const { return indices.size() / 3; }
     [[nodiscard]] bool valid() const;
 };
@@ -117,16 +131,33 @@ struct TriangleMesh {
 // would down-weight the only strategy that can see it -- losing energy for nothing. Analytic lights
 // therefore take weight 1 and emissive geometry takes a real MIS weight. Keeping the two apart is
 // the whole reason this structure exists.
-struct EmissiveTriangle {
-    std::uint32_t meshIndex = 0;
-    std::uint32_t primIndex = 0;
-    glm::vec3 v0{0.0f};
-    glm::vec3 v1{0.0f};
-    glm::vec3 v2{0.0f};
-    glm::vec3 normal{0.0f, 1.0f, 0.0f}; // geometric, normalised
-    glm::vec3 emission{0.0f};           // radiance leaving the surface
-    float area = 0.0f;
-    float cdf = 0.0f;                   // cumulative area fraction, ending at 1
+//
+// ADR-2247: emitters are sampled in two levels. A GROUP is one emitting mesh, or one copy of an emitting procedural
+// source; it is chosen by (approximately) its world area. Within it a triangle is chosen by its area -- world area
+// for a mesh, object-space area for an instanced source, shared by every copy -- and a point uniformly on that
+// triangle. The density at the point is then exact whatever the copies' scales are:
+//
+//   mesh:      p_A = P(group) / A_group
+//   instance:  p_A = P(group) * (A_obj(tri) / A_obj(group)) / A_world(tri)
+//
+// and both are computable at any hit from the group index alone, so a BSDF ray that lands on an emitter needs no
+// per-triangle table to be MIS-weighted. Before ADR-2247 only mesh emitters were in the list and instanced ones
+// (every procedural window and sign) could be found by BSDF rays alone.
+struct EmitterTriangle {
+    std::uint32_t prim = 0;
+    float area = 0.0f;   // world area for a mesh group, object-space area for an instanced source
+    float cdf = 0.0f;    // cumulative fraction within its group (or source), ending at 1
+};
+
+struct EmitterGroup {
+    bool instanced = false;
+    std::uint32_t object = 0;      // Snapshot::meshes index, or Snapshot::instanced index when `instanced`
+    std::uint32_t instance = 0;    // which copy, when `instanced`
+    std::uint32_t triBegin = 0;    // its triangles in Snapshot::emitterTriangles (shared by every copy of a source)
+    std::uint32_t triCount = 0;
+    float area = 0.0f;             // the triangles' total area (world for a mesh, object space for a source)
+    float weight = 0.0f;           // its selection weight: world area, approximate for a scaled copy
+    float cdf = 0.0f;              // cumulative selection probability, ending at 1
 };
 
 // One source mesh drawn many times (spec section 68). Embree instances it: the triangles exist once
@@ -140,6 +171,12 @@ struct InstancedObject {
     std::vector<glm::mat4> transforms;      // object -> world, one per instance
     std::vector<glm::mat3> normalMatrices;  // inverse transpose of each, precomputed once
     std::string name;
+    // The records themselves (ADR-2246): their random, colour and emissive lanes, index and id are what a program
+    // reads per instance and what procedural.wgsl multiplies the material by (`instColor`, `instEmissive`).
+    std::vector<spatial::InstanceRecord> records;
+    // procedural.wgsl's `proc.chroma`: x = living-chroma drift (0 = off), y = 2 pi / drift scale, z = 2 pi x speed
+    // (ADR-057); w = 1 when a program writes emission and leaves the instance's variation to the engine (ADR-904).
+    glm::vec4 chroma{0.0f};
 
     [[nodiscard]] bool valid() const { return source.valid() && !transforms.empty(); }
 };
@@ -173,14 +210,23 @@ struct Snapshot {
     // What lights the scene from infinity and what the camera sees behind it (ADR-2240).
     Environment environment;
 
-    // Every emissive triangle in the scene, with an area CDF for uniform-by-area selection.
-    std::vector<EmissiveTriangle> emissiveTriangles;
-    float totalEmissiveArea = 0.0f;
-    // (meshIndex << 32 | primIndex) -> index into `emissiveTriangles` (ADR-2242). What `emissivePdf` looks a BSDF hit
-    // up in: a scan of the list was 82% of a Neon Dreams trace, which has 4.4 million emissive triangles.
-    std::unordered_map<std::uint64_t, std::uint32_t> emissiveIndex;
+    // Emitters (ADR-2247): the groups, their triangles, and where each mesh's and each source's groups are.
+    std::vector<EmitterGroup> emitterGroups;
+    std::vector<EmitterTriangle> emitterTriangles;
+    float totalEmitterWeight = 0.0f;
+    std::vector<std::int32_t> meshEmitterGroup;      // per mesh: its group, or -1
+    std::vector<std::int32_t> instancedEmitterGroup; // per instanced object: the group of its copy 0, or -1
+    [[nodiscard]] bool hasEmitters() const { return !emitterGroups.empty(); }
+    // ADR-2251: some surface is alpha-masked, so rays (shadow rays included) must look at the texels they hit.
+    bool hasAlphaMask = false;
 
     CapabilityReport capabilities;
+
+    // The material programs, as the scene holds them (ADR-2246); `TriangleMesh::program` indexes this.
+    std::vector<scene::MaterialProgram> programs;
+    // The render clock this frame is evaluated at -- the `FrameTime::renderTime` the engine was updated with, which is
+    // the `time` (frame.params.x) the raster hands every material program for the same frame (ADR-2246).
+    double renderTime = 0.0;
 
     // Triangles actually stored. With instancing this is much smaller than what the camera sees,
     // which is the point; `visibleTriangleCount` is the other number.
@@ -197,6 +243,8 @@ struct Snapshot {
 // evaluations must come from the same composition without a re-flatten in between, or entity
 // indices do not refer to the same objects; `buildSnapshot` checks vertex counts and refuses to
 // match a mesh whose shape changed rather than producing a plausible, wrong vector.
-[[nodiscard]] Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous = nullptr);
+// `renderTime` is the clock the scene was evaluated at (`FrameTime::renderTime`); material programs read it as `time`.
+[[nodiscard]] Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous = nullptr,
+                                     double renderTime = 0.0);
 
 } // namespace avgen::pathtrace

@@ -34,8 +34,9 @@ constexpr std::array kScene{
     CoverageRow{"corruption", D::Unsupported, "a vertex-stage and shading term of the raster"},
     CoverageRow{"portal", D::Unsupported, "another world drawn through an opening"},
     CoverageRow{"portalClip", D::Unsupported, "a clip plane of the raster's camera passes"},
-    CoverageRow{"materialPrograms", D::Unsupported, "per-fragment programs: traced as the bare material"},
-    CoverageRow{"programTextures", D::Unsupported, "read only by material programs"},
+    CoverageRow{"materialPrograms", D::Traced, "evaluated per hit in the lit shader's order (ADR-2246); inputs with no "
+                                                 "ray-traced value are reported by name"},
+    CoverageRow{"programTextures", D::Unsupported, "a program's texture ops read colour 1 (reported as 'program texture op')"},
     CoverageRow{"programTextureVersion", D::NotApplicable, "bookkeeping"},
     CoverageRow{"waters", D::Degraded, "a water surface is traced as its flat sheet"},
     CoverageRow{"terrainGround", D::NotApplicable, "a height field for the fog's ground following"},
@@ -47,7 +48,8 @@ constexpr std::array kScene{
     CoverageRow{"atmospherics", D::Unsupported, "comets, auroras and placed media"},
     CoverageRow{"distortion", D::Unsupported, "screen-space"},
     CoverageRow{"pulses", D::Unsupported, "Shockwave fronts move vertices and light in the raster's shaders"},
-    CoverageRow{"entityFx", D::Unsupported, "Glow, Pulse and Bloom Source lanes and the effect-light pool"},
+    CoverageRow{"entityFx", D::Unsupported, "Glow, Pulse and Bloom Source lanes; its effect-light pool IS traced, as "
+                                         "unshadowed point lights (ADR-2248)"},
     CoverageRow{"ribbons", D::Unsupported, "camera-facing strips"},
     CoverageRow{"stars", D::Unsupported, "the Stars effect's field is drawn by the background pass"},
     CoverageRow{"shells", D::Unsupported, "analytic proxy shells"},
@@ -60,23 +62,27 @@ constexpr std::array kScene{
 // `scene::Material`'s fields, in declaration order.
 constexpr std::array kMaterial{
     CoverageRow{"baseColor", D::Traced, ""},
-    CoverageRow{"opacity", D::Unsupported, "no transparency: traced opaque"},
+    CoverageRow{"opacity", D::Traced, "cuts an alpha-masked surface (ADR-2251); alpha blend is unsupported and "
+                                      "reported"},
     CoverageRow{"emissiveColor", D::Traced, ""},
     CoverageRow{"emissiveIntensity", D::Traced, ""},
     CoverageRow{"roughness", D::Traced, ""},
     CoverageRow{"metallic", D::Traced, ""},
-    CoverageRow{"normalScale", D::Unsupported, "no normal mapping"},
+    CoverageRow{"normalScale", D::Traced, "scales the normal map's xy, as the raster does"},
     CoverageRow{"occlusionStrength", D::NotApplicable, "a path tracer computes occlusion"},
-    CoverageRow{"alphaMode", D::Unsupported, "no alpha mask or blend: traced opaque"},
-    CoverageRow{"alphaCutoff", D::Unsupported, "no alpha mask"},
-    CoverageRow{"doubleSided", D::NotApplicable, "both faces are always intersected"},
+    CoverageRow{"alphaMode", D::Traced, "Mask: rays pass through cut texels, shadow rays included (ADR-2251); "
+                                        "Blend: unsupported, traced opaque, reported"},
+    CoverageRow{"alphaCutoff", D::Traced, "the cutoff, without the raster's distance fade of it"},
+    CoverageRow{"doubleSided", D::Traced, "camera rays pass through a one-sided back face as the raster culls it; "
+                                        "scattered, shadow and light rays see both faces -- a deliberate difference "
+                                        "(ADR-2249)"},
     CoverageRow{"unlit", D::Traced, ""},
     CoverageRow{"surfaceClass", D::NotApplicable, "an AOV manifest label"},
-    CoverageRow{"program", D::Unsupported, "material programs are not evaluated"},
+    CoverageRow{"program", D::Traced, "scene::evaluateMaterialProgram at the hit (ADR-2246)"},
     CoverageRow{"baseColorTexture", D::Traced, ""},
     CoverageRow{"metallicRoughnessTexture", D::Traced, ""},
-    CoverageRow{"normalTexture", D::Unsupported, "no normal mapping"},
-    CoverageRow{"emissiveTexture", D::Traced, "at the hit; next-event estimation uses the untextured emission"},
+    CoverageRow{"normalTexture", D::Traced, "the raster's cotangent frame from the triangle's uv gradient (ADR-2251)"},
+    CoverageRow{"emissiveTexture", D::Traced, "at the hit and at a light sample alike (ADR-2247)"},
     CoverageRow{"occlusionTexture", D::NotApplicable, "a path tracer computes occlusion"},
     CoverageRow{"toon", D::Unsupported, "cel lighting is a raster shading model"},
     CoverageRow{"wire", D::Unsupported, "edge lines are a raster pass"},

@@ -29,6 +29,9 @@ struct SurfaceMaterial {
     float metallic = 0.0f;
     float roughness = 1.0f;      // perceptual roughness, as glTF authors it
     float occlusion = 1.0f;
+    // ADR-2251: the shading normal after the material's normal map and its program's normal output, in world space;
+    // zero when neither perturbs it (the interpolated normal stands). Set by `shadeSurfaceMaterial`.
+    glm::vec3 normal{0.0f};
 
     // glTF clamps roughness away from zero because a perfectly smooth GGX lobe is a delta function
     // and the sampling below cannot represent it. 0.045^2 keeps alpha above float noise.

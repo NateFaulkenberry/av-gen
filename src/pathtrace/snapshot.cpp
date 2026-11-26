@@ -1,6 +1,7 @@
 #include "pathtrace/snapshot.hpp"
 
 #include "core/log.hpp"
+#include "core/wind.hpp"
 #include "pathtrace/lights.hpp"
 #include "scene/procedural.hpp"
 
@@ -40,6 +41,49 @@ namespace {
     // the origin, which reads as a deflating character.
     if (total > 1e-6f && std::abs(total - 1.0f) > 1e-4f) m /= total;
     return total > 1e-6f ? m : glm::mat4(1.0f);
+}
+
+// ADR-2246: what a program reads or does that a ray tracer gives the neutral value for. The raster takes these from
+// screen-space derivatives, the GTAO buffer, the frame's audio and effect uniforms, the field textures and the
+// program's images; the tracer has none of them, so a program that uses one is traced with that one at rest -- and
+// says so, by name.
+[[nodiscard]] std::vector<std::string> programGaps(const scene::MaterialProgram& program) {
+    std::vector<std::string> gaps;
+    const auto add = [&](std::string g) {
+        if (std::find(gaps.begin(), gaps.end(), g) == gaps.end()) gaps.push_back(std::move(g));
+    };
+    using K = scene::MaterialOpKind;
+    using I = scene::MaterialInput;
+    const auto scan = [&](const std::vector<scene::MaterialOp>& ops) {
+        for (const scene::MaterialOp& op : ops) {
+            if (!op.enabled) continue;
+            switch (op.kind) {
+            case K::Input:
+                switch (op.input) {
+                case I::Curvature: case I::Convexity: case I::Concavity: case I::Cavity: case I::NormalVariance:
+                case I::Footprint:
+                    add("screen-space geometry input"); break;
+                case I::Occlusion: add("ambient-occlusion input"); break;
+                case I::Audio: case I::AudioBands: case I::BeatPhase: add("audio input"); break;
+                case I::TileGlow: case I::LandingGlow: add("tile glow input"); break;
+                case I::KeyLightDirection: case I::KeyLightColor: case I::SkyAmbient: add("key light / sky input"); break;
+                default: break;
+                }
+                break;
+            case K::Field: add("field op"); break;
+            case K::TextureTriplanar: case K::TextureTriplanarNormal: add("texture op"); break;
+            case K::CurvatureMask: case K::EdgeWear: case K::RoughnessFilter: case K::TileBorder: case K::TileContour:
+                add("screen-space geometry op"); break;
+            default: break;
+            }
+        }
+    };
+    scan(program.ops);
+    for (const scene::MaterialLayer& layer : program.layers) {
+        if (layer.enabled) scan(layer.ops);
+    }
+    if (program.occlusionRegister >= 0 || program.heightRegister >= 0) add("occlusion / height output");
+    return gaps;
 }
 
 } // namespace
@@ -122,8 +166,18 @@ std::size_t Snapshot::instanceCount() const {
     return n;
 }
 
-Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) {
+Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous, double renderTime) {
     Snapshot snap;
+    snap.renderTime = renderTime;
+    // ADR-2246: the programs, and each name resolved once so a hit does not look a string up.
+    snap.programs = scene.materialPrograms;
+    const auto programIndex = [&](const std::string& name) -> int {
+        if (name.empty()) return -1;
+        for (std::size_t i = 0; i < snap.programs.size(); ++i) {
+            if (snap.programs[i].name == name) return static_cast<int>(i);
+        }
+        return -1;
+    };
     snap.camera = scene.camera;
     if (previous != nullptr) {
         snap.hasMotion = true;
@@ -165,8 +219,34 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
         "inexplicably bright, check this first.");
 
     snap.lights = scene.lights;
-    snap.lightEmission.reserve(scene.lights.size());
-    for (const auto& l : scene.lights) snap.lightEmission.push_back(lightEmission(l));
+    // ADR-2248: the effect-light pool (ADR-703, LIGHTMOD) as `SceneRenderer::updateLights` appends it -- unshadowed
+    // point lights after the scene's own, while the raster's light list has room (kMaxSceneLights, 256).
+    int effectLights = 0;
+    {
+        constexpr std::size_t kMaxSceneLights = 256; // rendering/light_data.hpp; the tracer links no renderer
+        std::size_t enabled = static_cast<std::size_t>(
+            std::count_if(scene.lights.begin(), scene.lights.end(), [](const scene::PunctualLight& l) { return l.enabled; }));
+        const world::EffectLightFrame& pool = scene.entityFx.lights;
+        const std::uint32_t count = std::min<std::uint32_t>(pool.count, world::kEffectLightBudget);
+        for (std::uint32_t i = 0; i < count && enabled < kMaxSceneLights; ++i, ++enabled) {
+            const world::EffectLight& in = pool.lights[i];
+            scene::PunctualLight out;
+            out.type = scene::PunctualLight::Type::Point;
+            out.role = scene::PunctualLight::Role::Practical;
+            out.position = in.position;
+            out.color = in.color;
+            out.intensity = in.intensity;
+            out.range = std::max(in.range, 0.01f);
+            out.castsShadow = false;
+            out.contactShadow = false;
+            out.volumetricStrength = in.volumetric;
+            out.enabled = true;
+            snap.lights.push_back(out);
+            ++effectLights;
+        }
+    }
+    snap.lightEmission.reserve(snap.lights.size());
+    for (const auto& l : snap.lights) snap.lightEmission.push_back(lightEmission(l));
     int directional = 0;
     int punctual = 0;
     int area = 0;
@@ -228,9 +308,9 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
         out.entityIndex = ei;
         out.entityName = e.name;
         out.material = e.material;
-        // ADR-903: the entity's emission lane (its node's emissiveBoost). The path tracer shades the
-        // material alone -- no program -- so the gain folds straight into the intensity.
-        out.material.emissiveIntensity *= e.emissionGain;
+        // ADR-903/2246: the entity's emission lane (its node's emissiveBoost), applied after the program.
+        out.emissionGain = e.emissionGain;
+        out.program = programIndex(e.material.program);
 
         const glm::mat4 m = e.transform.matrix();
         const glm::mat3 nm = normalMatrix(m);
@@ -239,6 +319,7 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
         out.deforming = palette != nullptr;
         out.positions.reserve(src.vertices.size());
         out.objectPositions.reserve(src.vertices.size());
+        out.localPositions.reserve(src.vertices.size());
         out.normals.reserve(src.vertices.size());
         const bool hasUv = true; // scene::Vertex always carries a uv; it is zero when unauthored
         if (hasUv) out.uvs.reserve(src.vertices.size());
@@ -255,6 +336,7 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
                 nrm = glm::inverseTranspose(glm::mat3(sk)) * nrm;
             }
             out.objectPositions.push_back(pos);
+            out.localPositions.push_back(v.position); // bind space (pbr_skinned.wgsl), ADR-2246
             out.positions.push_back(glm::vec3(m * glm::vec4(pos, 1.0f)));
             const glm::vec3 n = nm * nrm;
             const float len = glm::length(n);
@@ -369,6 +451,7 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
         // ADR-2243: the material fields coverage.cpp lists as unsupported, counted where the frame has them.
         int programs = 0;
         int transparent = 0;
+        int masked = 0;
         int normalMapped = 0;
         int toon = 0;
         int wire = 0;
@@ -378,7 +461,8 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
             thinFilm += m.thinFilm.enabled() ? 1 : 0;
             anisotropic += m.anisotropy.enabled() ? 1 : 0;
             programs += m.program.empty() ? 0 : 1;
-            transparent += (m.opacity < 1.0f || m.alphaMode != scene::AlphaMode::Opaque) ? 1 : 0;
+            transparent += m.alphaMode == scene::AlphaMode::Blend ? 1 : 0;
+            masked += m.alphaMode == scene::AlphaMode::Mask ? 1 : 0;
             normalMapped += m.normalTexture.valid() ? 1 : 0;
             toon += m.toon.enabled() ? 1 : 0;
             wire += m.wire.enabled() ? 1 : 0;
@@ -406,19 +490,27 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
                                    anisotropic);
         }
         if (programs > 0) {
-            snap.capabilities.note("material program", Support::Unsupported,
-                                   "per-fragment material programs (ADR-030) are not evaluated: traced as the bare "
-                                   "material, so a program's colour, emission and lit/dark choice are lost",
+            snap.capabilities.note("material program", Support::Full,
+                                   "evaluated per hit through scene::evaluateMaterialProgram, in the lit shader's order "
+                                   "(ADR-2246), at the frame's render clock",
                                    programs);
         }
         if (transparent > 0) {
-            snap.capabilities.note("transparent / alpha-masked material", Support::Unsupported,
-                                   "opacity, alpha mask and alpha blend are not traced: the surface is opaque",
+            snap.capabilities.note("alpha-blended material", Support::Unsupported,
+                                   "alpha blend is not traced (stochastic transparency is not built): the surface is "
+                                   "opaque",
                                    transparent);
         }
+        if (masked > 0) {
+            snap.capabilities.note("alpha-masked material", Support::Full,
+                                   "rays pass through texels below the cutoff, shadow rays included (ADR-2251); the "
+                                   "raster's distance fade of the cutoff is not applied",
+                                   masked);
+        }
         if (normalMapped > 0) {
-            snap.capabilities.note("normal map", Support::Unsupported,
-                                   "no normal mapping: shaded with the interpolated vertex normal", normalMapped);
+            snap.capabilities.note("normal map", Support::Full,
+                                   "the raster's cotangent frame from the triangle's own uv gradient (ADR-2251)",
+                                   normalMapped);
         }
         if (toon > 0) {
             snap.capabilities.note("toon material", Support::Unsupported,
@@ -499,7 +591,22 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
         obj.source.entityIndex = static_cast<std::uint32_t>(pi);
         obj.source.entityName = obj.name;
         obj.source.material = proc.material;
-        obj.source.material.emissiveIntensity *= proc.emissionGain; // ADR-903, as above
+        obj.source.emissionGain = proc.emissionGain; // ADR-903/905, applied after the program (ADR-2246)
+        obj.source.emissionHue = proc.emissionHue;
+        obj.source.program = programIndex(proc.material.program);
+        // procedural_renderer.cpp `u.chroma`: the living chroma (ADR-057) and the variation switch (ADR-904).
+        {
+            const auto& mv = proc.materialVariation;
+            if (mv.chromaDrift > 0.0f && mv.chromaDriftScale > 1e-3f) {
+                obj.chroma = glm::vec4(mv.chromaDrift, wind::kTau / mv.chromaDriftScale, wind::kTau * mv.chromaDriftSpeed,
+                                       0.0f);
+            }
+            if (obj.source.program >= 0) {
+                const scene::MaterialProgram& prog = snap.programs[static_cast<std::size_t>(obj.source.program)];
+                if (prog.writesEmission() && !prog.emissionReadsInstance()) obj.chroma.w = 1.0f;
+            }
+        }
+        obj.records = proc.instances;
         // The source keeps OBJECT space. `sourceTransform` is folded in here because it is the same
         // for every instance; everything that differs per copy stays in the transform.
         const glm::mat3 srcNormal = normalMatrix(sourceXf);
@@ -508,6 +615,7 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
         obj.source.uvs.reserve(src.vertices.size());
         for (const scene::Vertex& v : src.vertices) {
             obj.source.positions.push_back(glm::vec3(sourceXf * glm::vec4(v.position, 1.0f)));
+            obj.source.localPositions.push_back(v.position); // procedural.wgsl `out.localPos = in.position`
             const glm::vec3 n = srcNormal * v.normal;
             const float len = glm::length(n);
             obj.source.normals.push_back(len > 1e-12f ? n / len : glm::vec3(0.0f, 1.0f, 0.0f));
@@ -586,9 +694,12 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
     unsupported(scene.pulses.count > 0, "shockwave pulse",
                 "the fronts displace vertices and add light in the raster's shaders (ADR-2124): absent",
                 static_cast<int>(scene.pulses.count));
-    unsupported(scene.entityFx.lights.count > 0, "effect light",
-                "the effect-light pool the raster appends to the scene's lights (ADR-703): not lit",
-                static_cast<int>(scene.entityFx.lights.count));
+    if (effectLights > 0) {
+        snap.capabilities.note("effect light", Support::Degraded,
+                               "the effect-light pool (ADR-703) traced as the raster appends it: unshadowed point "
+                               "lights; like every point light its shadow (none) and falloff match, its softness not",
+                               effectLights);
+    }
     unsupported(!scene.entityFx.empty(), "entity effect lane",
                 "Glow, Pulse and Bloom Source lanes (ADR-703) are raster shading terms: absent",
                 static_cast<int>(scene.entityFx.records.size()) - 1);
@@ -601,49 +712,121 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
         "the camera is a pinhole at the camera's pose and field of view: its near plane, depth of field and motion "
         "blur are not modelled, and the output is scene-linear radiance with no exposure, bloom, grade or tone map");
 
-    // ---- emissive geometry ------------------------------------------------------------------
-    //
-    // Collected AFTER the meshes, because it indexes into them. A triangle is a light if its
-    // material emits; the emission is uniform over the triangle since there is no emissive texture
-    // lookup here (that would need per-sample UV interpolation, and is a refinement not a blocker).
-    for (std::uint32_t mi = 0; mi < snap.meshes.size(); ++mi) {
-        const TriangleMesh& mesh = snap.meshes[mi];
-        const scene::Material& mat = mesh.material;
-        const glm::vec3 emission = mat.emissiveColor * mat.emissiveIntensity;
-        if (emission.x <= 0.0f && emission.y <= 0.0f && emission.z <= 0.0f) continue;
+    for (const TriangleMesh& m : snap.meshes) snap.hasAlphaMask |= m.material.alphaMode == scene::AlphaMode::Mask;
+    for (const InstancedObject& o : snap.instanced) {
+        snap.hasAlphaMask |= o.source.material.alphaMode == scene::AlphaMode::Mask;
+    }
 
-        for (std::size_t t = 0; t + 2 < mesh.indices.size(); t += 3) {
-            EmissiveTriangle e;
-            e.meshIndex = mi;
-            e.primIndex = static_cast<std::uint32_t>(t / 3);
-            e.v0 = mesh.positions[mesh.indices[t + 0]];
-            e.v1 = mesh.positions[mesh.indices[t + 1]];
-            e.v2 = mesh.positions[mesh.indices[t + 2]];
-            const glm::vec3 cross = glm::cross(e.v1 - e.v0, e.v2 - e.v0);
-            const float len = glm::length(cross);
-            if (len <= 1e-12f) continue;   // degenerate: zero area, would divide by zero
-            e.normal = cross / len;
-            e.area = 0.5f * len;
-            e.emission = emission;
-            snap.totalEmissiveArea += e.area;
-            snap.emissiveTriangles.push_back(e);
+    // ---- what each material program this frame uses leaves at rest (ADR-2246) --------------------------------
+    {
+        std::vector<int> used;
+        for (const TriangleMesh& m : snap.meshes) {
+            if (m.program >= 0) used.push_back(m.program);
+        }
+        for (const InstancedObject& o : snap.instanced) {
+            if (o.source.program >= 0) used.push_back(o.source.program);
+        }
+        std::sort(used.begin(), used.end());
+        used.erase(std::unique(used.begin(), used.end()), used.end());
+        for (const int pi : used) {
+            for (const std::string& gap : programGaps(snap.programs[static_cast<std::size_t>(pi)])) {
+                snap.capabilities.note("program " + gap, Support::Degraded,
+                                       "no ray-traced value: given the neutral one (0, or the flat normal), so the "
+                                       "program's use of it is at rest",
+                                       1);
+            }
         }
     }
-    if (snap.totalEmissiveArea > 0.0f) {
-        float running = 0.0f;
-        for (auto& e : snap.emissiveTriangles) {
-            running += e.area;
-            e.cdf = running / snap.totalEmissiveArea;
+
+    // ---- emitters (ADR-2247) ---------------------------------------------------------------------
+    //
+    // A surface can emit when its factor does or its program writes emission (ADR-2246): which of its points
+    // actually do is answered at the sampled point by the same shading a hit uses, so a program that lights one
+    // window in three costs samples on the dark two but never biases the image. Collected after the geometry,
+    // because the groups index into it.
+    const auto canEmit = [&](const TriangleMesh& m) {
+        if (m.emissionGain <= 0.0f) return false;
+        const glm::vec3 e = m.material.emissiveColor * m.material.emissiveIntensity;
+        if (e.x > 0.0f || e.y > 0.0f || e.z > 0.0f) return true;
+        return m.program >= 0 && snap.programs[static_cast<std::size_t>(m.program)].writesEmission();
+    };
+    // Appends `mesh`'s triangles (positions as given) with their area CDF; returns the total area.
+    const auto addTriangles = [&](const TriangleMesh& mesh, const std::vector<glm::vec3>& positions) -> float {
+        float total = 0.0f;
+        const std::size_t first = snap.emitterTriangles.size();
+        for (std::size_t t = 0; t + 2 < mesh.indices.size(); t += 3) {
+            const glm::vec3& v0 = positions[mesh.indices[t + 0]];
+            const glm::vec3& v1 = positions[mesh.indices[t + 1]];
+            const glm::vec3& v2 = positions[mesh.indices[t + 2]];
+            const float area = 0.5f * glm::length(glm::cross(v1 - v0, v2 - v0));
+            if (!(area > 1e-12f)) continue; // degenerate: zero area, would divide by zero
+            total += area;
+            snap.emitterTriangles.push_back(EmitterTriangle{static_cast<std::uint32_t>(t / 3), area, total});
         }
-        snap.emissiveTriangles.back().cdf = 1.0f;
-        snap.emissiveIndex.reserve(snap.emissiveTriangles.size());
-        for (std::uint32_t i = 0; i < snap.emissiveTriangles.size(); ++i) {
-            const auto& e = snap.emissiveTriangles[i];
-            snap.emissiveIndex.emplace((static_cast<std::uint64_t>(e.meshIndex) << 32) | e.primIndex, i);
-        }   // exact, so a u of 0.999999 cannot fall off the end
+        for (std::size_t i = first; i < snap.emitterTriangles.size(); ++i) snap.emitterTriangles[i].cdf /= total;
+        if (snap.emitterTriangles.size() > first) snap.emitterTriangles.back().cdf = 1.0f;
+        return total;
+    };
+    snap.meshEmitterGroup.assign(snap.meshes.size(), -1);
+    snap.instancedEmitterGroup.assign(snap.instanced.size(), -1);
+    std::size_t emitterTriangleCount = 0;
+    for (std::uint32_t mi = 0; mi < snap.meshes.size(); ++mi) {
+        const TriangleMesh& mesh = snap.meshes[mi];
+        if (!canEmit(mesh)) continue;
+        const auto begin = static_cast<std::uint32_t>(snap.emitterTriangles.size());
+        const float area = addTriangles(mesh, mesh.positions);
+        if (!(area > 0.0f)) continue;
+        EmitterGroup g;
+        g.object = mi;
+        g.triBegin = begin;
+        g.triCount = static_cast<std::uint32_t>(snap.emitterTriangles.size()) - begin;
+        g.area = area;
+        g.weight = area;
+        snap.meshEmitterGroup[mi] = static_cast<std::int32_t>(snap.emitterGroups.size());
+        snap.emitterGroups.push_back(g);
+        emitterTriangleCount += g.triCount;
+    }
+    std::size_t emitterInstances = 0;
+    for (std::uint32_t oi = 0; oi < snap.instanced.size(); ++oi) {
+        const InstancedObject& obj = snap.instanced[oi];
+        if (!canEmit(obj.source)) continue;
+        const auto begin = static_cast<std::uint32_t>(snap.emitterTriangles.size());
+        const float area = addTriangles(obj.source, obj.source.positions);
+        if (!(area > 0.0f)) continue;
+        const auto count = static_cast<std::uint32_t>(snap.emitterTriangles.size()) - begin;
+        snap.instancedEmitterGroup[oi] = static_cast<std::int32_t>(snap.emitterGroups.size());
+        for (std::uint32_t ii = 0; ii < obj.transforms.size(); ++ii) {
+            // The selection weight approximates the copy's world area (exact for a uniform scale); the density
+            // stays exact whatever it is, because the triangle's world area is measured at the point.
+            const glm::mat3 m3(obj.transforms[ii]);
+            const float det = std::abs(glm::determinant(m3));
+            EmitterGroup g;
+            g.instanced = true;
+            g.object = oi;
+            g.instance = ii;
+            g.triBegin = begin;
+            g.triCount = count;
+            g.area = area;
+            g.weight = area * std::pow(det, 2.0f / 3.0f);
+            snap.emitterGroups.push_back(g);
+        }
+        emitterTriangleCount += count;
+        emitterInstances += obj.transforms.size();
+    }
+    for (const EmitterGroup& g : snap.emitterGroups) snap.totalEmitterWeight += g.weight;
+    if (snap.totalEmitterWeight > 0.0f) {
+        float running = 0.0f;
+        for (EmitterGroup& g : snap.emitterGroups) {
+            running += g.weight;
+            g.cdf = running / snap.totalEmitterWeight;
+        }
+        snap.emitterGroups.back().cdf = 1.0f; // exact, so a u of 0.999999 cannot fall off the end
         snap.capabilities.note("emissive geometry", Support::Full,
-                               "sampled directly and combined with BSDF sampling by MIS",
-                               static_cast<int>(snap.emissiveTriangles.size()));
+                               fmt::format("{} emitting surfaces ({} triangles, {} instanced copies) sampled by area "
+                                           "and combined with BSDF sampling by MIS; emission evaluated at the sampled "
+                                           "point (texture, program, instance lanes)",
+                                           snap.emitterGroups.size(), emitterTriangleCount, emitterInstances),
+                               static_cast<int>(snap.emitterGroups.size()));
     }
 
     return snap;

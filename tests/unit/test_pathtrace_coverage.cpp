@@ -114,13 +114,17 @@ TEST_CASE("the capability report names what Neon Dreams lost silently", "[unit][
         }
         return nullptr;
     };
-    for (const char* feature : {"clouds", "material program", "normal map", "stars", "shockwave pulse", "effect light"}) {
+    for (const char* feature : {"clouds", "stars", "shockwave pulse"}) {
         INFO(feature);
         const pathtrace::Capability* c = find(feature);
         REQUIRE(c != nullptr);
         CHECK(c->support == pathtrace::Support::Unsupported);
         CHECK(c->count > 0);
     }
+    // ADR-2246/2248: programs and the effect-light pool are traced now, and still named.
+    REQUIRE(find("material program") != nullptr);
+    CHECK(find("material program")->support == pathtrace::Support::Full);
+    REQUIRE(find("effect light") != nullptr);
     CHECK(find("effect light")->count == 3);
 
     // And a plain scene reports none of them: the rows are about this frame's content.

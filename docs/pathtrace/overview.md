@@ -39,6 +39,7 @@ never reaches into the realtime post chain. Colour management is downstream of t
 | 7 | Glowmere | traced as geometry (`test_pathtrace_glowmere.cpp`) |
 | 8 | Embree instancing | **partly** |
 | H1 | Hybrid RT restoration, phase 1: environment map, world-space procedural records, emitter lookup, coverage table, no-GPU CLI, sorted AOV channels | **done** (ADR-2240..2245) |
+| H2 | Materials and lights: material programs and instance lanes in the raster's order, instanced/textured/programmed emitters in NEE, effect lights, range cull, camera back-face culling, shadow-ray aim fix, alpha masks, normal maps | **done** (ADR-2246..2251) |
 
 ## From the Render panel
 
@@ -145,7 +146,9 @@ pixels rather than after somebody notices they are wrong.
 | Procedural / scatter | **degraded** | drawn as Embree instances, so geometry is stored once. Deformers and effectors are still not applied and LOD rung 0 is always used |
 | SDF in `Raymarch` mode | **unsupported** | no triangles exist; `spatial::SdfTree` is CPU-evaluable but sphere tracing is a separate integrator path |
 | Water surface | **degraded** | the mesh is a real CPU sheet, but ripples, swell, foam and refraction live in `shaders/water.wgsl` |
-| Point / spot lights | **degraded** | treated as delta positions, so their shadows are hard; the realtime path softens them |
+| Point / spot lights | **degraded** | treated as delta positions, so their shadows are hard; the realtime path softens them. Out-of-range ones are skipped exactly (ADR-2248); the effect-light pool is traced (ADR-2248) |
+| Material programs, instance lanes | **supported** | `pathtrace/surface.cpp` shades in `shadeSurface`'s order through the CPU twins, at the frame's render clock (ADR-2246); inputs with no ray-traced value (screen-space geometry, AO, audio, fields, texture ops) are reported by name |
+| Alpha mask / normal maps | **supported** | ADR-2251; alpha blend is reported and traced opaque |
 | Volumetrics | **unsupported** | a stated non-goal for now (spec section 72) |
 | HDR environment map | **supported** | importance-sampled and MIS-weighted, at `environmentIntensity` and `environmentRotation`; the camera sees the raster's background rule (ADR-2240) |
 | Clouds, material programs, effect lights, Stars, pulses, ... | **unsupported** | every `Scene` member and `Material` field has a row in `pathtrace/coverage.cpp`, checked against the headers by a test; what the frame contains is reported (ADR-2243) |

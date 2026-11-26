@@ -184,8 +184,9 @@ TEST_CASE("the emissive sampler's PDF integrates to one over the sphere",
     // function. If they drift apart the MIS weights are computed from a density nothing sampled.
     const scene::Scene sc = emissiveOnlyScene(2.0f, 4.0f);
     const pathtrace::Snapshot snap = pathtrace::buildSnapshot(sc);
-    REQUIRE(snap.emissiveTriangles.size() >= 2);
-    REQUIRE(snap.totalEmissiveArea == Approx(4.0f).epsilon(0.01)); // a 2x2 m quad
+    REQUIRE(snap.emitterGroups.size() == 1);
+    REQUIRE(snap.emitterGroups[0].triCount >= 2);
+    REQUIRE(snap.totalEmitterWeight == Approx(4.0f).epsilon(0.01)); // a 2x2 m quad
 
     const glm::vec3 p{0.3f, 0.0f, -0.2f};
     int checked = 0;
@@ -194,13 +195,16 @@ TEST_CASE("the emissive sampler's PDF integrates to one over the sphere",
         const auto es = pathtrace::sampleEmissive(snap, p, s.next2D(), s.next1D());
         if (!es.valid) continue;
         ++checked;
-        const float q = pathtrace::emissivePdf(snap, es.meshIndex, es.primIndex, false, es.direction, es.distance);
+        const float q = pathtrace::emissivePdf(snap, es.point, es.direction, es.distance);
         REQUIRE(q == Approx(es.pdf).epsilon(1e-4));
     }
     REQUIRE(checked > 400); // live arm
 
     // A triangle that is not an emitter has no density under this strategy.
-    REQUIRE(pathtrace::emissivePdf(snap, 999, 0, false, glm::vec3(0, 1, 0), 1.0f) == 0.0f);
+    pathtrace::ShadingPoint floor;
+    floor.object = 0; // the floor: in the scene, not an emitter
+    REQUIRE(snap.meshEmitterGroup[0] < 0);
+    REQUIRE(pathtrace::emissivePdf(snap, floor, glm::vec3(0, 1, 0), 1.0f) == 0.0f);
 }
 
 TEST_CASE("the emissive area CDF selects triangles in proportion to area",
@@ -216,7 +220,7 @@ TEST_CASE("the emissive area CDF selects triangles in proportion to area",
     big.material.emissiveIntensity = 3.0f;
 
     const pathtrace::Snapshot snap = pathtrace::buildSnapshot(sc);
-    REQUIRE(snap.totalEmissiveArea == Approx(1.0f + 16.0f).epsilon(0.01)); // 1x1 plus 4x4
+    REQUIRE(snap.totalEmitterWeight == Approx(1.0f + 16.0f).epsilon(0.01)); // 1x1 plus 4x4
 
     int small = 0;
     int large = 0;
@@ -225,7 +229,7 @@ TEST_CASE("the emissive area CDF selects triangles in proportion to area",
         pathtrace::Sampler s(83, static_cast<std::uint32_t>(i), 0);
         const auto es = pathtrace::sampleEmissive(snap, glm::vec3(0.0f, 0.0f, 0.0f), s.next2D(), s.next1D());
         if (!es.valid) continue;
-        (es.meshIndex == 1 ? small : large)++;
+        (es.point.object == 1 ? small : large)++;
     }
     // 1 of 17 should land on the small emitter.
     const double fraction = static_cast<double>(small) / (small + large);

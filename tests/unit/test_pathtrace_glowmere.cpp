@@ -69,7 +69,7 @@ TEST_CASE("Glowmere Valley reaches the path tracer as geometry", "[unit][pathtra
     pathtrace::logCapabilities(snap);
 
     INFO("meshes " << snap.meshes.size() << " triangles " << snap.triangleCount() << " lights "
-                   << snap.lights.size() << " emissive tris " << snap.emissiveTriangles.size());
+                   << snap.lights.size() << " emitter groups " << snap.emitterGroups.size());
 
     // A real world, not a toy. If this collapses to a handful of triangles the snapshot is dropping
     // something silently, which is the failure mode section 87 exists to prevent.

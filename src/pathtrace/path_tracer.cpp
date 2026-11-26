@@ -6,6 +6,7 @@
 #include "pathtrace/camera.hpp"
 #include "pathtrace/lights.hpp"
 #include "pathtrace/sampler.hpp"
+#include "pathtrace/surface.hpp"
 #include "pathtrace/texture.hpp"
 
 #include <fmt/format.h>
@@ -33,32 +34,6 @@ struct Counters {
     std::uint64_t bsdfHitsOnLights = 0;
 };
 
-// glTF: every texture MULTIPLIES its factor. Base colour and emissive arrive already linear from
-// `sampleSlot` (it decodes iff the format is sRGB); metallic-roughness and occlusion are linear
-// data and are never decoded. The channel assignment -- roughness in G, metallic in B -- is the
-// glTF spec's, and getting it backwards is a silent, plausible-looking error.
-[[nodiscard]] SurfaceMaterial resolveMaterial(const Snapshot& snap, const scene::Material& mat,
-                                              glm::vec2 uv) {
-    SurfaceMaterial m;
-    const std::span<const scene::TextureData> textures{snap.textures};
-
-    const glm::vec4 base = sampleSlot(textures, mat.baseColorTexture, uv, glm::vec4(1.0f));
-    m.baseColor = mat.baseColor * glm::vec3(base);
-    m.opacity = mat.opacity * base.w;
-
-    const glm::vec4 mr = sampleSlot(textures, mat.metallicRoughnessTexture, uv, glm::vec4(1.0f));
-    m.roughness = glm::clamp(mat.roughness * mr.y, 0.0f, 1.0f);
-    m.metallic = glm::clamp(mat.metallic * mr.z, 0.0f, 1.0f);
-
-    const glm::vec4 em = sampleSlot(textures, mat.emissiveTexture, uv, glm::vec4(1.0f));
-    m.emission = mat.emissiveColor * mat.emissiveIntensity * glm::vec3(em);
-
-    const glm::vec4 ao = sampleSlot(textures, mat.occlusionTexture, uv, glm::vec4(1.0f));
-    m.occlusion = glm::mix(1.0f, ao.x, glm::clamp(mat.occlusionStrength, 0.0f, 1.0f));
-
-    return m;
-}
-
 // A shadow ray must clear the surface it leaves AND stop short of the surface it aims at. Getting
 // the second half wrong is invisible in the code and total in the image.
 //
@@ -73,20 +48,64 @@ struct Counters {
 //
 // The fix measures the distance from the offset origin and takes a RELATIVE shortfall, which stays
 // far above float precision at every scale.
-[[nodiscard]] bool visible(const EmbreeScene& embree, const SurfaceHit& hit, const glm::vec3& dir,
-                           float distance, Counters& counters) {
+[[nodiscard]] ShadingPoint pointOf(const SurfaceHit& hit) {
+    ShadingPoint point;
+    point.instanced = hit.instanced;
+    point.object = hit.meshIndex;
+    point.instance = hit.instanceIndex;
+    point.prim = hit.primIndex;
+    point.b0 = hit.baryW;
+    point.b1 = hit.baryU;
+    point.b2 = hit.baryV;
+    point.position = hit.position;
+    point.normal = hit.shadingNormal;
+    return point;
+}
+
+// ADR-2251: an alpha-masked surface whose opacity here (factor x program x texture alpha, as the raster discards on)
+// is below its cutoff is not there.
+[[nodiscard]] bool cutOut(const Snapshot& snap, const SurfaceHit& hit) {
+    const scene::Material& mat = EmbreeScene::materialOf(snap, hit);
+    if (mat.alphaMode != scene::AlphaMode::Mask) return false;
+    return shadeSurfaceMaterial(snap, pointOf(hit)).opacity < mat.alphaCutoff;
+}
+
+// True when a segment from `origin` along `dir` (unit) meets nothing solid before `tfar`. With no masked surface in the
+// scene this is Embree's occlusion query; with one, the segment is walked hit by hit through the cut-out texels.
+[[nodiscard]] bool clear(const Snapshot& snap, const EmbreeScene& embree, const glm::vec3& origin,
+                         const glm::vec3& dir, float tfar) {
+    if (!snap.hasAlphaMask) return !embree.occluded(origin, dir, 0.0f, tfar);
+    float tnear = 0.0f;
+    for (int step = 0; step < 64; ++step) {
+        const SurfaceHit h = embree.intersect(snap, origin, dir, tnear, tfar);
+        if (!h.hit) return true;
+        if (!cutOut(snap, h)) return false;
+        tnear = h.t + shadowEpsilon(h.t);
+    }
+    return false; // more masked layers than any real scene has: call it occluded rather than loop
+}
+
+[[nodiscard]] bool visible(const Snapshot& snap, const EmbreeScene& embree, const SurfaceHit& hit,
+                           const glm::vec3& dir, float distance, Counters& counters) {
     const float eps = shadowEpsilon(hit.t);
     const glm::vec3 origin = hit.position + hit.geometricNormal * eps;
     if (std::isinf(distance)) {
         ++counters.shadowRays;
-        return !embree.occluded(origin, dir, 0.0f, std::numeric_limits<float>::infinity());
+        return clear(snap, embree, origin, dir, std::numeric_limits<float>::infinity());
     }
-    // How far the target actually is from the offset origin.
-    const float d = distance - glm::dot(hit.geometricNormal, dir) * eps;
+    // ADR-2250: aim from the OFFSET origin at the target point itself. Keeping `dir` (which points from the
+    // un-offset hit) moves the ray off the target by the offset, and on a target surface that is not perpendicular
+    // to it the ray then meets the target's own plane before `tfar` -- the emitter occluding itself. The offset is
+    // relative to the hit's distance from the camera, so the loss grew with distance and grazing: measured, 5,718 of
+    // 20,000 shadow rays from a floor point 5.7 m away at a grazing view were blocked by the very quad they aimed at,
+    // and light sampling read 13% dark there while BSDF sampling (no shadow ray) did not.
+    const glm::vec3 target = hit.position + dir * distance;
+    const glm::vec3 segment = target - origin;
+    const float d = glm::length(segment);
     const float tfar = d * (1.0f - 1e-4f);
-    if (!(tfar > 0.0f)) return true;   // the target is inside the epsilon shell
+    if (!(tfar > 0.0f) || glm::dot(segment, dir) <= 0.0f) return true; // the target is inside the epsilon shell
     ++counters.shadowRays;
-    return !embree.occluded(origin, dir, 0.0f, tfar);
+    return clear(snap, embree, origin, segment / d, tfar);
 }
 
 // ---- next-event estimation, with MIS (spec sections 43-45) ---------------------------------------
@@ -109,13 +128,15 @@ struct Counters {
     // --- analytic lights: weight 1, always ---
     for (std::size_t li = 0; li < snap.lights.size(); ++li) {
         const scene::PunctualLight& light = snap.lights[li];
-        const LightSample ls = sampleLight(light, snap.lightEmission[li], hit.position, sampler.next2D());
+        const glm::vec2 u = sampler.next2D(); // drawn for every light, so skipping one below changes no other sample
+        if (lightOutOfRange(light, hit.position)) continue; // ADR-2248: nothing `sampleLight` would have returned
+        const LightSample ls = sampleLight(light, snap.lightEmission[li], hit.position, u);
         if (!ls.valid) continue;
         const float nDotL = glm::dot(hit.shadingNormal, ls.direction);
         if (nDotL <= 0.0f) continue;
         const glm::vec3 f = evaluateBsdf(m, hit.shadingNormal, view, ls.direction);
         if (f.x <= 0.0f && f.y <= 0.0f && f.z <= 0.0f) continue;
-        if (light.castsShadow && !visible(embree, hit, ls.direction, ls.distance, counters)) continue;
+        if (light.castsShadow && !visible(snap, embree, hit, ls.direction, ls.distance, counters)) continue;
 
         if (ls.delta) {
             sum += f * ls.radiance * nDotL;
@@ -127,14 +148,16 @@ struct Counters {
     }
 
     // --- emissive geometry: MIS against BSDF sampling ---
-    if (!snap.emissiveTriangles.empty()) {
+    if (snap.hasEmitters()) {
         const EmissiveSample es = sampleEmissive(snap, hit.position, sampler.next2D(), sampler.next1D());
-        if (es.valid) {
+        // A point the surface does not light (a dark window of a lit facade) is a sample of zero: no shadow ray.
+        const bool emits = es.radiance.x > 0.0f || es.radiance.y > 0.0f || es.radiance.z > 0.0f;
+        if (es.valid && emits) {
             const float nDotL = glm::dot(hit.shadingNormal, es.direction);
             if (nDotL > 0.0f) {
                 const glm::vec3 f = evaluateBsdf(m, hit.shadingNormal, view, es.direction);
                 if (f.x > 0.0f || f.y > 0.0f || f.z > 0.0f) {
-                    if (visible(embree, hit, es.direction, es.distance, counters)) {
+                    if (visible(snap, embree, hit, es.direction, es.distance, counters)) {
                         const float bPdf = bsdfPdf(m, hit.shadingNormal, view, es.direction);
                         const float w = settings.strategy == TraceSettings::Strategy::LightOnly
                                             ? 1.0f
@@ -156,7 +179,7 @@ struct Counters {
             if (nDotL > 0.0f) {
                 const glm::vec3 f = evaluateBsdf(m, hit.shadingNormal, view, es.direction);
                 if ((f.x > 0.0f || f.y > 0.0f || f.z > 0.0f) &&
-                    visible(embree, hit, es.direction, std::numeric_limits<float>::infinity(), counters)) {
+                    visible(snap, embree, hit, es.direction, std::numeric_limits<float>::infinity(), counters)) {
                     const float bPdf = bsdfPdf(m, hit.shadingNormal, view, es.direction);
                     const float w = settings.strategy == TraceSettings::Strategy::LightOnly
                                         ? 1.0f
@@ -250,8 +273,19 @@ struct PathResult {
     bool takeFullEmission = true;
 
     for (std::uint32_t depth = 0;; ++depth) {
-        const SurfaceHit hit =
+        SurfaceHit hit =
             embree.intersect(snap, ray.origin, ray.direction, 0.0f, std::numeric_limits<float>::infinity());
+        // ADR-2249: the camera sees what the raster draws, and the raster culls the back faces of a one-sided material
+        // (CullMode::Back unless doubleSided). So a camera ray passes through such a face and goes on; every scattered,
+        // shadow and light ray still sees both faces -- a deliberate difference, recorded in pathtrace/coverage.cpp,
+        // because light transport through a culled face is not the raster's to decide.
+        // ADR-2251: every ray passes through an alpha-masked texel below its cutoff, as the raster discards it.
+        for (int skip = 0; skip < 64 && hit.hit; ++skip) {
+            const bool culled = depth == 0 && hit.backface && !EmbreeScene::materialOf(snap, hit).doubleSided;
+            if (!culled && !(snap.hasAlphaMask && cutOut(snap, hit))) break;
+            hit = embree.intersect(snap, ray.origin, ray.direction, hit.t + shadowEpsilon(hit.t),
+                                   std::numeric_limits<float>::infinity());
+        }
 
         if (!hit.hit) {
             if (!firstHitRecorded) {
@@ -282,7 +316,16 @@ struct PathResult {
 
         // A hit can come from either list, so never index `meshes` directly.
         const scene::Material& mat = EmbreeScene::materialOf(snap, hit);
-        const SurfaceMaterial m = resolveMaterial(snap, mat, hit.uv);
+        // ADR-2246: the material as the raster's lit shader assembles it -- factors, program, instance lanes,
+        // textures, emission lanes -- at this point.
+        const ShadingPoint point = pointOf(hit);
+        const SurfaceMaterial m = shadeSurfaceMaterial(snap, point);
+        // ADR-2251: the normal map and the program's normal shade from here on, kept in the geometric hemisphere (a
+        // perturbed normal below the surface would return light from behind it).
+        if ((m.normal.x != 0.0f || m.normal.y != 0.0f || m.normal.z != 0.0f) &&
+            glm::dot(m.normal, hit.geometricNormal) > 0.0f) {
+            hit.shadingNormal = m.normal;
+        }
         const glm::vec3 view = -ray.direction;
 
         if (!firstHitRecorded) {
@@ -331,7 +374,7 @@ struct PathResult {
             float w = 1.0f;
             if (!takeFullEmission && settings.strategy != TraceSettings::Strategy::BsdfOnly) {
                 const float lPdf =
-                    emissivePdf(snap, hit.meshIndex, hit.primIndex, hit.instanced, ray.direction, hit.t);
+                    emissivePdf(snap, point, ray.direction, hit.t);
                 if (lPdf > 0.0f) {
                     ++counters.bsdfHitsOnLights;
                     // LightOnly must drop this entirely: the light sampler already counted this

@@ -131,9 +131,10 @@ public:
         // come from: `buildSnapshot(scene, &previous)` wants two evaluations of the same
         // composition, which a single-frame job can never have. This is a capability the sequence
         // gains for free and the single frame cannot.
+        // ADR-2246: the frame's render clock, exactly the `time` RenderJob updates the engine and the renderer with.
         const pathtrace::Snapshot snapshot =
-            previous_ ? pathtrace::buildSnapshot(engine_.scene(), &*previous_)
-                      : pathtrace::buildSnapshot(engine_.scene());
+            previous_ ? pathtrace::buildSnapshot(engine_.scene(), &*previous_, time.renderTime)
+                      : pathtrace::buildSnapshot(engine_.scene(), nullptr, time.renderTime);
         if (snapshot.empty()) {
             return fail("trace sequence: frame {} has nothing the tracer can see; refusing to "
                         "write a black frame",

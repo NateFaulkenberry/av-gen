@@ -167,11 +167,14 @@ Result<void> TraceJob::execute() {
     engine.setDetailLimits(scene::DetailLimits::offlineDefault());
     // A warm-up step at dt 0 then the real one, which is what app::RenderJob does: some systems
     // need a frame to settle, and a snapshot of frame zero is not a snapshot of the scene.
+    const FrameTime frame{request_.seconds, 1.0 / 60.0, 1};
     engine.update(FrameTime{request_.seconds, 0.0, 0});
-    engine.update(FrameTime{request_.seconds, 1.0 / 60.0, 1});
+    engine.update(frame);
     if (cancelled()) return {};
 
-    const Snapshot snapshot = buildSnapshot(engine.scene());
+    // ADR-2246: the snapshot carries the clock the engine was just updated at -- what `RenderJob` hands the renderer
+    // with the same update (render_job.cpp), so a program's `time` is the raster twin's.
+    const Snapshot snapshot = buildSnapshot(engine.scene(), nullptr, frame.renderTime);
     capabilities_ = snapshot.capabilities;
     logCapabilities(snapshot);
     if (snapshot.empty()) {

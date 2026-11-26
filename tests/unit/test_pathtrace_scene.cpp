@@ -166,6 +166,10 @@ TEST_CASE("procedural scatter reaches the tracer at its instance transforms",
         r.position = glm::vec4(static_cast<float>(i) * 2.0f - 11.0f, 0.0f, 0.0f, 1.0f);
         r.rotation = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
         r.scale = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
+        // The colour and emissive lanes as generation writes them with no variation (ADR-2246: the tracer multiplies
+        // by them, as procedural.wgsl does -- a zero lane is a black instance in both renderers).
+        r.color = glm::vec4(1.0f, 1.0f, 1.0f, static_cast<float>(i));
+        r.emissive = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
         proc.instances.push_back(r);
     }
     s.procedurals.push_back(std::move(proc));
@@ -231,6 +235,10 @@ TEST_CASE("a scattered scene renders, and the scatter is visible in the picture"
         r.position = glm::vec4(static_cast<float>(i) * 1.6f - 6.4f, 0.4f, 0.0f, 1.0f);
         r.rotation = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
         r.scale = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
+        // The colour and emissive lanes as generation writes them with no variation (ADR-2246: the tracer multiplies
+        // by them, as procedural.wgsl does -- a zero lane is a black instance in both renderers).
+        r.color = glm::vec4(1.0f, 1.0f, 1.0f, static_cast<float>(i));
+        r.emissive = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
         proc.instances.push_back(r);
     }
     s.procedurals.push_back(std::move(proc));
@@ -301,6 +309,10 @@ TEST_CASE("procedural scatter is instanced: geometry stored once, drawn many tim
                                static_cast<float>(i / 25) * 1.5f - 15.0f, 1.0f);
         r.rotation = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
         r.scale = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
+        // The colour and emissive lanes as generation writes them with no variation (ADR-2246: the tracer multiplies
+        // by them, as procedural.wgsl does -- a zero lane is a black instance in both renderers).
+        r.color = glm::vec4(1.0f, 1.0f, 1.0f, static_cast<float>(i));
+        r.emissive = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
         proc.instances.push_back(r);
     }
     s.procedurals.push_back(std::move(proc));
@@ -343,6 +355,10 @@ TEST_CASE("an instanced hit resolves to the right copy and the right normal",
                                      : glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
         r.rotation = glm::vec4(q.x, q.y, q.z, q.w);
         r.scale = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
+        // The colour and emissive lanes as generation writes them with no variation (ADR-2246: the tracer multiplies
+        // by them, as procedural.wgsl does -- a zero lane is a black instance in both renderers).
+        r.color = glm::vec4(1.0f, 1.0f, 1.0f, static_cast<float>(i));
+        r.emissive = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
         proc.instances.push_back(r);
     }
     s.procedurals.push_back(std::move(proc));
@@ -416,6 +432,10 @@ TEST_CASE("instanced and non-instanced geometry share one scene and shade the sa
         r.position = glm::vec4(2.0f + static_cast<float>(i) * 1.6f, 0.6f, 0.0f, 1.0f);
         r.rotation = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
         r.scale = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
+        // The colour and emissive lanes as generation writes them with no variation (ADR-2246: the tracer multiplies
+        // by them, as procedural.wgsl does -- a zero lane is a black instance in both renderers).
+        r.color = glm::vec4(1.0f, 1.0f, 1.0f, static_cast<float>(i));
+        r.emissive = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
         proc.instances.push_back(r);
     }
     s.procedurals.push_back(std::move(proc));

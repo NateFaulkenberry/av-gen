@@ -14,6 +14,7 @@
 // obviously broken.
 
 #include "pathtrace/snapshot.hpp"
+#include "pathtrace/surface.hpp"
 #include "scene/scene_types.hpp"
 
 #include <glm/glm.hpp>
@@ -41,6 +42,11 @@ struct LightSample {
 // per light (`Snapshot::lightEmission`, ADR-2242) rather than once per light per sample.
 [[nodiscard]] glm::vec3 lightEmission(const scene::PunctualLight& light);
 
+// ADR-2248: true when `light` is a point or spot light whose range window is zero at `p` -- a light `sampleLight`
+// would return invalid there whatever `u` is -- so next-event estimation can skip it before the work. The integrator
+// still draws the light's random numbers, so skipping changes no other sample and the image is bit-identical.
+[[nodiscard]] bool lightOutOfRange(const scene::PunctualLight& light, const glm::vec3& p);
+
 // Samples one light whose emitted colour is `emission` (`lightEmission(light)`). `u` is a 2-D uniform sample.
 [[nodiscard]] LightSample sampleLight(const scene::PunctualLight& light, const glm::vec3& emission,
                                       const glm::vec3& p, glm::vec2 u);
@@ -61,29 +67,25 @@ struct LightSample {
 
 struct EmissiveSample {
     glm::vec3 direction{0.0f};
-    glm::vec3 radiance{0.0f};
+    glm::vec3 radiance{0.0f};   // the surface's emission at the sampled point (shadeSurfaceMaterial), toward p
     float distance = 0.0f;
     float pdf = 0.0f;           // solid angle
-    std::uint32_t meshIndex = 0;
-    std::uint32_t primIndex = 0;
+    ShadingPoint point;         // where on which surface (ADR-2247)
     bool valid = false;
 };
 
-// Picks a triangle with probability proportional to its area, then a point uniformly on it.
-// `u` chooses the point; `pick` chooses the triangle.
-[[nodiscard]] EmissiveSample sampleEmissive(const Snapshot& snap, const glm::vec3& p, glm::vec2 u,
-                                            float pick);
+// Picks an emitter group by its weight, a triangle within it by area, and a point uniformly on that triangle
+// (ADR-2247). `u` chooses the point; `pick` chooses the group and then, rescaled, the triangle. The radiance is
+// the emission `shadeSurfaceMaterial` gives at that point, so a textured or programmed emitter is lit by exactly
+// what a BSDF ray landing on it would see.
+[[nodiscard]] EmissiveSample sampleEmissive(const Snapshot& snap, const glm::vec3& p, glm::vec2 u, float pick);
 
-// The solid-angle density `sampleEmissive` would have had for a ray that HIT emissive triangle
-// (meshIndex, primIndex) at `distance` travelling along `direction`. This is the other half of MIS:
-// without it a BSDF ray that lands on an emitter cannot be weighted and its energy is double
-// counted.
-//
-// `meshIndex` indexes `Snapshot::meshes`. An INSTANCED hit's index is into `Snapshot::instanced`, a different list,
-// and instanced emitters are not in `emissiveTriangles`: no light sampler can find them, so their density is 0 and the
-// BSDF strategy takes them whole (`instanced` true). Before ADR-2242 the instanced index was looked up as a mesh index
-// and could take the MIS weight of an unrelated triangle. A lookup, not a scan (ADR-2242).
-[[nodiscard]] float emissivePdf(const Snapshot& snap, std::uint32_t meshIndex, std::uint32_t primIndex, bool instanced,
-                                const glm::vec3& direction, float distance);
+// The solid-angle density `sampleEmissive` would have had for a ray from a point that HIT the surface `hit` at
+// `distance` travelling along `direction` -- the other half of MIS: without it a BSDF ray that lands on an emitter
+// cannot be weighted and its energy is double counted. 0 for a surface that is not in any group (only the BSDF
+// strategy could have found it). Instanced hits resolve through their copy's group (ADR-2247); a lookup, not a scan
+// (ADR-2242).
+[[nodiscard]] float emissivePdf(const Snapshot& snap, const ShadingPoint& hit, const glm::vec3& direction,
+                                float distance);
 
 } // namespace avgen::pathtrace
