@@ -1746,7 +1746,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         GpuBackendOptions gpuOptions;
         gpuOptions.executable = executablePath;
         gpuOptions.pipelineCache = true;
-        gpuOptions.label.clear(); // the device Studio has always made: unlabelled
+        gpuOptions.label = gpu::ContextDesc{}.label; // the device Studio has always made ("avgen")
         gpuOptions.surfaceLayer = [this]() -> void* { return window_ ? window_->metalLayer() : nullptr; };
         hostOptions.renderBackend = gpuRenderBackendFactory(std::move(gpuOptions));
         // A render job used to step four frames or 10 ms per UI frame (`job_->step(4, 0.010)`); a headless one ran

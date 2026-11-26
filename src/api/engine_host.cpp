@@ -150,6 +150,14 @@ EngineHost::EngineHost(app::Engine& borrowed, EngineHostOptions options)
 
 EngineHost::~EngineHost() {
     stop();
+    if (showLock_.showActive) {
+        // ADR-2167: a process that quits mid-show (a live profile, a closed editor) says what its show's lock did.
+        log::info("show: ended with the host; the machine GPU lock {} ({} attempt(s), the dearest {:.2f} ms{})",
+                  showLock_.held ? "released" : "was never ours", showLock_.attempts, showLock_.maxAttemptMs,
+                  showLock_.contended
+                      ? fmt::format(", shared with '{}' (pid {})", showLock_.holder, showLock_.holderPid)
+                      : std::string());
+    }
     // Every waiter is released before the engine goes: a client thread blocked in Session::call must not wait
     // on a pump that is never coming.
     local_.queue().shutdown();

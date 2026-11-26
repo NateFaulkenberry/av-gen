@@ -47,7 +47,7 @@ struct GpuBackendOptions {
     std::vector<std::filesystem::path> shaderSearchDirs;
     bool pipelineCache = true;
     // ADR-2165: Studio's device presents to its window: the window's CAMetalLayer, asked for when the device is
-    // created (empty, or null: a headless device). And the device's label (Studio's has none, as before).
+    // created (empty, or null: a headless device). And the device's label (Studio's keeps ContextDesc's, "avgen").
     std::function<void*()> surfaceLayer;
     std::string label = "avgen-engine-host";
 };
