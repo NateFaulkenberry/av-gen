@@ -6,6 +6,7 @@
 #include "ai/capabilities.hpp"
 #include "ai/tool_context.hpp"
 #include "ai/transaction.hpp"
+#include "api/session.hpp"
 #include "app/engine.hpp"
 #include "app/world_builder.hpp"
 #include "analysis/analysis_track.hpp"
@@ -38,6 +39,26 @@
 
 namespace avgen::ai {
 namespace {
+
+// ADR-2167: a profiling child renders on the GPU, beside the live frame: none starts while the host runs a show.
+std::optional<ToolResult> refusedDuringShow(ToolContext& ctx, const char* what) {
+    api::Session* session = ctx.session();
+    if (session == nullptr) {
+        return std::nullopt;
+    }
+    const api::ShowState show = session->host().showState();
+    if (!show.active) {
+        return std::nullopt;
+    }
+    nlohmann::json details{{"field", "show"}, {"reasons", show.reasonsJson()}};
+    if (show.remainingSeconds && *show.remainingSeconds > 0.0) {
+        details["retryAfterMs"] = static_cast<std::int64_t>(std::ceil(*show.remainingSeconds * 1000.0));
+    }
+    return ToolResult::failure(ToolErrorCode::Busy,
+                               fmt::format("a show is running ({}): {} starts no GPU child process until it stops",
+                                           show.reasonsText(), what),
+                               "retry when the show stops", std::move(details));
+}
 
 using nlohmann::json;
 
@@ -4369,6 +4390,9 @@ void registerPerformanceTools(ToolRegistry& registry) {
             if (request.mode != "headless" && request.mode != "live") {
                 return ToolResult::failure(ToolErrorCode::InvalidArguments, "mode must be headless or live");
             }
+            if (auto refused = refusedDuringShow(ctx, "the profiler")) {
+                return std::move(*refused);
+            }
             auto handle = ctx.profileHook()(ctx.engine(), request);
             if (!handle) {
                 return ToolResult::failure(ToolErrorCode::Internal, "the profile did not start: " + handle.error().message);
@@ -4396,6 +4420,9 @@ void registerPerformanceTools(ToolRegistry& registry) {
         }
         if (request.maxRisk != "low" && request.maxRisk != "medium" && request.maxRisk != "high") {
             return ToolResult::failure(ToolErrorCode::InvalidArguments, "maxRisk must be low, medium or high");
+        }
+        if (auto refused = refusedDuringShow(ctx, "the optimizer")) {
+            return std::move(*refused);
         }
         auto handle = ctx.profileHook()(ctx.engine(), request);
         if (!handle) {

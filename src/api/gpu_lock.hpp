@@ -68,6 +68,9 @@ public:
     [[nodiscard]] GpuLockAttempt tryAcquire();
     // Removes the directory if it is ours (its pid is this process). An ancestor's lock is left alone.
     void release();
+    // ADR-2167: what `holder` says from now on; rewritten in place when the directory is ours (a show taking over a
+    // lock its job already held, and handing it back).
+    void setHolderName(std::string name);
 
     [[nodiscard]] bool held() const { return owned_ || ancestor_; }
     [[nodiscard]] bool ownsDirectory() const { return owned_; }

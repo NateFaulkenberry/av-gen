@@ -4506,6 +4506,9 @@
             "description": "The session's id in this process",
             "type": "integer"
           },
+          "show": {
+            "description": "ADR-2167: {active, reasons[] (transport | liveInput | output | share), remainingSeconds|null, gpuLock: null | {held, contended, holder: null | {pid, name}, path, attempts, lastAttemptMs, maxAttemptMs}}"
+          },
           "showRunning": {
             "description": "A live host is running a show now",
             "type": "boolean"

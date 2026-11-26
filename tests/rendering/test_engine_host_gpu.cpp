@@ -97,8 +97,10 @@ struct GpuRig {
             fs::copy_file(source / f, root / f, fs::copy_options::overwrite_existing);
         }
         api::EngineHostOptions o;
-        o.renderBackend = app::gpuRenderBackendFactory(
-            app::GpuBackendOptions{{}, {fs::path(AVGEN_SHADER_SOURCE_DIR)}, /*pipelineCache=*/false});
+        app::GpuBackendOptions gpuOptions;
+        gpuOptions.shaderSearchDirs = {fs::path(AVGEN_SHADER_SOURCE_DIR)};
+        gpuOptions.pipelineCache = false;
+        o.renderBackend = app::gpuRenderBackendFactory(std::move(gpuOptions));
         o.gpuLockPath = root / "avgen-gpu.lock"; // the suite already runs under the machine's lock
         host = std::make_unique<api::EngineHost>(std::move(o));
         host->bindHostThread();
@@ -241,4 +243,59 @@ TEST_CASE("engine host: a cancel mid-sequence keeps and lists the frames written
         CHECK(o.at("sha256").is_string());
     }
     CHECK(done.at("result").at("frameHashes").size() >= listed);
+}
+
+TEST_CASE("engine host: while a show runs no render starts or steps, the show holds the lock, and the render after it "
+          "is the render without it",
+          "[gpu][api][jobs][show][adr2167]") {
+    GpuRig rig("show");
+    bool on = false;
+    rig.host->local().setShowState([&on] {
+        return on ? api::showStateFor(api::ShowFacts{.transportPlaying = true, .outputsOpen = 1}) : api::ShowState{};
+    });
+    const json args{{"range", "0:0.5"}, {"fps", 24}, {"width", 160}, {"height", 90}, {"output", "png"}};
+    // The reference, with no show.
+    json ref = args;
+    ref["path"] = "ref";
+    const json reference = rig.run("render.start", ref);
+    REQUIRE(reference.at("state") == "succeeded");
+
+    // A refusal costs no GPU work.
+    on = true;
+    const api::CallResult refused = rig.session->call("render.capture", json{{"frame", 3}, {"path", "x.png"}});
+    REQUIRE_FALSE(refused.success);
+    CHECK(refused.error->code == ai::ToolErrorCode::Busy);
+    CHECK(refused.error->details.at("field") == "show");
+    REQUIRE(rig.host->updateShow().held);
+    CHECK(api::readLockPid(rig.root / "avgen-gpu.lock") == static_cast<long>(::getpid()));
+    on = false;
+    rig.host->updateShow();
+    CHECK_FALSE(fs::exists(rig.root / "avgen-gpu.lock"));
+
+    // A render that is running when the show starts pauses between frames, and resumes when it stops.
+    json run = args;
+    run["path"] = "paused";
+    const api::CallResult started = rig.require("render.start", run);
+    REQUIRE(started.job.has_value());
+    std::uint64_t before = 0;
+    for (int i = 0; i < 200 && before < 3; ++i) {
+        (void)rig.host->stepJobs();
+        before = rig.session->call("job.status", json{{"id", *started.job}}).result.value("framesDone", std::uint64_t{0});
+    }
+    REQUIRE(before >= 3);
+    on = true;
+    rig.host->updateShow();
+    for (int i = 0; i < 30; ++i) {
+        (void)rig.host->stepJobs();
+    }
+    const json paused = rig.session->call("job.status", json{{"id", *started.job}}).result;
+    CHECK(paused.at("framesDone").get<std::uint64_t>() == before);
+    CHECK(paused.at("phase").get<std::string>().rfind("paused: show active", 0) == 0);
+    on = false;
+    rig.host->updateShow();
+    const api::CallResult w = rig.session->call("job.wait", json{{"id", *started.job}, {"timeoutMs", 600'000}});
+    REQUIRE(w.success);
+    REQUIRE(w.result.at("state") == "succeeded");
+    CHECK(w.result.at("result").at("sequenceHash") == reference.at("result").at("sequenceHash"));
+    CHECK(w.result.at("result").at("frameHashes") == reference.at("result").at("frameHashes"));
 }

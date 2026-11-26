@@ -106,6 +106,8 @@ PipelineCompileProgress pipelineCompileProgress() {
     return p;
 }
 
+std::function<void(const PipelineCompileProgress&)> pipelineWaitHook() { return hookState().hook; }
+
 void setPipelineWaitHook(std::function<void(const PipelineCompileProgress&)> hook) {
     HookState& s = hookState();
     s.hook = std::move(hook);

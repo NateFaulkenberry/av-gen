@@ -28,6 +28,7 @@
 #include "ai/provider.hpp"
 #include "ai/tool_api.hpp"
 #include "ai/transaction.hpp"
+#include "api/engine_host.hpp"
 #include "api/session.hpp"
 
 #include <memory>
@@ -86,6 +87,9 @@ public:
     // `jobs` may be null (a headless session or a test), in which case `submit()` refuses and a
     // caller drives `runTaskBlocking` itself. `options` are the session's, fixed from here on.
     ControlPlane(app::Engine& engine, app::JobSystem* jobs, api::SessionOptions options = studioSessionOptions());
+    // ADR-2165: the assistant's session on a host someone else owns -- Studio's EngineHost, over its engine, with the
+    // device, the render jobs and the show. The host outlives the plane.
+    ControlPlane(api::EngineHost& host, app::JobSystem* jobs, api::SessionOptions options = studioSessionOptions());
     ~ControlPlane();
     ControlPlane(const ControlPlane&) = delete;
     ControlPlane& operator=(const ControlPlane&) = delete;
@@ -116,7 +120,7 @@ public:
     // The session's registry: immutable, the same one every client of this session sees.
     [[nodiscard]] const ToolRegistry& tools() const { return session_->tools(); }
     [[nodiscard]] api::Session& session() { return *session_; }
-    [[nodiscard]] api::LocalHost& host() { return host_; }
+    [[nodiscard]] api::EngineHost& host() { return *host_; }
     [[nodiscard]] SnapshotStore& snapshots() { return session_->snapshots(); }
     // The undo seam. Replacing the default snapshot sink with one backed by the editor's undo
     // stack is the whole of the reconciliation §26 asks for.
@@ -124,15 +128,15 @@ public:
     [[nodiscard]] TransactionSink& transactionSink() const { return session_->transactionSink(); }
 
     // The host's hooks, installed into every call's context by the session.
-    void setPerformanceSource(PerformanceSource source) { host_.setPerformanceSource(std::move(source)); }
+    void setPerformanceSource(PerformanceSource source) { host_->local().setPerformanceSource(std::move(source)); }
     // ADR-765: the host's recorder, for `director.record_plan`. Unset: the tool says it is unavailable.
-    void setRecordingHook(RecordingHook hook) { host_.setRecordingHook(std::move(hook)); }
+    void setRecordingHook(RecordingHook hook) { host_->local().setRecordingHook(std::move(hook)); }
     // ADR-767: the host's watcher, for `director.watch_events`.
-    void setWatchHook(WatchHook hook) { host_.setWatchHook(std::move(hook)); }
+    void setWatchHook(WatchHook hook) { host_->local().setWatchHook(std::move(hook)); }
     // ADR-931: the host's evaluator, for `director.evaluate`. Unset: the tool says it is unavailable.
-    void setEvaluationHook(EvaluationHook hook) { host_.setEvaluationHook(std::move(hook)); }
+    void setEvaluationHook(EvaluationHook hook) { host_->local().setEvaluationHook(std::move(hook)); }
     // ADR-1106: the host's live profiler, for `performance.profile_scene`.
-    void setProfileHook(ProfileHook hook) { host_.setProfileHook(std::move(hook)); }
+    void setProfileHook(ProfileHook hook) { host_->local().setProfileHook(std::move(hook)); }
 
     // ---- running a task -------------------------------------------------------------------------
     // Submits to the job system and returns immediately. Null when a task is already running or
@@ -173,7 +177,9 @@ private:
     std::unique_ptr<CredentialStore> credentials_;
     // Declared in this order: the host owns the queue the session marshals onto, and the orchestrator
     // is a client of the session. Destroyed the other way round.
-    api::LocalHost host_;
+    // ADR-2165: an EngineHost (Studio's, borrowed; or one of the plane's own over `engine`, with no GPU half).
+    std::unique_ptr<api::EngineHost> ownedHost_;
+    api::EngineHost* host_;
     std::unique_ptr<api::Session> session_;
     Orchestrator orchestrator_;
     AiSettings settings_;

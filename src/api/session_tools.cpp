@@ -111,6 +111,9 @@ void registerSessionTools(ai::ToolRegistry& registry) {
                         {"client", anything("{kind, name, version}")},
                         {"policy", schema::string("authoring or live", {"authoring", "live"})},
                         {"showRunning", schema::boolean("A live host is running a show now")},
+                        {"show", anything("ADR-2167: {active, reasons[] (transport | liveInput | output | share), "
+                                          "remainingSeconds|null, gpuLock: null | {held, contended, holder: null | "
+                                          "{pid, name}, path, attempts, lastAttemptMs, maxAttemptMs}}")},
                         {"permissions", anything("The session's fixed permissions")},
                         {"version", anything("api::version(): engine, revision, api level, formats")},
                         {"project", anything("{state, file, folder, writable, hasComposition}")},

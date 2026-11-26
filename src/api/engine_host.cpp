@@ -9,6 +9,7 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <string_view>
@@ -65,6 +66,12 @@ struct EngineHost::Pending {
     std::string lockHolderSeen;
     bool deviceCreatedHere = false;
     std::vector<std::string> warnings;
+    // ADR-2165: the operator's own job (Studio's Render panel and queue, headless --render/--queue): its CPU half
+    // is `prepare`, it does not count against an API client's capacity, and it may wait HELD for Run queue.
+    std::function<Result<std::unique_ptr<GpuRenderJob>>()> prepare;
+    bool local = false;
+    bool held = false;
+    bool lockTaken = false;
     [[nodiscard]] const std::string& id() const { return request.jobId; }
 };
 
@@ -105,6 +112,8 @@ json fileEntry(const fs::path& path, std::optional<std::uint64_t> frame) {
     return e;
 }
 
+std::string heldForShowPhase(const std::string& reasons) { return "held: show active (" + reasons + ")"; }
+
 std::string framePath(std::uint64_t index, RenderFormat format) {
     return fmt::format("frame_{:06d}.{}", index, format == RenderFormat::Exr ? "exr" : "png");
 }
@@ -123,6 +132,16 @@ EngineHost::EngineHost(EngineHostOptions options)
                   app::timePolicyName(engine_->timePolicy()));
     }
     local_.setOfferedTimePolicies({app::TimePolicy::Stepped, app::TimePolicy::Offline});
+    if (options_.renderBackend) {
+        warnings_ = std::make_shared<JobWarningSink>();
+        spdlog::default_logger()->sinks().push_back(warnings_);
+    }
+}
+
+EngineHost::EngineHost(app::Engine& borrowed, EngineHostOptions options)
+    : options_(std::move(options)), local_(borrowed) {
+    // ADR-2165: the engine is the owner's -- its live control, its time policy and the policies its loop honours
+    // (LocalHost's default: the engine's own setting, until the owner offers more).
     if (options_.renderBackend) {
         warnings_ = std::make_shared<JobWarningSink>();
         spdlog::default_logger()->sinks().push_back(warnings_);
@@ -176,10 +195,74 @@ bool EngineHost::canRender() { return static_cast<bool>(options_.renderBackend) 
 EngineHostJobStats EngineHost::jobStats() const {
     EngineHostJobStats s;
     s.queued = pending_.size();
+    for (const auto& p : pending_) {
+        s.held += p->held ? 1 : 0;
+    }
     s.running = active_ != nullptr;
     s.deviceCreated = backend_ && backend_->deviceCreated();
     s.lockHeld = lock_ && lock_->held();
+    s.pausedForShow = heldForShow_ && active_ != nullptr;
     return s;
+}
+
+std::optional<ShowLockState> EngineHost::showLock() { return showLock_; }
+
+bool EngineHost::jobInLoop() {
+    if (!backend_ || (active_ == nullptr && pending_.empty())) {
+        return false;
+    }
+    if (local_.showState().active) {
+        return false;
+    }
+    if (active_) {
+        return true;
+    }
+    return std::any_of(pending_.begin(), pending_.end(), [](const std::unique_ptr<Pending>& p) { return !p->held; });
+}
+
+Result<void> EngineHost::ensureBackend() {
+    if (backend_) {
+        return {};
+    }
+    if (!options_.renderBackend) {
+        return fail("this host has no GPU half");
+    }
+    backend_ = options_.renderBackend();
+    if (!backend_) {
+        deviceFailed_ = true;
+        return fail("this host's GPU half could not be made");
+    }
+    return {};
+}
+
+Result<RenderBackend*> EngineHost::ensureDevice() {
+    if (auto r = ensureBackend(); !r) {
+        return std::unexpected(r.error());
+    }
+    if (auto r = backend_->ensureDevice(); !r) {
+        deviceFailed_ = true;
+        return std::unexpected(r.error());
+    }
+    return backend_.get();
+}
+
+void EngineHost::ensureLock() {
+    if (!lock_) {
+        lock_ = std::make_unique<GpuLock>(options_.gpuLockPath);
+    }
+}
+
+void EngineHost::releaseJobLock() {
+    jobHoldsLock_ = false;
+    if (!lock_) {
+        return;
+    }
+    if (showLock_.showActive && showLock_.held) {
+        // ADR-2167: the show still holds it. Say so in the lock's own `holder`, for whoever waits.
+        lock_->setHolderName(options_.showLockHolder);
+        return;
+    }
+    lock_->release();
 }
 
 std::optional<ai::ToolError> EngineHost::submitJob(JobSubmission submission) {
@@ -188,21 +271,31 @@ std::optional<ai::ToolError> EngineHost::submitJob(JobSubmission submission) {
                         deviceFailed_ ? "this host could not create a GPU device" : "this host has no GPU half",
                         "run it in avgen serve or avgen call on a machine with a GPU", json{{"field", "gpu"}});
     }
-    const std::size_t inFlight = pending_.size() + (active_ ? 1 : 0);
-    if (inFlight >= options_.queueCapacity) {
+    // ADR-2167: no GPU job starts while a show runs -- whoever asks, the Studio assistant included.
+    if (const ShowState show = showState(); show.active) {
+        json details{{"field", "show"}, {"reasons", show.reasonsJson()}};
+        if (show.remainingSeconds && *show.remainingSeconds > 0.0) {
+            details["retryAfterMs"] = static_cast<std::int64_t>(std::ceil(*show.remainingSeconds * 1000.0));
+        }
         return jobError(ai::ToolErrorCode::Busy,
-                        fmt::format("the render queue is full: {} job(s) queued or running (capacity {})", inFlight,
+                        fmt::format("a show is running ({}): no GPU job starts until it stops", show.reasonsText()),
+                        "retry when the show stops", std::move(details));
+    }
+    // The operator's own jobs (a render queue in Studio) do not count against an API client's capacity.
+    const auto apiInFlight = static_cast<std::size_t>(
+        std::count_if(pending_.begin(), pending_.end(), [](const std::unique_ptr<Pending>& p) { return !p->local; }) +
+        (active_ && !active_->local ? 1 : 0));
+    if (apiInFlight >= options_.queueCapacity) {
+        return jobError(ai::ToolErrorCode::Busy,
+                        fmt::format("the render queue is full: {} job(s) queued or running (capacity {})", apiInFlight,
                                     options_.queueCapacity),
                         "job.wait for one of them, or job.cancel one, then submit again",
                         json{{"field", "queue"}, {"capacity", options_.queueCapacity}});
     }
-    if (!backend_) {
-        backend_ = options_.renderBackend();
-        if (!backend_) {
-            deviceFailed_ = true;
-            return jobError(ai::ToolErrorCode::Unavailable, "this host's GPU half could not be made");
-        }
+    if (auto r = ensureBackend(); !r) {
+        return jobError(ai::ToolErrorCode::Unavailable, r.error().message);
     }
+    const std::size_t inFlight = pending_.size() + (active_ ? 1 : 0);
     auto p = std::make_unique<Pending>();
     p->table = std::move(submission.table);
     p->request = std::move(submission.request);
@@ -210,6 +303,59 @@ std::optional<ai::ToolError> EngineHost::submitJob(JobSubmission submission) {
     pending_.push_back(std::move(p));
     local_.queue().wake();
     return std::nullopt;
+}
+
+std::optional<ai::ToolError> EngineHost::submitLocal(LocalJobSubmission submission) {
+    if (!canRender()) {
+        return jobError(ai::ToolErrorCode::Unavailable,
+                        deviceFailed_ ? "this host could not create a GPU device" : "this host has no GPU half");
+    }
+    if (!submission.table || !submission.prepare) {
+        return jobError(ai::ToolErrorCode::Internal, "a local job needs a record and a prepare step");
+    }
+    if (auto r = ensureBackend(); !r) {
+        return jobError(ai::ToolErrorCode::Unavailable, r.error().message);
+    }
+    auto p = std::make_unique<Pending>();
+    p->table = std::move(submission.table);
+    p->request.jobId = submission.jobId;
+    p->prepare = std::move(submission.prepare);
+    p->local = true;
+    p->held = submission.held;
+    if (p->held) {
+        const std::string phase = submission.heldPhase.empty() ? std::string("held") : submission.heldPhase;
+        p->table->update(p->id(), [&](JobRecord& r) { r.phase = phase; });
+    }
+    pending_.push_back(std::move(p));
+    local_.queue().wake();
+    return std::nullopt;
+}
+
+bool EngineHost::releaseJob(const JobTable& table, const std::string& id) {
+    for (const auto& p : pending_) {
+        if (p->table.get() == &table && p->id() == id && p->held) {
+            p->held = false;
+            p->table->update(p->id(), [&](JobRecord& r) { r.phase = heldForShow_ ? heldForShowPhase(heldForShowReasons_)
+                                                                                    : std::string("queued"); });
+            local_.queue().wake();
+            return true;
+        }
+    }
+    return false;
+}
+
+bool EngineHost::cancelJob(const JobTable& table, const std::string& id) {
+    if (active_ && active_->table.get() == &table && active_->id() == id) {
+        active_->table->requestCancel(id);
+        active_->job->cancel();
+        return true;
+    }
+    for (const auto& p : pending_) {
+        if (p->table.get() == &table && p->id() == id) {
+            return p->table->requestCancel(id);
+        }
+    }
+    return false;
 }
 
 void EngineHost::cancelJobs(const JobTable& table) {
@@ -226,16 +372,55 @@ void EngineHost::cancelJobs(const JobTable& table) {
 }
 
 void EngineHost::failJob(Pending& job, ai::ToolError error) {
-    log::warn("api: {} failed: {}", job.id(), error.message);
-    if (lock_) {
-        lock_->release();
-    }
+    log::warn("{}: {} failed: {}", job.local ? "render" : "api", job.id(), error.message);
+    releaseJobLock();
     job.table->update(job.id(), [&](JobRecord& r) {
         r.state = JobState::Failed;
         r.phase = "failed";
         r.error = std::move(error);
         r.result = json{{"warnings", job.warnings}};
     });
+}
+
+void EngineHost::holdForShow(const ShowState& show) {
+    const std::string reasons = show.reasonsText();
+    if (heldForShow_ && reasons == heldForShowReasons_) {
+        return;
+    }
+    if (!heldForShow_ && (active_ || !pending_.empty())) {
+        log::info("jobs: held while the show runs ({}): {} waiting, {} paused", reasons, pending_.size(),
+                  active_ ? 1 : 0);
+    }
+    heldForShow_ = true;
+    heldForShowReasons_ = reasons;
+    const std::string held = heldForShowPhase(reasons);
+    for (const auto& p : pending_) {
+        if (!p->held) {
+            p->table->update(p->id(), [&](JobRecord& r) { r.phase = held; });
+        }
+    }
+    if (active_) {
+        active_->table->update(active_->id(), [&](JobRecord& r) { r.phase = "paused: show active (" + reasons + ")"; });
+    }
+}
+
+void EngineHost::resumeAfterShow() {
+    if (!heldForShow_) {
+        return;
+    }
+    heldForShow_ = false;
+    heldForShowReasons_.clear();
+    if (active_ || !pending_.empty()) {
+        log::info("jobs: the show stopped; {} waiting, {} resuming", pending_.size(), active_ ? 1 : 0);
+    }
+    for (const auto& p : pending_) {
+        if (!p->held) {
+            p->table->update(p->id(), [](JobRecord& r) { r.phase = "queued"; });
+        }
+    }
+    if (active_) {
+        active_->table->update(active_->id(), [](JobRecord& r) { r.phase = "rendering"; });
+    }
 }
 
 bool EngineHost::stepJobs() {
@@ -249,23 +434,48 @@ bool EngineHost::stepJobs() {
     } reset{inStep_};
     waitingForLock_ = false;
 
+    // Jobs cancelled while queued (or held) never start.
+    for (auto it = pending_.begin(); it != pending_.end();) {
+        Pending& p = **it;
+        if (!p.table->cancelRequested(p.id())) {
+            ++it;
+            continue;
+        }
+        if (p.lockTaken) {
+            releaseJobLock();
+        }
+        p.table->update(p.id(), [](JobRecord& r) {
+            r.state = JobState::Cancelled;
+            r.phase = "cancelled before it started";
+        });
+        it = pending_.erase(it);
+    }
+
+    // ADR-2167: nothing starts and nothing renders while a show runs. A running job keeps its place and resumes
+    // after the frame it had rendered; a cancel still reaches it (it stops at once: it is between frames).
+    if (const ShowState show = showState(); show.active) {
+        holdForShow(show);
+        if (active_ && active_->table->cancelRequested(active_->id())) {
+            active_->job->cancel();
+            (void)active_->job->step(0.0);
+            finishActive();
+        }
+        return active_ != nullptr || !pending_.empty();
+    }
+    resumeAfterShow();
+
     if (!active_) {
-        // Jobs cancelled while queued never start.
-        while (!pending_.empty() && pending_.front()->table->cancelRequested(pending_.front()->id())) {
-            Pending& p = *pending_.front();
-            if (lock_) {
-                lock_->release();
-            }
-            p.table->update(p.id(), [](JobRecord& r) {
-                r.state = JobState::Cancelled;
-                r.phase = "cancelled before it started";
-            });
-            pending_.pop_front();
+        // The first job that may start: FIFO order, skipping the operator's held queue entries.
+        const auto next = std::find_if(pending_.begin(), pending_.end(),
+                                       [](const std::unique_ptr<Pending>& p) { return !p->held; });
+        if (next == pending_.end()) {
+            return !pending_.empty();
         }
-        if (pending_.empty()) {
-            return false;
-        }
-        Pending& p = *pending_.front();
+        Pending& p = **next;
+        const auto drop = [&] {
+            pending_.erase(std::find_if(pending_.begin(), pending_.end(),
+                                        [&](const std::unique_ptr<Pending>& q) { return q.get() == &p; }));
+        };
         if (warnings_) {
             warnings_->collect(&p.warnings);
         }
@@ -285,13 +495,16 @@ bool EngineHost::stepJobs() {
                 r.state = JobState::Preparing;
                 r.phase = "loading the project snapshot";
             });
-            auto made = backend_->create(p.request);
+            auto made = p.prepare ? p.prepare() : backend_->create(p.request);
             p.loadSeconds = secondsSince(p.loadBegan);
             if (!made) {
-                failJob(p, jobError(ai::ToolErrorCode::FailedPrecondition,
-                                    fmt::format("the render could not load its snapshot: {}", made.error().message),
-                                    "project.validate reports what the project needs"));
-                pending_.pop_front();
+                // The operator's job reports the loader's own words, as the Render panel and --render always did.
+                failJob(p, p.local ? jobError(ai::ToolErrorCode::FailedPrecondition, made.error().message)
+                                   : jobError(ai::ToolErrorCode::FailedPrecondition,
+                                              fmt::format("the render could not load its snapshot: {}",
+                                                          made.error().message),
+                                              "project.validate reports what the project needs"));
+                drop();
                 return !pending_.empty();
             }
             p.job = std::move(*made);
@@ -299,39 +512,51 @@ bool EngineHost::stepJobs() {
         }
 
         // The machine's GPU lock, before the device is touched.
-        if (!lock_) {
-            lock_ = std::make_unique<GpuLock>(options_.gpuLockPath);
-        }
-        const GpuLockAttempt attempt = lock_->tryAcquire();
-        p.lockPath = lock_->path().string();
-        if (attempt == GpuLockAttempt::Busy) {
-            p.lockWaited = true;
-            const double waited = secondsSince(p.lockWaitBegan);
-            const auto& holder = lock_->lastHolder();
-            p.lockHolderSeen = holder ? fmt::format("'{}' (pid {})", holder->holder, holder->pid) : "unknown";
-            const double limit = lockTimeout(options_.gpuLockTimeoutSeconds);
-            if (waited > limit) {
-                failJob(p, jobError(ai::ToolErrorCode::Busy,
-                                    fmt::format("timed out after {:.0f} s waiting for the machine's GPU lock '{}', held "
-                                                "by {}",
-                                                waited, p.lockPath, p.lockHolderSeen),
-                                    "retry when the GPU is free (tools/gpu-lock.sh serialises GPU work)",
-                                    json{{"field", "gpuLock"}, {"path", p.lockPath}}));
-                pending_.pop_front();
-                return !pending_.empty();
+        if (!p.lockTaken) {
+            const auto now = Clock::now();
+            if (p.lockWaited && now < nextLockPoll_) {
+                waitingForLock_ = true;
+                return true;
             }
-            const std::string phase = fmt::format("waiting for the GPU lock (held by {})", p.lockHolderSeen);
-            p.table->update(p.id(), [&](JobRecord& r) {
-                r.state = JobState::Preparing;
-                r.phase = phase;
-            });
-            waitingForLock_ = true;
-            return true;
-        }
-        p.lockWaitSeconds = secondsSince(p.lockWaitBegan);
-        p.lockHeldByAncestor = attempt == GpuLockAttempt::HeldByAncestor;
-        if (p.lockHeldByAncestor && lock_->lastHolder()) {
-            p.lockHolderSeen = fmt::format("'{}' (pid {})", lock_->lastHolder()->holder, lock_->lastHolder()->pid);
+            ensureLock();
+            if (!lock_->ownsDirectory()) {
+                lock_->setHolderName(GpuLock::defaultHolder()); // a job's own name, not a past show's
+            }
+            const GpuLockAttempt attempt = lock_->tryAcquire();
+            p.lockPath = lock_->path().string();
+            if (attempt == GpuLockAttempt::Busy) {
+                p.lockWaited = true;
+                nextLockPoll_ = now + std::chrono::duration_cast<Clock::duration>(
+                                          std::chrono::duration<double>(options_.gpuLockPollSeconds));
+                const double waited = secondsSince(p.lockWaitBegan);
+                const auto& holder = lock_->lastHolder();
+                p.lockHolderSeen = holder ? fmt::format("'{}' (pid {})", holder->holder, holder->pid) : "unknown";
+                const double limit = lockTimeout(options_.gpuLockTimeoutSeconds);
+                if (waited > limit) {
+                    failJob(p, jobError(ai::ToolErrorCode::Busy,
+                                        fmt::format("timed out after {:.0f} s waiting for the machine's GPU lock '{}', "
+                                                    "held by {}",
+                                                    waited, p.lockPath, p.lockHolderSeen),
+                                        "retry when the GPU is free (tools/gpu-lock.sh serialises GPU work)",
+                                        json{{"field", "gpuLock"}, {"path", p.lockPath}}));
+                    drop();
+                    return !pending_.empty();
+                }
+                const std::string phase = fmt::format("waiting for the GPU lock (held by {})", p.lockHolderSeen);
+                p.table->update(p.id(), [&](JobRecord& r) {
+                    r.state = JobState::Preparing;
+                    r.phase = phase;
+                });
+                waitingForLock_ = true;
+                return true;
+            }
+            p.lockTaken = true;
+            jobHoldsLock_ = true;
+            p.lockWaitSeconds = secondsSince(p.lockWaitBegan);
+            p.lockHeldByAncestor = attempt == GpuLockAttempt::HeldByAncestor;
+            if (p.lockHeldByAncestor && lock_->lastHolder()) {
+                p.lockHolderSeen = fmt::format("'{}' (pid {})", lock_->lastHolder()->holder, lock_->lastHolder()->pid);
+            }
         }
 
         // The device, lazily, under the lock.
@@ -345,32 +570,42 @@ bool EngineHost::stepJobs() {
             failJob(p, jobError(ai::ToolErrorCode::Unavailable,
                                 fmt::format("no GPU device could be created: {}", r.error().message),
                                 "this machine or session has no usable GPU"));
-            pending_.pop_front();
+            drop();
             return !pending_.empty();
         }
         p.deviceCreatedHere = !hadDevice;
         p.table->update(p.id(), [](JobRecord& r) { r.phase = "compiling pipelines and warming up"; });
-        // While the start waits for a compile: say how far it has got, and keep answering calls.
+        // While the start waits for a compile: say how far it has got, and (unless the host's own hook keeps it
+        // alive) keep answering calls.
         Pending* raw = &p;
-        auto started = p.job->start([this, raw](const CompileProgress& c) {
+        const bool pump = options_.pumpWhileCompiling;
+        auto started = p.job->start([this, raw, pump](const CompileProgress& c) {
             const std::string phase = "compiling pipelines";
             const std::string message = fmt::format("{} of {} pipeline(s) compiled{}{}", c.landed, c.started,
                                                     c.waitingFor.empty() ? "" : "; waiting for ", c.waitingFor);
             raw->table->update(raw->id(), [&](JobRecord& r) {
                 r.phase = phase + ": " + message;
             });
-            local_.queue().pump(ai::MainThreadQueue::kDefaultBudgetMs);
+            if (pump) {
+                local_.queue().pump(ai::MainThreadQueue::kDefaultBudgetMs);
+            }
         });
         p.startSeconds = secondsSince(p.startBegan);
         if (!started) {
-            failJob(p, jobError(ai::ToolErrorCode::Internal,
-                                fmt::format("the render did not start: {}", started.error().message),
-                                "the host log has the renderer's error"));
-            pending_.pop_front();
+            failJob(p, p.local ? jobError(ai::ToolErrorCode::Internal, started.error().message)
+                               : jobError(ai::ToolErrorCode::Internal,
+                                          fmt::format("the render did not start: {}", started.error().message),
+                                          "the host log has the renderer's error"));
+            drop();
             return !pending_.empty();
         }
-        active_ = std::move(pending_.front());
-        pending_.pop_front();
+        for (auto it = pending_.begin(); it != pending_.end(); ++it) {
+            if (it->get() == &p) {
+                active_ = std::move(*it);
+                pending_.erase(it);
+                break;
+            }
+        }
         active_->renderBegan = Clock::now();
         active_->table->update(active_->id(), [](JobRecord& r) {
             r.state = JobState::Running;
@@ -415,12 +650,14 @@ void EngineHost::finishActive() {
     const GpuJobProgress g = a.job->progress();
     const double renderSeconds = secondsSince(a.renderBegan);
     // The job's GPU work is over (finish() drained the ring): the next job, or another process, may have the GPU.
-    lock_->release();
+    releaseJobLock();
 
     const RenderRequest& q = a.request;
     json outputs = json::array();
     std::error_code ec;
-    if (q.format == RenderFormat::Video) {
+    if (a.local) {
+        // The operator's job writes where its render settings say; its RenderJob lists that, not this record.
+    } else if (q.format == RenderFormat::Video) {
         if (fs::exists(q.file, ec)) {
             outputs.push_back(fileEntry(q.file, std::nullopt));
         }
@@ -491,8 +728,8 @@ void EngineHost::finishActive() {
     const JobState state = !out.error.empty() ? JobState::Failed
                            : out.cancelled    ? JobState::Cancelled
                                               : JobState::Succeeded;
-    log::info("api: {} {} in {:.2f} s ({} frame(s), sequence hash {})", a.id(), jobStateName(state), total,
-              out.frameHashes.size(), hashHex(out.sequenceHash));
+    log::info("{}: {} {} in {:.2f} s ({} frame(s), sequence hash {})", a.local ? "render" : "api", a.id(),
+              jobStateName(state), total, out.frameHashes.size(), hashHex(out.sequenceHash));
     a.table->update(a.id(), [&](JobRecord& r) {
         r.state = state;
         r.phase = jobStateName(state);
@@ -503,9 +740,81 @@ void EngineHost::finishActive() {
             r.progress = 1.0;
         }
         if (state == JobState::Failed) {
-            r.error = jobError(ai::ToolErrorCode::Internal, out.error, "the host log has the renderer's error");
+            r.error = a.local ? jobError(ai::ToolErrorCode::Internal, out.error)
+                              : jobError(ai::ToolErrorCode::Internal, out.error, "the host log has the renderer's error");
         }
     });
+}
+
+// ---- the show (ADR-2167) ----------------------------------------------------------------------------
+
+const ShowLockState& EngineHost::updateShow() {
+    const ShowState show = showState();
+    const auto now = Clock::now();
+    if (show.active && !showLock_.showActive) {
+        showLock_ = ShowLockState{};
+        showLock_.showActive = true;
+        showRetryAt_ = now;
+        log::info("show: started ({})", show.reasonsText());
+    } else if (!show.active && showLock_.showActive) {
+        const bool held = showLock_.held;
+        const ShowLockState ended = showLock_;
+        showLock_ = ShowLockState{};
+        if (held && lock_) {
+            if (jobHoldsLock_) {
+                lock_->setHolderName(GpuLock::defaultHolder()); // the paused job keeps it, under its own name
+            } else {
+                lock_->release();
+            }
+        }
+        log::info("show: ended; the machine GPU lock {} ({} attempt(s), the dearest {:.2f} ms{})",
+                  held ? "released" : "was never ours", ended.attempts, ended.maxAttemptMs,
+                  ended.contended ? fmt::format(", shared with '{}' (pid {})", ended.holder, ended.holderPid) : "");
+        return showLock_;
+    }
+    if (!show.active || showLock_.held || now < showRetryAt_) {
+        return showLock_;
+    }
+    // One round of the lock's protocol, never a wait: a show cannot wait for an agent's test suite.
+    ensureLock();
+    const auto t0 = Clock::now();
+    lock_->setHolderName(options_.showLockHolder); // written by the acquire, or in place over a paused job's
+    const GpuLockAttempt attempt = lock_->tryAcquire();
+    const double ms = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+    ++showLock_.attempts;
+    showLock_.lastAttemptMs = ms;
+    showLock_.maxAttemptMs = std::max(showLock_.maxAttemptMs, ms);
+    showLock_.path = lock_->path().string();
+    if (attempt != GpuLockAttempt::Busy) {
+        const bool wasContended = showLock_.contended;
+        showLock_.held = true;
+        showLock_.contended = false;
+        if (const auto& h = lock_->lastHolder(); attempt == GpuLockAttempt::HeldByAncestor && h) {
+            showLock_.holderPid = h->pid;
+            showLock_.holder = h->holder;
+        } else {
+            showLock_.holderPid = 0;
+            showLock_.holder.clear();
+        }
+        log::info("show: holding the machine GPU lock {} ({}{}; {:.2f} ms)", showLock_.path,
+                  attempt == GpuLockAttempt::Acquired ? "acquired" : "held by the process that started this one",
+                  wasContended ? ", after sharing the GPU" : "", ms);
+        return showLock_;
+    }
+    const auto& h = lock_->lastHolder();
+    const long pid = h ? h->pid : 0;
+    const std::string name = h ? h->holder : std::string("unknown");
+    if (!showLock_.contended || pid != showLock_.holderPid) {
+        log::warn("show: the machine GPU lock {} is held by '{}' (pid {}); the show runs anyway, sharing the GPU, "
+                  "and takes the lock when it is free ({:.2f} ms)",
+                  showLock_.path, name, pid, ms);
+    }
+    showLock_.contended = true;
+    showLock_.holderPid = pid;
+    showLock_.holder = name;
+    showRetryAt_ = now + std::chrono::duration_cast<Clock::duration>(
+                             std::chrono::duration<double>(options_.showLockRetrySeconds));
+    return showLock_;
 }
 
 void EngineHost::stop() {

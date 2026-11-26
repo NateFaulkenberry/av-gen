@@ -22,6 +22,8 @@
 #include "app/world_builder.hpp"
 #include "app/recent_files.hpp"
 #include "app/render_job.hpp"
+#include "app/offline_render.hpp"
+#include "api/engine_host.hpp"
 #include "app/render_source.hpp"
 #include "app/trace_sequence.hpp"
 #include "pathtrace/trace_job.hpp"
@@ -525,10 +527,24 @@ private:
     // generated rather than loaded and so cannot go through `Engine::loadFile`.
     [[nodiscard]] Result<void> openAny(const std::filesystem::path& path);
 
-    // `outputBase` resolves a relative output path; empty means the project file's own folder.
-    [[nodiscard]] Result<std::unique_ptr<RenderJob>> makeRenderJob(const std::filesystem::path& projectFile,
-                                                                   RenderSettings settings,
-                                                                   const std::filesystem::path& outputBase = {});
+    // ADR-2165: one of the operator's render jobs, on Studio's EngineHost. `project` is loaded when the job reaches
+    // the front of the host's queue (and removed then when `scratch`); `outputBase` resolves a relative output path,
+    // empty meaning the project file's own folder. `held`: a render-queue entry, waiting for Run queue. Returns the
+    // job's id in `studioJobs_`, or the refusal.
+    [[nodiscard]] Result<std::string> submitRenderJob(const std::filesystem::path& project, RenderSettings settings,
+                                                      const std::filesystem::path& outputBase, bool scratch,
+                                                      bool held, int maxFramesPerStep);
+    // ADR-2165: headless --render and each --queue entry: submits, steps the host to the end, logs progress as
+    // RenderJob::run did, and returns today's exit codes (2: did not start; 7: failed; 5: failed with GPU errors).
+    [[nodiscard]] int runRenderToEnd(const std::filesystem::path& project, RenderSettings settings,
+                                     const std::string& label);
+    // The Render panel's job (ADR-2165): its record, the status line, the queue's next entry.
+    void servicePanelJob();
+    [[nodiscard]] bool panelJobBusy() const;
+    // ADR-2167: the show's facts, read from the frame's own state.
+    [[nodiscard]] api::ShowState currentShowState() const;
+    [[nodiscard]] Result<void> initLiveRenderer();
+    [[nodiscard]] Result<void> validateRendererOptions() const;
     // Writes the session to a fresh scratch copy for a render to load (never the person's file).
     [[nodiscard]] Result<RenderSource> writeRenderSource(std::string_view tag);
     void startPathTraceFromUi();
@@ -615,7 +631,18 @@ private:
 
     AppOptions options_;
     RecentFiles recent_{{}};
-    std::unique_ptr<RenderJob> job_;             // in-app render in progress
+    // ADR-2165: the Render panel's RenderJob once Studio's host has started it (shared: the panel reads its last
+    // progress and preview frame after the host is done with it). The job itself is the host's.
+    std::shared_ptr<RenderJob> job_;
+    // ADR-2165: Studio's host -- over `engine_` -- with the GPU device and shaders the live renderer is built from,
+    // the render jobs (panel, queue, --render, --queue, the assistant's render.*), and the show's GPU lock.
+    std::unique_ptr<api::EngineHost> host_;
+    GpuRenderBackend* gpu_ = nullptr; // host_'s backend
+    // The operator's job records (the panel's, the queue's, the command line's); the assistant's are its session's.
+    std::shared_ptr<api::JobTable> studioJobs_ = std::make_shared<api::JobTable>();
+    std::string panelJobId_;           // the panel's current job (queued, starting or running)
+    std::string panelJobPhase_;        // its last phase, so a change is shown once
+    std::deque<std::string> queueIds_; // held render-queue entries, in order
 
     // ---- path tracing from the UI (ADR-351) -----------------------------------------------------
     //
@@ -648,15 +675,6 @@ private:
     // playback has them -- but the editor showing a different world from the deliverable is a
     // worse trap than a slower editor, so it is one checkbox away.
     bool liftViewportLimits_ = false;
-    // A queued render: the scratch copy it will load, its settings, and where its output resolves.
-    // The copy is taken when the render is QUEUED, so it renders the session as it was then -- the
-    // same thing the old save-then-queue did, without writing over the person's file.
-    struct QueuedRender {
-        std::filesystem::path scratch;
-        RenderSettings settings;
-        std::filesystem::path outputBase;
-    };
-    std::deque<QueuedRender> uiQueue_;
     std::uint64_t renderSerial_ = 0;
     RenderProgress lastRender_;
     // ADR-320's upload target: ONE 512x512 RGBA8 texture, created on the first frame that needs it
@@ -683,8 +701,9 @@ private:
     std::uint32_t finalWidth_ = 0;
     std::uint32_t finalHeight_ = 0;
     std::unique_ptr<platform::Window> window_;
-    std::unique_ptr<gpu::Context> context_;
-    std::unique_ptr<gpu::ShaderLibrary> shaders_;
+    // ADR-2165: the host's (host_ owns them); null in a headless run that renders nothing itself.
+    gpu::Context* context_ = nullptr;
+    gpu::ShaderLibrary* shaders_ = nullptr;
     std::unique_ptr<rendering::SceneRenderer> renderer_;
     // The selected entity's recent transforms, cameras and screen positions (forensics 4.3/9.3).
     // Recorded here rather than in the renderer because it is a *reading* of frames, not part of

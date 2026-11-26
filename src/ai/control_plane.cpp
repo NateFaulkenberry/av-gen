@@ -108,8 +108,19 @@ std::unique_ptr<api::Session> makeSession(api::SessionOptions options, api::Host
 } // namespace
 
 ControlPlane::ControlPlane(app::Engine& engine, app::JobSystem* jobs, api::SessionOptions options)
-    : jobs_(jobs), credentials_(makeSystemCredentialStore()), host_(engine),
-      session_(makeSession(std::move(options), host_)), orchestrator_(*session_) {
+    : jobs_(jobs), credentials_(makeSystemCredentialStore()),
+      ownedHost_(std::make_unique<api::EngineHost>(engine, api::EngineHostOptions{})), host_(ownedHost_.get()),
+      session_(makeSession(std::move(options), *host_)), orchestrator_(*session_) {
+    registerBuiltinProviders(providerRegistry_);
+    settings_.reconcileWith(providerRegistry_);
+    orchestrator_.setLimits(settings_.limits);
+    log::info("ai: control plane ready -- {} tool(s) across {} domain(s), {} provider(s) available",
+              tools().size(), tools().domains().size(), providerRegistry_.entries().size());
+}
+
+ControlPlane::ControlPlane(api::EngineHost& host, app::JobSystem* jobs, api::SessionOptions options)
+    : jobs_(jobs), credentials_(makeSystemCredentialStore()), host_(&host),
+      session_(makeSession(std::move(options), *host_)), orchestrator_(*session_) {
     registerBuiltinProviders(providerRegistry_);
     settings_.reconcileWith(providerRegistry_);
     orchestrator_.setLimits(settings_.limits);
@@ -402,7 +413,7 @@ void ControlPlane::shutdown() {
     cancelCurrentTask();
     // Release every worker waiting on the main thread before the engine goes away, or one will
     // wait for a pump that is never coming and take the shutdown with it.
-    host_.queue().shutdown();
+    host_->queue().shutdown();
     // Then *wait* for the running task, bounded. The job body captures `this`, so returning while
     // it is still inside the agent loop would leave a worker running over a destroyed control
     // plane. Cancellation plus a shut-down queue makes this prompt: the HTTP client polls the

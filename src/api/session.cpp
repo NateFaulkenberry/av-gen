@@ -161,6 +161,26 @@ std::optional<ai::ToolError> Host::submitJob(JobSubmission /*submission*/) {
 
 std::vector<app::TimePolicy> Host::offeredTimePolicies() { return {engine().timePolicy()}; }
 
+// ADR-2167: session.info's `show`: the host's show with its reasons, and the machine GPU lock its show holds.
+static json showInfoJson(Host& host) {
+    const ShowState s = host.showState();
+    json out{{"active", s.active},
+             {"reasons", s.reasonsJson()},
+             {"remainingSeconds", s.remainingSeconds ? json(*s.remainingSeconds) : json(nullptr)}};
+    const std::optional<ShowLockState> lock = host.showLock();
+    out["gpuLock"] = lock ? lock->toJson() : json(nullptr);
+    return out;
+}
+
+ShowState Host::showState() {
+    ShowState s;
+    s.active = showRunning();
+    if (s.active) {
+        s.remainingSeconds = showRemainingSeconds();
+    }
+    return s;
+}
+
 std::vector<app::TimePolicy> LocalHost::offeredTimePolicies() {
     if (offered_.empty()) {
         return Host::offeredTimePolicies();
@@ -940,6 +960,7 @@ json Session::info(const json& toolNames) {
              {"client", client_.toJson()},
              {"policy", hostPolicyName(policy_)},
              {"showRunning", policy_ == HostPolicy::Live && host_->showRunning()},
+             {"show", showInfoJson(*host_)},
              {"permissions", std::move(permissionsJson)},
              {"version", version().toJson()},
              {"project", std::move(project)},

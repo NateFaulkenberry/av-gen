@@ -21,6 +21,7 @@
 #include <csignal>
 #include <cstdlib>
 #include <fstream>
+#include <functional>
 #include <sstream>
 #include <thread>
 
@@ -183,7 +184,8 @@ struct Rig {
     std::unique_ptr<api::EngineHost> host;
     std::unique_ptr<api::Session> session;
 
-    explicit Rig(const std::string& name, bool gpu = true) {
+    explicit Rig(const std::string& name, bool gpu = true,
+                 const std::function<void(api::EngineHostOptions&)>& configure = {}) {
         root = freshDir(name);
         lockDir = root / "lock" / "avgen-gpu.lock";
         fs::create_directories(lockDir.parent_path());
@@ -193,6 +195,9 @@ struct Rig {
         }
         o.gpuLockPath = lockDir;
         o.gpuLockTimeoutSeconds = 30.0;
+        if (configure) {
+            configure(o);
+        }
         host = std::make_unique<api::EngineHost>(std::move(o));
         host->bindHostThread();
         api::SessionOptions so;
@@ -638,4 +643,367 @@ TEST_CASE("engine host jobs: a cancelled sequence in a reused folder lists only 
     for (const json& o : cancelled.at("outputs")) {
         CHECK(o.at("frame").get<std::uint64_t>() < hashed);
     }
+}
+
+// ---- ADR-2165/2167 (Engine API stage S10): the show, the operator's jobs, and the show's GPU lock -------------
+
+namespace {
+
+// A show the test switches on and off, with the reasons Studio would give.
+struct ShowSwitch {
+    bool on = false;
+    api::ShowFacts facts{.outputsOpen = 1};
+    void install(api::EngineHost& host) {
+        host.local().setShowState([this] { return on ? api::showStateFor(facts) : api::ShowState{}; });
+    }
+};
+
+std::string readHolderFile(const fs::path& dir) {
+    std::ifstream in(dir / "holder");
+    std::string text;
+    std::getline(in, text);
+    return text;
+}
+
+json recordOf(Rig& rig, const std::string& id) {
+    const api::CallResult r = rig.call("job.status", json{{"id", id}});
+    INFO(r.toWire().dump());
+    REQUIRE(r.success);
+    return r.result;
+}
+
+// An operator job over the fake backend, as Studio's Render panel submits one.
+std::string submitLocalFake(Rig& rig, const std::shared_ptr<api::JobTable>& table, bool held, double seconds = 1.0) {
+    const std::string id = table->create("studio.render", "sequence", json::object(), "");
+    api::RenderRequest q;
+    q.jobId = id;
+    q.startSeconds = 0.0;
+    q.endSeconds = seconds;
+    q.fps = 10.0;
+    q.outputDir = rig.root / ("local-" + id);
+    api::LocalJobSubmission sub;
+    sub.table = table;
+    sub.jobId = id;
+    sub.held = held;
+    sub.heldPhase = "queued: Run queue starts it";
+    FakeStats* stats = &rig.stats;
+    sub.prepare = [stats, q]() -> Result<std::unique_ptr<api::GpuRenderJob>> {
+        ++stats->created;
+        return std::unique_ptr<api::GpuRenderJob>(std::make_unique<FakeJob>(*stats, q, "local"));
+    };
+    REQUIRE_FALSE(rig.host->submitLocal(std::move(sub)).has_value());
+    return id;
+}
+
+void stepUntilFinished(Rig& rig, const api::JobTable& table, const std::string& id, int limit = 1000) {
+    for (int i = 0; i < limit; ++i) {
+        const auto r = table.get(id);
+        REQUIRE(r.has_value());
+        if (api::jobFinished(r->state)) {
+            return;
+        }
+        (void)rig.host->stepJobs();
+    }
+    FAIL("job " << id << " did not finish");
+}
+
+} // namespace
+
+TEST_CASE("show state: each fact is a reason; a known end only for a file that plays to its end", "[api][show]") {
+    CHECK_FALSE(api::showStateFor({}).active);
+    CHECK(api::showStateFor({}).reasons.empty());
+    const auto only = [](api::ShowFacts f, api::ShowReason r) {
+        const api::ShowState s = api::showStateFor(f);
+        CHECK(s.active);
+        REQUIRE(s.reasons.size() == 1);
+        CHECK(s.reasons[0] == r);
+    };
+    only({.transportPlaying = true}, api::ShowReason::Transport);
+    only({.liveInput = true}, api::ShowReason::LiveInput);
+    only({.outputsOpen = 2}, api::ShowReason::Output);
+    only({.shareOpen = true}, api::ShowReason::Share);
+    // Paused with a projector open is a show (the parked clock still moves the world); so is live input, which never
+    // sets the transport playing.
+    const api::ShowState all = api::showStateFor(
+        {.transportPlaying = true, .liveInput = true, .outputsOpen = 1, .shareOpen = true});
+    CHECK(all.reasonsText() == "transport, liveInput, output, share");
+    CHECK(all.reasonsJson() == json::array({"transport", "liveInput", "output", "share"}));
+    // The end is known only for a file playing to its end.
+    const api::ShowFacts file{.transportPlaying = true, .hasAudio = true, .durationSeconds = 100.0, .positionSeconds = 40.0};
+    REQUIRE(api::showStateFor(file).remainingSeconds.has_value());
+    CHECK(*api::showStateFor(file).remainingSeconds == 60.0);
+    api::ShowFacts looping = file;
+    looping.looping = true;
+    CHECK_FALSE(api::showStateFor(looping).remainingSeconds.has_value());
+    api::ShowFacts live = file;
+    live.liveInput = true;
+    CHECK_FALSE(api::showStateFor(live).remainingSeconds.has_value());
+    api::ShowFacts paused = file;
+    paused.transportPlaying = false;
+    paused.outputsOpen = 1;
+    CHECK(api::showStateFor(paused).active);
+    CHECK_FALSE(api::showStateFor(paused).remainingSeconds.has_value());
+}
+
+TEST_CASE("show: an API render is refused Busy with the reasons, and session.info reports the show",
+          "[api][jobs][show][adr2167]") {
+    Rig rig("show_refuse");
+    ShowSwitch show;
+    show.install(*rig.host);
+    show.on = true;
+    show.facts = api::ShowFacts{.transportPlaying = true, .outputsOpen = 1};
+    for (const auto& [tool, args] :
+         {std::pair{"render.capture", json{{"frame", 0}, {"path", "c.png"}}},
+          std::pair{"render.start", json{{"path", "renders/s"}, {"range", "0:1"}, {"output", "png"}}}}) {
+        const api::CallResult r = rig.call(tool, args);
+        INFO(tool << " " << r.toWire().dump());
+        REQUIRE_FALSE(r.success);
+        CHECK(r.error->code == ai::ToolErrorCode::Busy);
+        CHECK(r.error->details.at("field") == "show");
+        CHECK(r.error->details.at("reasons") == json::array({"transport", "output"}));
+    }
+    CHECK(rig.stats.created == 0); // refused before any snapshot load or GPU work
+    CHECK(rig.call("job.list").result.at("jobs").empty());
+    const json info = rig.call("session.info").result;
+    CHECK(info.at("show").at("active") == true);
+    CHECK(info.at("show").at("reasons") == json::array({"transport", "output"}));
+    CHECK(info.at("show").at("gpuLock").is_object());
+    // When the show stops the same call succeeds.
+    show.on = false;
+    const json done = rig.wait(rig.start(json{{"range", "0:0.5"}, {"fps", 10}, {"output", "png"}, {"path", "renders/s"}}));
+    CHECK(done.at("state") == "succeeded");
+    CHECK(rig.call("session.info").result.at("show").at("active") == false);
+}
+
+TEST_CASE("show: a job queued before the show stays queued, a running one pauses between frames, both resume",
+          "[api][jobs][show][adr2167]") {
+    // The reference: the same render, uninterrupted.
+    std::string reference;
+    {
+        Rig plain("show_reference");
+        reference = plain.wait(plain.start(json{{"range", "0:1"}, {"fps", 10}, {"output", "png"}, {"path", "r"}}))
+                        .at("result")
+                        .at("sequenceHash");
+    }
+    Rig rig("show_hold");
+    ShowSwitch show;
+    show.install(*rig.host);
+    const std::string running = rig.start(json{{"range", "0:1"}, {"fps", 10}, {"output", "png"}, {"path", "r"}});
+    const std::string queued = rig.start(json{{"range", "0:0.5"}, {"fps", 10}, {"output", "png"}, {"path", "q"}});
+    for (int i = 0; i < 4; ++i) { // start the first and render three of its ten frames
+        (void)rig.host->stepJobs();
+    }
+    REQUIRE(recordOf(rig, running).at("state") == "running");
+    const auto framesBefore = recordOf(rig, running).at("framesDone").get<std::uint64_t>();
+    REQUIRE(framesBefore > 0);
+    REQUIRE(framesBefore < 10);
+    show.on = true;
+    CHECK_FALSE(rig.host->jobInLoop());
+    for (int i = 0; i < 20; ++i) {
+        (void)rig.host->stepJobs();
+    }
+    const json paused = recordOf(rig, running);
+    CHECK(paused.at("framesDone").get<std::uint64_t>() == framesBefore); // not one more frame during the show
+    CHECK(paused.at("phase").get<std::string>().rfind("paused: show active (output)", 0) == 0);
+    const json held = recordOf(rig, queued);
+    CHECK(held.at("state") == "queued");
+    CHECK(held.at("phase").get<std::string>().rfind("held: show active (output)", 0) == 0);
+    CHECK(rig.stats.started == 1); // the second never started
+    CHECK(rig.host->jobStats().pausedForShow);
+    show.on = false;
+    CHECK(rig.host->jobInLoop());
+    const json first = rig.wait(running);
+    const json second = rig.wait(queued);
+    CHECK(first.at("state") == "succeeded");
+    CHECK(second.at("state") == "succeeded");
+    CHECK(first.at("result").at("sequenceHash") == reference); // pausing changed nothing in the output
+}
+
+TEST_CASE("show lock: the show takes the machine lock without waiting and releases it when it stops",
+          "[api][jobs][show][gpulock][adr2167]") {
+    Rig rig("show_lock");
+    ShowSwitch show;
+    show.install(*rig.host);
+    rig.host->updateShow();
+    CHECK_FALSE(fs::exists(rig.lockDir)); // no show, no lock
+    show.on = true;
+    const api::ShowLockState& s = rig.host->updateShow();
+    CHECK(s.showActive);
+    CHECK(s.held);
+    CHECK_FALSE(s.contended);
+    REQUIRE(fs::is_directory(rig.lockDir));
+    CHECK(api::readLockPid(rig.lockDir) == static_cast<long>(::getpid()));
+    CHECK(readHolderFile(rig.lockDir) == "avgen-studio-show");
+    CHECK(s.attempts == 1);
+    // Held: later frames do not touch the lock again.
+    for (int i = 0; i < 10; ++i) {
+        rig.host->updateShow();
+    }
+    CHECK(rig.host->updateShow().attempts == 1);
+    show.on = false;
+    rig.host->updateShow();
+    CHECK_FALSE(fs::exists(rig.lockDir));
+}
+
+TEST_CASE("show lock: another process's lock never stalls the show; the contention is reported and the lock taken "
+          "when it frees",
+          "[api][jobs][show][gpulock][adr2167]") {
+    Rig rig("show_contended", true, [](api::EngineHostOptions& o) { o.showLockRetrySeconds = 0.0; });
+    ShowSwitch show;
+    show.install(*rig.host);
+    Child agent;
+    scriptStyleLock(rig.lockDir, agent.pid, "an-agent");
+    show.on = true;
+    const auto t0 = std::chrono::steady_clock::now();
+    const api::ShowLockState s = rig.host->updateShow();
+    const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+    CHECK(ms < 50.0); // one tryAcquire: no wait, whatever the lock's timeout says
+    CHECK(s.showActive);
+    CHECK_FALSE(s.held);
+    CHECK(s.contended);
+    CHECK(s.holderPid == agent.pid);
+    CHECK(s.holder == "an-agent");
+    CHECK(api::readLockPid(rig.lockDir) == static_cast<long>(agent.pid)); // the agent's lock is untouched
+    const json info = rig.call("session.info").result.at("show").at("gpuLock");
+    CHECK(info.at("contended") == true);
+    CHECK(info.at("holder").at("pid") == agent.pid);
+    CHECK(info.at("holder").at("name") == "an-agent");
+    // The agent ends (its process dies): the next frame's retry takes the lock.
+    agent.kill();
+    const api::ShowLockState after = rig.host->updateShow();
+    CHECK(after.held);
+    CHECK_FALSE(after.contended);
+    CHECK(api::readLockPid(rig.lockDir) == static_cast<long>(::getpid()));
+    show.on = false;
+    rig.host->updateShow();
+    CHECK_FALSE(fs::exists(rig.lockDir));
+}
+
+TEST_CASE("show lock: a job that ends during the show leaves the show's lock; the show hands a paused job's lock back",
+          "[api][jobs][show][gpulock][adr2167]") {
+    Rig rig("show_lock_jobs");
+    ShowSwitch show;
+    show.install(*rig.host);
+    const std::string id = rig.start(json{{"range", "0:1"}, {"fps", 10}, {"output", "png"}, {"path", "r"}});
+    (void)rig.host->stepJobs();
+    (void)rig.host->stepJobs();
+    REQUIRE(recordOf(rig, id).at("state") == "running");
+    REQUIRE(fs::is_directory(rig.lockDir)); // the job's
+    // The show starts with the job paused: the lock is the show's now, under the show's name.
+    show.on = true;
+    REQUIRE(rig.host->updateShow().held);
+    CHECK(readHolderFile(rig.lockDir) == "avgen-studio-show");
+    // The operator cancels the paused job during the show: the lock stays the show's.
+    REQUIRE(rig.call("job.cancel", json{{"id", id}}).success);
+    (void)rig.host->stepJobs();
+    CHECK(recordOf(rig, id).at("state") == "cancelled");
+    CHECK(fs::is_directory(rig.lockDir));
+    CHECK(api::readLockPid(rig.lockDir) == static_cast<long>(::getpid()));
+    show.on = false;
+    rig.host->updateShow();
+    CHECK_FALSE(fs::exists(rig.lockDir));
+
+    // A show that starts and ends while a job is paused hands the lock back to the job, which keeps it to its end.
+    const std::string next = rig.start(json{{"range", "0:1"}, {"fps", 10}, {"output", "png"}, {"path", "r2"}});
+    (void)rig.host->stepJobs();
+    (void)rig.host->stepJobs();
+    show.on = true;
+    rig.host->updateShow();
+    (void)rig.host->stepJobs();
+    show.on = false;
+    rig.host->updateShow();
+    REQUIRE(fs::is_directory(rig.lockDir));
+    CHECK(readHolderFile(rig.lockDir) != "avgen-studio-show");
+    CHECK(rig.wait(next).at("state") == "succeeded");
+    CHECK_FALSE(fs::exists(rig.lockDir));
+}
+
+TEST_CASE("operator jobs: held queue entries wait for release, do not count against the API's capacity, and cancel "
+          "one by one",
+          "[api][jobs][adr2165]") {
+    Rig rig("local_jobs");
+    auto table = std::make_shared<api::JobTable>();
+    const std::string a = submitLocalFake(rig, table, /*held=*/true);
+    const std::string b = submitLocalFake(rig, table, /*held=*/true);
+    const std::string c = submitLocalFake(rig, table, /*held=*/true);
+    for (int i = 0; i < 5; ++i) {
+        (void)rig.host->stepJobs();
+    }
+    CHECK(rig.stats.created == 0); // nothing loads before Run queue
+    CHECK(table->get(a)->phase == "queued: Run queue starts it");
+    CHECK(rig.host->jobStats().held == 3);
+    CHECK_FALSE(rig.host->jobInLoop());
+    // The API still has its four places.
+    std::vector<std::string> api;
+    for (int i = 0; i < 4; ++i) {
+        api.push_back(rig.start(json{{"range", "0:0.2"}, {"fps", 10}, {"output", "png"}, {"path", fmt::format("p{}", i)}}));
+    }
+    const api::CallResult fifth = rig.call("render.start", json{{"range", "0:0.2"}, {"fps", 10}, {"output", "png"},
+                                                                {"path", "p5"}});
+    REQUIRE_FALSE(fifth.success);
+    CHECK(fifth.error->details.at("field") == "queue");
+    for (const auto& id : api) {
+        CHECK(rig.wait(id).at("state") == "succeeded");
+    }
+    CHECK(table->get(a)->state == api::JobState::Queued); // still held after the API jobs ran
+    // Run queue, one at a time; a cancelled entry never starts.
+    REQUIRE(rig.host->cancelJob(*table, b));
+    REQUIRE(rig.host->releaseJob(*table, a));
+    CHECK_FALSE(rig.host->releaseJob(*table, a)); // released already
+    stepUntilFinished(rig, *table, a);
+    CHECK(table->get(a)->state == api::JobState::Succeeded);
+    (void)rig.host->stepJobs();
+    CHECK(table->get(b)->state == api::JobState::Cancelled);
+    CHECK(table->get(c)->state == api::JobState::Queued);
+    REQUIRE(rig.host->releaseJob(*table, c));
+    stepUntilFinished(rig, *table, c);
+    CHECK(table->get(c)->state == api::JobState::Succeeded);
+    // An operator job's record carries the hashes; its files are its RenderJob's to name.
+    CHECK(table->get(c)->result.at("frameHashes").size() == 10);
+    CHECK(table->get(c)->outputs.empty());
+}
+
+TEST_CASE("show: the profiler starts no child process while a show runs", "[api][jobs][show][adr2167]") {
+    Rig rig("show_profile");
+    ShowSwitch show;
+    show.install(*rig.host);
+    int started = 0;
+    rig.host->local().setProfileHook([&](app::Engine&, const ai::ProfileRequest&)
+                                         -> Result<std::shared_ptr<ai::DeferredResult>> {
+        ++started;
+        return fail("the test's profiler does not run");
+    });
+    api::SessionOptions so;
+    so.client = api::ClientInfo{api::ClientKind::Test, "profile", "1"};
+    so.permissions.subprocess = true;
+    so.permissions.readRoots = {rig.root};
+    so.permissions.writeRoots = {rig.root};
+    auto session = api::Session::create(std::move(so), *rig.host);
+    REQUIRE(session.has_value());
+    REQUIRE((*session)->call("project.create", json{{"path", "prof/prof.json"}, {"scene", "empty"}}).success);
+    show.on = true;
+    for (const char* tool : {"performance.profile_scene", "performance.optimize_scene"}) {
+        const api::CallResult r = (*session)->call(tool, json::object());
+        INFO(tool << " " << r.toWire().dump());
+        REQUIRE_FALSE(r.success);
+        CHECK(r.error->code == ai::ToolErrorCode::Busy);
+        CHECK(r.error->details.at("field") == "show");
+    }
+    CHECK(started == 0);
+    show.on = false;
+    const api::CallResult r = (*session)->call("performance.profile_scene", json::object());
+    CHECK(started == 1); // reached the hook (which refuses), so the show was the only thing in the way
+    CHECK(r.error->code != ai::ToolErrorCode::Busy);
+    (*session)->close();
+}
+
+TEST_CASE("engine host over a borrowed engine leaves its clock and live control alone", "[api][jobs][adr2165]") {
+    app::Engine engine(app::EngineMode::Offline);
+    const app::TimePolicy before = engine.timePolicy();
+    api::EngineHost host(engine, api::EngineHostOptions{});
+    CHECK(&host.engine() == &engine);
+    CHECK(engine.timePolicy() == before);
+    CHECK(host.offeredTimePolicies() == std::vector<app::TimePolicy>{before});
+    CHECK_FALSE(host.canRender());
+    CHECK_FALSE(host.showRunning());
 }

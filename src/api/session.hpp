@@ -55,6 +55,7 @@
 #include "api/compensation.hpp"
 #include "api/jobs.hpp"
 #include "api/path_policy.hpp"
+#include "api/show_state.hpp"
 #include "core/error.hpp"
 
 #include <nlohmann/json.hpp>
@@ -161,6 +162,11 @@ public:
     [[nodiscard]] virtual bool showRunning() { return false; }
     // When it will stop, if the host knows (seconds); for `details.retryAfterMs`.
     [[nodiscard]] virtual std::optional<double> showRemainingSeconds() { return std::nullopt; }
+    // ADR-2167: the show with its reasons (api/show_state.hpp). The default is the two answers above, with no
+    // reasons; a host that knows them says so. `showRunning()` is `showState().active` on every host here.
+    [[nodiscard]] virtual ShowState showState();
+    // ADR-2167: the machine GPU lock as the host's show holds it; nothing on a host that never has a show.
+    [[nodiscard]] virtual std::optional<ShowLockState> showLock() { return std::nullopt; }
     // Whether this host can run GPU work (ADR-2155). When it cannot, a tool whose permissions include "gpu"
     // answers `Unavailable` ("this host cannot render ..."), in its capability answer and when called.
     // ADR-2159: an EngineHost with a GPU half says true (Studio's LocalHost stays false until stage S10).
@@ -187,10 +193,11 @@ public:
     [[nodiscard]] app::Engine& engine() override { return *engine_; }
     [[nodiscard]] ai::MainThreadQueue& queue() override { return queue_; }
     void installHooks(ai::ToolContext& ctx) override;
-    [[nodiscard]] bool showRunning() override { return showRunning_ ? showRunning_() : false; }
+    [[nodiscard]] bool showRunning() override { return show_ ? show_().active : false; }
     [[nodiscard]] std::optional<double> showRemainingSeconds() override {
-        return showRemaining_ ? showRemaining_() : std::nullopt;
+        return show_ ? show_().remainingSeconds : std::nullopt;
     }
+    [[nodiscard]] ShowState showState() override { return show_ ? show_() : ShowState{}; }
     // Empty (the default): only the engine's current setting -- a headless run's Offline engine is
     // ticked by its fixed-step loop and honours nothing else. Studio offers StoppedAmbient and
     // StoppedFrozen; a test may offer Stepped.
@@ -202,10 +209,19 @@ public:
     void setWatchHook(ai::WatchHook hook) { watch_ = std::move(hook); }
     void setEvaluationHook(ai::EvaluationHook hook) { evaluation_ = std::move(hook); }
     void setProfileHook(ai::ProfileHook hook) { profile_ = std::move(hook); }
+    // A show that is running or not, with no reasons (the tests' form).
     void setShowPredicate(std::function<bool()> running, std::function<std::optional<double>()> remaining = {}) {
-        showRunning_ = std::move(running);
-        showRemaining_ = std::move(remaining);
+        show_ = [running = std::move(running), remaining = std::move(remaining)] {
+            ShowState s;
+            s.active = running && running();
+            if (s.active && remaining) {
+                s.remainingSeconds = remaining();
+            }
+            return s;
+        };
     }
+    // ADR-2167: the show with its reasons (Studio's: transport, live input, outputs, share).
+    void setShowState(std::function<ShowState()> show) { show_ = std::move(show); }
 
 private:
     app::Engine* engine_;
@@ -215,8 +231,7 @@ private:
     ai::WatchHook watch_;
     ai::EvaluationHook evaluation_;
     ai::ProfileHook profile_;
-    std::function<bool()> showRunning_;
-    std::function<std::optional<double>()> showRemaining_;
+    std::function<ShowState()> show_;
     std::vector<app::TimePolicy> offered_;
 };
 

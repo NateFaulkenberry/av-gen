@@ -1366,10 +1366,13 @@ Application::~Application() {
     step("engine_");
     renderer_.reset();
     step("renderer_");
-    shaders_.reset();
-    step("shaders_");
-    context_.reset();
-    step("context_");
+    // ADR-2165: the host owns the device and the shaders now, and goes where they went: after everything built
+    // from them, before the window. Its jobs (and their RenderJobs' readback rings) go before its device.
+    shaders_ = nullptr;
+    context_ = nullptr;
+    gpu_ = nullptr;
+    host_.reset();
+    step("host_");
     window_.reset();
     step("window_");
 }
@@ -1384,10 +1387,10 @@ void Application::initControlPlane(api::SessionOptions session) {
     // project's folder is readable and writable whichever project is open (owner decision 1), so a
     // project opened after this -- File > Open, a recent file, `project.open` -- needs no refresh.
     session.permissions.liveControl = liveControlAllowed_;
-    ai_ = std::make_unique<ai::ControlPlane>(*engine_, jobs_.get(), std::move(session));
+    ai_ = std::make_unique<ai::ControlPlane>(*host_, jobs_.get(), std::move(session)); // ADR-2165: Studio's host
     // ADR-2154: Studio's loop honours both parked clocks; a headless run's fixed-step loop only its own.
     if (engine_->mode() == EngineMode::Live) {
-        ai_->host().setOfferedTimePolicies({TimePolicy::StoppedAmbient, TimePolicy::StoppedFrozen});
+        ai_->host().local().setOfferedTimePolicies({TimePolicy::StoppedAmbient, TimePolicy::StoppedFrozen});
     }
     // ADR-101: an assistant's edit lands in the same history as a person's, so Cmd+Z takes back
     // "the last thing that happened" rather than "the last thing *I* did". The snapshot sink stays
@@ -1533,101 +1536,19 @@ void Application::saveSettings() {
     }
 }
 
-Result<void> Application::init(const AppOptions& options, const std::filesystem::path& executablePath) {
-    initStart_ = std::chrono::steady_clock::now(); // ADR-1090: the profile's load time starts here
-    executablePath_ = executablePath;              // ADR-1110: the Quality Lab is found beside this build
-    if (!options.headless) {
-        recent_ = RecentFiles(platform::preferencesDirectory() / "recent.json");
-        if (auto r = recent_.load(); !r) {
-            log::warn("recent files: {}", r.error().message);
-        }
+// ADR-2165: the live renderer, its output mapper and compositor, built from the host's device and shaders, and the
+// renderer options the command line set. Moved out of `init` unchanged: the order of every step is the one it had.
+Result<void> Application::initLiveRenderer() {
+    auto device = host_->ensureDevice();
+    if (!device) {
+        return std::unexpected(device.error());
     }
-    options_ = options;
-    engine_ = std::make_unique<Engine>(options.headless ? EngineMode::Offline : EngineMode::Live);
-    // ADR-2154: the parked clock is a named setting. A headless run's Offline engine keeps its fixed-step
-    // clock (`Offline`), whatever the flag says: its outputs must not change.
-    if (!options.headless) {
-        if (auto r = engine_->setTimePolicy(options.parkedClock); !r) {
-            log::warn("--parked-clock: {}", r.error().message);
-        }
+    gpu_ = dynamic_cast<GpuRenderBackend*>(*device);
+    if (gpu_ == nullptr) {
+        return fail("the host's GPU half is not the application's");
     }
-    // The edit history bumps this engine's project revisions (ADR-2154).
-    edits_.attach(engine_.get());
-    // ADR-2133: live control is off in every engine until this turns it on. Before the project loads, so the project's
-    // control map opens what it names in a session that may listen, and nothing in one that may not.
-    {
-        const LiveControl live = liveControlFor(LiveControlAsk{
-            .interactive = !options.headless && !options.captureUi && options.uiScript.empty() && options.uiAb.empty(),
-            .oscFlag = options.oscPort.has_value() || options.oscBind.has_value(),
-            .midiFlag = options.midi.has_value(),
-            .noOsc = options.noOsc});
-        liveControlAllowed_ = live.osc || live.midi;
-        if (options.oscBind) {
-            if (auto r = engine_->control().setOscBind(*options.oscBind); !r) {
-                return std::unexpected(r.error());
-            }
-        }
-        // OSC waits for the command line's port when there is one (below, after the load), so a run started with
-        // --osc-port never takes the project's port -- 9000, usually the editor's -- for the moment in between.
-        engine_->control().setLiveOsc(live.osc && !options.oscPort);
-        engine_->control().setLiveMidi(live.midi);
-        liveOscAfterLoad_ = live.osc;
-    }
-    if (options.headless) {
-        // A headless run gets a control plane too, so `--ai-script` and `--ai-prompt` work without
-        // a window. It *reads* the settings file -- an operator who configured a provider in the
-        // app expects a batch run to use it -- and never writes one, because a render has no
-        // business changing the user's configuration. The credential still comes from the keychain
-        // or, on a machine where that cannot be read, from AVGEN_AI_<PROVIDER>_KEY.
-        settingsPath_ = AppSettings::pathIn(platform::preferencesDirectory());
-        jobs_ = std::make_unique<JobSystem>(2);
-        // Today's headless roots: none. The open project's folder is the one place it reads and writes
-        // (`--ai-script` saving the project it was given), and every other path tool says how to give it more.
-        initControlPlane(ai::studioSessionOptions());
-        // No theme here. `imgui_` is only constructed alongside the window, further down, so in a
-        // headless run this called a method on a null unique_ptr and took down every `--headless`
-        // render, the `--render` batch path and `tools/review_frames.py` with it. There is also
-        // nothing to theme: a run with no window draws no UI.
-        settingsPath_.clear(); // read-only from here: saveSettings() is now a no-op
-    }
-
-    if (!options.headless) {
-        platform::WindowDesc wdesc;
-        wdesc.title = "avgen " + std::string(api::kEngineVersion);
-        wdesc.width = options.width;
-        wdesc.height = options.height;
-        // The world is the canvas, and a canvas the size of a dialogue box is not one. An explicit
-        // --size still wins: that flag exists so a run can be reproduced at a stated size.
-        wdesc.maximised = !options.sizeGiven;
-        auto window = platform::Window::create(wdesc);
-        if (!window) {
-            return std::unexpected(window.error());
-        }
-        window_ = std::move(*window);
-    }
-
-    gpu::ContextDesc cdesc;
-    cdesc.metalLayer = window_ ? window_->metalLayer() : nullptr;
-    // ADR-1811: Dawn's persistent pipeline cache, so a new build starts its shader warm-up warm. AVGEN_PIPELINE_CACHE
-    // =off runs without it (the A/B arm, and a way out if a cache is ever suspected); =<dir> puts it elsewhere.
-    {
-        const char* env = std::getenv("AVGEN_PIPELINE_CACHE");
-        const std::string value = env != nullptr ? env : "";
-        if (value == "off" || value == "0") {
-            log::info("pipeline cache: off (AVGEN_PIPELINE_CACHE={})", value);
-        } else if (!value.empty()) {
-            cdesc.pipelineCacheDir = value;
-        } else if (const auto dir = platform::cacheDirectory(); !dir.empty()) {
-            cdesc.pipelineCacheDir = dir / "pipeline-cache";
-        }
-    }
-    auto context = gpu::Context::create(cdesc);
-    if (!context) {
-        return std::unexpected(context.error());
-    }
-    context_ = std::move(*context);
-
-    shaders_ = std::make_unique<gpu::ShaderLibrary>(*context_, gpu::ShaderLibrary::defaultSearchDirs(executablePath));
+    context_ = &gpu_->context();
+    shaders_ = &gpu_->shaders();
     if (window_) {
         // ADR-1562: the interface layer first, so the window can say what it is doing while the renderer's pipelines
         // compile -- minutes, the first time a build's shaders meet a cold Metal cache, before ADR-1561.
@@ -1746,6 +1667,168 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             return fail("unknown debug target '{}'", options_.debugTarget);
         }
     }
+    return {};
+}
+
+// ADR-2165: the renderer options of a run that draws no frames of its own are still checked, so a misspelt
+// --tier, --quality-arm, --disable or --debug-target fails the same way whether or not the run renders.
+Result<void> Application::validateRendererOptions() const {
+    if (!options_.qualityTier.empty()) {
+        rendering::QualityTier tier = rendering::QualityTier::Realtime;
+        if (!rendering::qualityTierFromName(options_.qualityTier, tier)) {
+            return fail("unknown quality tier '{}' (preview|realtime|high|offline)", options_.qualityTier);
+        }
+    }
+    std::string token;
+    {
+        rendering::QualitySettings settings{};
+        std::istringstream stream(options_.qualityArms);
+        while (std::getline(stream, token, ',')) {
+            if (!token.empty() && !rendering::SceneRenderer::setQualityArm(settings, token)) {
+                return fail("unknown quality arm '{}' (one of: {})", token, rendering::SceneRenderer::qualityArmNames());
+            }
+        }
+    }
+    {
+        rendering::SceneRenderer::PassToggles toggles;
+        std::istringstream stream(options_.disablePasses);
+        while (std::getline(stream, token, ',')) {
+            if (!token.empty() && !rendering::SceneRenderer::setPassArm(toggles, token, false)) {
+                return fail("--disable: unknown phase '{}' ({})", token, rendering::SceneRenderer::passArmNames());
+            }
+        }
+    }
+    if (!options_.debugTarget.empty()) {
+        static constexpr rendering::AuxDebugView kViews[] = {
+            rendering::AuxDebugView::None,      rendering::AuxDebugView::Normal,
+            rendering::AuxDebugView::Roughness, rendering::AuxDebugView::Velocity,
+            rendering::AuxDebugView::Emission,  rendering::AuxDebugView::Ids,
+            rendering::AuxDebugView::Occlusion, rendering::AuxDebugView::Depth,
+            rendering::AuxDebugView::LinearDepth, rendering::AuxDebugView::DepthEdges,
+            rendering::AuxDebugView::ObjectDepth, rendering::AuxDebugView::Overdraw,
+            rendering::AuxDebugView::FragmentDensity,
+            rendering::AuxDebugView::TemporalHistory};
+        bool found = false;
+        for (const auto view : kViews) {
+            found = found || options_.debugTarget == rendering::auxDebugViewName(view);
+        }
+        if (!found) {
+            return fail("unknown debug target '{}'", options_.debugTarget);
+        }
+    }
+    return {};
+}
+
+Result<void> Application::init(const AppOptions& options, const std::filesystem::path& executablePath) {
+    initStart_ = std::chrono::steady_clock::now(); // ADR-1090: the profile's load time starts here
+    executablePath_ = executablePath;              // ADR-1110: the Quality Lab is found beside this build
+    if (!options.headless) {
+        recent_ = RecentFiles(platform::preferencesDirectory() / "recent.json");
+        if (auto r = recent_.load(); !r) {
+            log::warn("recent files: {}", r.error().message);
+        }
+    }
+    options_ = options;
+    engine_ = std::make_unique<Engine>(options.headless ? EngineMode::Offline : EngineMode::Live);
+    // ADR-2154: the parked clock is a named setting. A headless run's Offline engine keeps its fixed-step
+    // clock (`Offline`), whatever the flag says: its outputs must not change.
+    if (!options.headless) {
+        if (auto r = engine_->setTimePolicy(options.parkedClock); !r) {
+            log::warn("--parked-clock: {}", r.error().message);
+        }
+    }
+    // The edit history bumps this engine's project revisions (ADR-2154).
+    edits_.attach(engine_.get());
+    // ADR-2165: Studio's host, over this engine: the GPU device and shader library (made below when this run draws
+    // frames itself, or lazily by the first render job), the render jobs, and the show's GPU lock (ADR-2167).
+    {
+        api::EngineHostOptions hostOptions;
+        GpuBackendOptions gpuOptions;
+        gpuOptions.executable = executablePath;
+        gpuOptions.pipelineCache = true;
+        gpuOptions.label.clear(); // the device Studio has always made: unlabelled
+        gpuOptions.surfaceLayer = [this]() -> void* { return window_ ? window_->metalLayer() : nullptr; };
+        hostOptions.renderBackend = gpuRenderBackendFactory(std::move(gpuOptions));
+        // A render job used to step four frames or 10 ms per UI frame (`job_->step(4, 0.010)`); a headless one ran
+        // a frame at a time. The slice is the host's; the frame cap is the job's (submitRenderJob).
+        hostOptions.sliceMs = 10.0;
+        hostOptions.gpuLockPollSeconds = 0.25;
+        // The window's own pipeline wait hook keeps it alive while a job compiles; the assistant waits for the frame.
+        hostOptions.pumpWhileCompiling = false;
+        host_ = std::make_unique<api::EngineHost>(*engine_, std::move(hostOptions));
+    }
+    // ADR-2133: live control is off in every engine until this turns it on. Before the project loads, so the project's
+    // control map opens what it names in a session that may listen, and nothing in one that may not.
+    {
+        const LiveControl live = liveControlFor(LiveControlAsk{
+            .interactive = !options.headless && !options.captureUi && options.uiScript.empty() && options.uiAb.empty(),
+            .oscFlag = options.oscPort.has_value() || options.oscBind.has_value(),
+            .midiFlag = options.midi.has_value(),
+            .noOsc = options.noOsc});
+        liveControlAllowed_ = live.osc || live.midi;
+        if (options.oscBind) {
+            if (auto r = engine_->control().setOscBind(*options.oscBind); !r) {
+                return std::unexpected(r.error());
+            }
+        }
+        // OSC waits for the command line's port when there is one (below, after the load), so a run started with
+        // --osc-port never takes the project's port -- 9000, usually the editor's -- for the moment in between.
+        engine_->control().setLiveOsc(live.osc && !options.oscPort);
+        engine_->control().setLiveMidi(live.midi);
+        liveOscAfterLoad_ = live.osc;
+    }
+    if (options.headless) {
+        // A headless run gets a control plane too, so `--ai-script` and `--ai-prompt` work without
+        // a window. It *reads* the settings file -- an operator who configured a provider in the
+        // app expects a batch run to use it -- and never writes one, because a render has no
+        // business changing the user's configuration. The credential still comes from the keychain
+        // or, on a machine where that cannot be read, from AVGEN_AI_<PROVIDER>_KEY.
+        settingsPath_ = AppSettings::pathIn(platform::preferencesDirectory());
+        jobs_ = std::make_unique<JobSystem>(2);
+        // Today's headless roots: none. The open project's folder is the one place it reads and writes
+        // (`--ai-script` saving the project it was given), and every other path tool says how to give it more.
+        initControlPlane(ai::studioSessionOptions());
+        // No theme here. `imgui_` is only constructed alongside the window, further down, so in a
+        // headless run this called a method on a null unique_ptr and took down every `--headless`
+        // render, the `--render` batch path and `tools/review_frames.py` with it. There is also
+        // nothing to theme: a run with no window draws no UI.
+        settingsPath_.clear(); // read-only from here: saveSettings() is now a no-op
+    }
+
+    if (!options.headless) {
+        platform::WindowDesc wdesc;
+        wdesc.title = "avgen " + std::string(api::kEngineVersion);
+        wdesc.width = options.width;
+        wdesc.height = options.height;
+        // The world is the canvas, and a canvas the size of a dialogue box is not one. An explicit
+        // --size still wins: that flag exists so a run can be reproduced at a stated size.
+        wdesc.maximised = !options.sizeGiven;
+        auto window = platform::Window::create(wdesc);
+        if (!window) {
+            return std::unexpected(window.error());
+        }
+        window_ = std::move(*window);
+    }
+
+    // ADR-2165: the GPU device and shader library are the host's. A run that draws frames itself -- the editor, the
+    // headless frame loop and its --capture, the headless live profile -- has them made now, exactly as
+    // `Application::init` always made them (the window's layer, Dawn's pipeline cache, AVGEN_PIPELINE_CACHE), and
+    // builds its live renderer from them. A run that does not -- --render, --queue, --pathtrace, --frames 0 (an
+    // --ai-script or --save-project with no frames) -- creates no device here: a render job creates it, under the
+    // machine's GPU lock, when the first one starts, and a CPU-only run never does.
+    const bool drawsFrames = !options.headless || options.liveProfile.enabled ||
+                             (!options.queue && !options.pathtrace && !options.render && options.frames != 0);
+    if (!drawsFrames) {
+        log::info("headless: this run draws no frames of its own; no GPU device until a render job needs one");
+        if (auto r = validateRendererOptions(); !r) {
+            return r;
+        }
+    }
+    if (drawsFrames) {
+        if (auto r = initLiveRenderer(); !r) {
+            return r;
+        }
+    }
 
     if (auto applied = applyDebugDraw(); !applied) {
         return applied;
@@ -1823,16 +1906,12 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             }
             initControlPlane(std::move(session));
         }
-        // Owner decision 3: while the transport plays, the editor is running a show, and a client other
-        // than its own assistant is refused structural edits, jobs, project calls and seeks. Studio has
-        // no external client yet; the predicate is what one would be refused by.
-        ai_->host().setShowPredicate([this] { return engine_ != nullptr && engine_->isPlaying(); },
-                                     [this]() -> std::optional<double> {
-                                         if (engine_ == nullptr || !engine_->hasAudio()) {
-                                             return std::nullopt;
-                                         }
-                                         return std::max(engine_->durationSeconds() - engine_->positionSeconds(), 0.0);
-                                     });
+        // Owner decision 3: while a show runs, a client other than the editor's own assistant is refused
+        // structural edits, jobs, project calls and seeks. ADR-2167: the show is the transport playing, live
+        // input, an output or projection window, or a Syphon/NDI share (api/show_state.hpp), and while it runs no
+        // GPU job starts -- the assistant's included -- and the host holds the machine GPU lock (updateShow, in
+        // the frame loop).
+        host_->local().setShowState([this] { return currentShowState(); });
         // Performance is renderer state, and `src/ai/` lives in avgen_core which cannot see the
         // renderer. So the application -- which owns both -- fills in a plain snapshot, and a
         // session without a renderer simply installs nothing and the tool says so honestly.
@@ -2281,7 +2360,10 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         };
         panel_->onStartRender = [this] { startRenderFromUi(); };
         panel_->onCancelRender = [this] {
-            if (job_) job_->cancel();
+            // ADR-2165: the panel's job, wherever it is -- rendering, or still waiting for the lock or the show.
+            if (!panelJobId_.empty()) {
+                host_->cancelJob(*studioJobs_, panelJobId_);
+            }
         };
         panel_->onEnqueueRender = [this] {
             engine_->renderSettings() = uiRender_;
@@ -2293,25 +2375,31 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
                 panel_->setStatus(source.error().message);
                 return;
             }
-            uiQueue_.push_back(QueuedRender{source->scratch, uiRender_, source->outputBase});
-            panel_->queuedRenders = uiQueue_.size();
+            // ADR-2165: the entry is a held job on Studio's host; Run queue releases them one at a time.
+            auto id = submitRenderJob(source->scratch, uiRender_, source->outputBase, /*scratch=*/true, /*held=*/true,
+                                      4);
+            if (!id) {
+                std::error_code ec;
+                std::filesystem::remove(source->scratch, ec);
+                panel_->setStatus(id.error().message);
+                return;
+            }
+            queueIds_.push_back(*id);
+            panel_->queuedRenders = queueIds_.size();
             panel_->setStatus("queued " + (engine_->projectPath().empty()
                                                ? std::string("this session")
                                                : engine_->projectPath().filename().string()));
         };
         panel_->onRunQueue = [this] {
-            if (job_ || uiQueue_.empty()) return;
-            const QueuedRender queued = uiQueue_.front();
-            uiQueue_.pop_front();
-            panel_->queuedRenders = uiQueue_.size();
-            auto job = makeRenderJob(queued.scratch, queued.settings, queued.outputBase);
-            std::error_code ec;
-            std::filesystem::remove(queued.scratch, ec); // loaded; the copy has done its job
-            if (!job) {
-                panel_->setStatus(job.error().message);
-                return;
+            if (panelJobBusy() || queueIds_.empty()) return;
+            const std::string id = queueIds_.front();
+            queueIds_.pop_front();
+            panel_->queuedRenders = queueIds_.size();
+            // ADR-2165: the entry starts at the host's next step; it loads its scratch copy then and removes it.
+            if (host_->releaseJob(*studioJobs_, id)) {
+                panelJobId_ = id;
+                panelJobPhase_.clear();
             }
-            job_ = std::move(*job);
         };
         panel_->outputs = &outputs_;
         panel_->shareStatus = share::TextureShare::describe();
@@ -2670,6 +2758,9 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
 
     // Hot reload of the engine's own shaders.
     for (const char* name : {"common.wgsl", "pbr.wgsl", "grid.wgsl", "skybox.wgsl", "tonemap.wgsl"}) {
+        if (shaders_ == nullptr) {
+            break; // ADR-2165: a run with no live renderer has no engine shaders to reload
+        }
         if (auto located = shaders_->locate(name)) {
             engineShaderWatcher_.watch(*located);
         }
@@ -3488,7 +3579,7 @@ void Application::storeOutputsToProject() {
 }
 
 void Application::startRenderFromUi() {
-    if (job_) {
+    if (panelJobBusy()) {
         return;
     }
     engine_->renderSettings() = uiRender_;
@@ -3502,15 +3593,127 @@ void Application::startRenderFromUi() {
         panel_->setStatus(source.error().message);
         return;
     }
-    auto job = makeRenderJob(source->scratch, uiRender_, source->outputBase);
-    std::error_code removeError;
-    std::filesystem::remove(source->scratch, removeError); // loaded; the copy has done its job
-    if (!job) {
-        panel_->setStatus(job.error().message);
+    // ADR-2165: a job on Studio's host. It loads the copy (and removes it) when it starts, at the host's next step:
+    // the frame after this one, as the panel's job always stepped there. A show holds it until the show stops.
+    auto id = submitRenderJob(source->scratch, uiRender_, source->outputBase, /*scratch=*/true, /*held=*/false, 4);
+    if (!id) {
+        std::error_code removeError;
+        std::filesystem::remove(source->scratch, removeError);
+        panel_->setStatus(id.error().message);
         return;
     }
-    job_ = std::move(*job);
-    panel_->setStatus("rendering...");
+    panelJobId_ = *id;
+    panelJobPhase_.clear();
+    const api::ShowState show = host_->showState();
+    panel_->setStatus(show.active ? "render held: a show is running (" + show.reasonsText() +
+                                        "); it starts when the show stops"
+                                  : std::string("rendering..."));
+}
+
+Result<std::string> Application::submitRenderJob(const std::filesystem::path& project, RenderSettings settings,
+                                                 const std::filesystem::path& outputBase, bool scratch, bool held,
+                                                 int maxFramesPerStep) {
+    if (host_ == nullptr) {
+        return fail("no render host");
+    }
+    const nlohmann::json request{{"project", project.string()},
+                                 {"output", settings.outputPath.string()},
+                                 {"width", settings.width},
+                                 {"height", settings.height},
+                                 {"fps", settings.fps}};
+    const std::string id = studioJobs_->create("studio.render", "sequence", request, project.string());
+    LocalRenderJob job;
+    job.project = project;
+    job.settings = std::move(settings);
+    job.outputBase = outputBase;
+    job.debug = debugOptions();
+    job.maxFramesPerStep = maxFramesPerStep;
+    job.onStarted = [this, id](std::shared_ptr<RenderJob> started) {
+        if (id == panelJobId_ || panelJobId_.empty()) {
+            job_ = std::move(started);
+        }
+    };
+    if (scratch) {
+        job.onLoaded = [project] {
+            std::error_code ec;
+            std::filesystem::remove(project, ec); // loaded; the copy has done its job
+        };
+    }
+    api::LocalJobSubmission submission;
+    submission.table = studioJobs_;
+    submission.jobId = id;
+    submission.held = held;
+    submission.heldPhase = "queued: Run queue starts it";
+    submission.prepare = [this, job = std::move(job)]() mutable -> Result<std::unique_ptr<api::GpuRenderJob>> {
+        if (gpu_ == nullptr) {
+            gpu_ = dynamic_cast<GpuRenderBackend*>(host_->backend());
+        }
+        if (gpu_ == nullptr) {
+            return fail("the host has no GPU half");
+        }
+        return gpu_->createLocal(std::move(job));
+    };
+    if (auto refused = host_->submitLocal(std::move(submission))) {
+        studioJobs_->discard(id);
+        return fail("{}", refused->message);
+    }
+    return id;
+}
+
+bool Application::panelJobBusy() const {
+    if (panelJobId_.empty()) {
+        return false;
+    }
+    const auto record = studioJobs_->get(panelJobId_);
+    return record && !api::jobFinished(record->state);
+}
+
+void Application::servicePanelJob() {
+    if (panelJobId_.empty() || panel_ == nullptr) {
+        return;
+    }
+    const auto record = studioJobs_->get(panelJobId_);
+    if (!record) {
+        panelJobId_.clear();
+        return;
+    }
+    if (!api::jobFinished(record->state)) {
+        // Waiting for the machine's GPU lock or for a show to stop: the panel says which, once per change.
+        if (record->phase != panelJobPhase_) {
+            panelJobPhase_ = record->phase;
+            if (record->phase.rfind("waiting for the GPU lock", 0) == 0 || record->phase.rfind("held", 0) == 0 ||
+                record->phase.rfind("paused", 0) == 0) {
+                panel_->setStatus("render " + record->phase);
+            } else if (record->state == api::JobState::Running && record->phase == "rendering") {
+                panel_->setStatus("rendering...");
+            }
+        }
+        return;
+    }
+    // Finished. The panel keeps the job's last progress, as it kept the RenderJob's (ADR-320).
+    std::string error;
+    if (job_) {
+        const auto p = job_->progress();
+        lastRender_ = p;
+        error = p.error;
+        panel_->setStatus(p.error.empty() ? fmt::format("render done: {} frames, hash {:016x}", p.framesRendered,
+                                                        p.sequenceHash)
+                                          : "render failed: " + p.error);
+    } else {
+        // It never started (its project did not load, the device or the start failed, or it was cancelled first).
+        error = record->error ? record->error->message : std::string();
+        panel_->setStatus(record->state == api::JobState::Cancelled ? std::string("render cancelled")
+                                                                     : error);
+        if (record->state != api::JobState::Cancelled && error.empty()) {
+            error = "failed";
+        }
+    }
+    job_.reset();
+    panelJobId_.clear();
+    panelJobPhase_.clear();
+    if (!queueIds_.empty() && error.empty() && panel_->onRunQueue) {
+        panel_->onRunQueue();
+    }
 }
 
 // The one way a project reaches the disk from the editor. Cmd-S, Save As and the unsaved-changes
@@ -4937,6 +5140,17 @@ int Application::run() {
         if (const int aiCode = runAiTask(); aiCode != 0) {
             return aiCode;
         }
+        // ADR-2165: a batch run finishes the render jobs its script started and did not wait for, as `avgen call`
+        // does (the editor's frame loop steps them).
+        while (options_.headless && host_->hasJobs()) {
+            const bool more = host_->stepJobs();
+            if (!more) {
+                break;
+            }
+            if (!host_->jobStats().running) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100)); // waiting for the GPU lock
+            }
+        }
     }
     const int code = options_.headless ? runHeadless() : runLive();
     if (options_.saveProject) {
@@ -5129,7 +5343,8 @@ int Application::runLive() {
         double paceWaitMs = 0.0;
         double pacePeriodMs = 0.0; // the cap's period this frame, 0 = not capped (ADR-1362 reads it)
         {
-            const bool capOn = options_.liveFrameCap.value_or(settings_.liveFrameCap) && !job_ && !abRunning;
+            const bool capOn = options_.liveFrameCap.value_or(settings_.liveFrameCap) && !host_->jobInLoop() &&
+                               !abRunning; // ADR-2165: "a render job shares the loop" is the host's to say
             const bool alignOn = capOn && options_.liveVsyncAlign.value_or(true);
             if (capOn && --paceRefreshAge <= 0) {
                 paceRefreshAge = 120;
@@ -5600,7 +5815,7 @@ int Application::runLive() {
             }
         };
         const bool uiBuiltEarly = options_.liveLateLatch.value_or(true) && engine_->liveSonic() && !uiScript_.active() &&
-                                  !options_.captureUi && !abRunning && !job_;
+                                  !options_.captureUi && !abRunning && !host_->jobInLoop();
         if (uiBuiltEarly) {
             buildUi();
         }
@@ -5720,7 +5935,7 @@ int Application::runLive() {
         // ADR-364: what the application is doing this frame, and therefore what the viewport is
         // allowed to cost. Computed here -- before the jobs are stepped -- so that the frame in
         // which a render *starts* is already suspended, rather than one frame late.
-        const RenderActivity activity = job_             ? RenderActivity::OfflineRaster
+        const RenderActivity activity = host_->jobInLoop() ? RenderActivity::OfflineRaster
                                         : (ptJob_ && !ptJob_->done()) ? RenderActivity::OfflinePathTrace
                                                                       : RenderActivity::Interactive;
         const ViewportPolicy viewportPolicy =
@@ -5757,24 +5972,20 @@ int Application::runLive() {
             uiRender_.normalisePattern();
             startRenderFromUi();
         }
-        // Background render: a few frames per UI frame, then the next queued job.
-        if (job_) {
+        // ADR-2167: the show's GPU lock, on its edges only (tryAcquire, never a wait; a contended show retries
+        // once a second). Then the GPU jobs, which do not start or step while a show runs.
+        host_->updateShow();
+        // Background render (ADR-2165: Studio's host): a slice per UI frame -- the panel's job four frames or
+        // 10 ms, as before -- then the panel's next queued job.
+        if (host_->hasJobs()) {
             core::PhaseProfiler::Scope scope(prof, kPhJob);
-            const bool complete = job_->step(4, 0.010);
+            (void)host_->stepJobs();
             // Collected before the job is released, so the final frame of a render is the one left
             // on the panel rather than whatever the last UI poll happened to catch (ADR-320).
             serviceRenderPreview();
-            if (complete) {
-                const auto p = job_->progress();
-                lastRender_ = p;
-                panel_->setStatus(p.error.empty() ? fmt::format("render done: {} frames, hash {:016x}", p.framesRendered,
-                                                                p.sequenceHash)
-                                                  : "render failed: " + p.error);
-                job_.reset();
-                if (!uiQueue_.empty() && p.error.empty() && panel_->onRunQueue) {
-                    panel_->onRunQueue();
-                }
-            }
+            servicePanelJob();
+        } else if (!panelJobId_.empty()) {
+            servicePanelJob();
         }
         // Again, and outside the branch: the call above cannot run on a frame where there is no
         // job, so without this the panel would still be saying "live" about the last frame of a
@@ -6552,11 +6763,72 @@ Result<RenderSource> Application::writeRenderSource(std::string_view tag) {
     return source;
 }
 
-Result<std::unique_ptr<RenderJob>> Application::makeRenderJob(const std::filesystem::path& projectFile,
-                                                              RenderSettings settings,
-                                                              const std::filesystem::path& outputBase) {
-    // ADR-2159: the one way a render job is built, shared with the API host (app/offline_render.hpp).
-    return makeOfflineRenderJob(*context_, *shaders_, projectFile, std::move(settings), outputBase, debugOptions());
+int Application::runRenderToEnd(const std::filesystem::path& project, RenderSettings settings,
+                                const std::string& label) {
+    auto id = submitRenderJob(project, std::move(settings), {}, /*scratch=*/false, /*held=*/false, 1);
+    if (!id) {
+        log::error("{}: {}", label, id.error().message);
+        return 2;
+    }
+    // What `RenderJob::run` did, through the host: a frame per step, progress once a second. The host also waits
+    // its turn on the machine's GPU lock (polled four times a second) -- under tools/gpu-lock.sh it is ours already.
+    bool started = false;
+    std::string lastPhase;
+    auto lastLog = std::chrono::steady_clock::now();
+    std::optional<api::JobRecord> record;
+    for (;;) {
+        (void)host_->stepJobs();
+        record = studioJobs_->get(*id);
+        if (!record || api::jobFinished(record->state)) {
+            break;
+        }
+        started = started || record->state == api::JobState::Running;
+        if (record->phase != lastPhase && record->phase.rfind("waiting for the GPU lock", 0) == 0) {
+            log::info("{}: {}", label, record->phase);
+        }
+        lastPhase = record->phase;
+        const auto now = std::chrono::steady_clock::now();
+        if (started && job_ && std::chrono::duration<double>(now - lastLog).count() >= 1.0) {
+            const auto p = job_->progress();
+            log::info("render: {}/{} frames ({:.0f}%), {:.1f} fps, hash {:016x}", p.framesRendered, p.framesTotal,
+                      p.fraction() * 100.0, p.renderFps, p.lastFrameHash);
+            lastLog = now;
+        }
+        if (record->phase.rfind("waiting for the GPU lock", 0) == 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(250));
+        }
+    }
+    job_.reset();
+    if (!record) {
+        log::error("{}: the job's record is gone", label);
+        return 7;
+    }
+    if (record->state == api::JobState::Succeeded) {
+        return 0;
+    }
+    const std::string message = record->error ? record->error->message : std::string(api::jobStateName(record->state));
+    log::error("{}: {}", label, message);
+    if (!started) {
+        return 2; // it never started: the project did not load, or the device or the renderer did not start
+    }
+    const std::uint64_t gpuErrors =
+        record->result.is_object() ? record->result.value("gpuErrors", std::uint64_t{0}) : std::uint64_t{0};
+    return gpuErrors == 0 ? 7 : 5;
+}
+
+api::ShowState Application::currentShowState() const {
+    api::ShowFacts f;
+    if (engine_ != nullptr) {
+        f.transportPlaying = engine_->isPlaying();
+        f.liveInput = engine_->hasLiveInput() || engine_->liveSonic();
+        f.hasAudio = engine_->hasAudio();
+        f.looping = engine_->transport().loop().usable();
+        f.durationSeconds = engine_->durationSeconds();
+        f.positionSeconds = engine_->positionSeconds();
+    }
+    f.outputsOpen = outputs_.openCount();
+    f.shareOpen = share_.isOpen();
+    return api::showStateFor(f);
 }
 
 // The CPU path tracer (ADR-351). Unlike `--render` this needs no GPU at all: the tracer is CPU-only
@@ -6835,14 +7107,8 @@ int Application::runQueue(const std::filesystem::path& queueFile) {
         }
         log::info("queue job {}/{}: {} -> {}", index, doc["jobs"].size(), project.filename().string(),
                   settings.outputPath.string());
-        auto job = makeRenderJob(project, settings);
-        if (!job) {
-            log::error("queue job {}: {}", index, job.error().message);
-            ++failures;
-            continue;
-        }
-        if (auto r = (*job)->run(); !r) {
-            log::error("queue job {}: {}", index, r.error().message);
+        // ADR-2165: on Studio's host, one at a time, as before.
+        if (runRenderToEnd(project, settings, fmt::format("queue job {}", index)) != 0) {
             ++failures;
         }
     }
@@ -6901,15 +7167,17 @@ int Application::runHeadless() {
                 return 2;
             }
         }
-        auto job = makeRenderJob(projectFile, renderSettingsFromOptions());
-        if (!job) {
-            log::error("render: {}", job.error().message);
+        // ADR-2165: through Studio's host, which creates the device when the job starts (this run made none).
+        return runRenderToEnd(projectFile, renderSettingsFromOptions(), "render");
+    }
+    // ADR-2165: `--frames 0` draws no frames: what an --ai-script or --save-project run that renders nothing asks
+    // for. Before, a headless run read 0 as "the default 120".
+    if (options_.frames == 0) {
+        if (options_.capture) {
+            log::error("--capture needs at least one frame; --frames 0 draws none");
             return 2;
         }
-        if (auto r = (*job)->run(); !r) {
-            log::error("render: {}", r.error().message);
-            return context_->errorCount() == 0 ? 7 : 5;
-        }
+        log::info("headless: --frames 0: no frames drawn");
         return 0;
     }
     const int frames = options_.frames > 0 ? options_.frames : 120;

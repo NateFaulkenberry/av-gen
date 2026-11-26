@@ -67,7 +67,9 @@ int main(int argc, char** argv) {
         avgen::log::init(avgen::log::Level::Info); // stderr; stdout is the protocol
         // ADR-2160: the shaders are found beside the executable (<exe>/shaders), so name the file that is running,
         // not argv[0]: started through PATH, argv[0] is a bare "avgen" with no directory at all.
-        auto gpu = avgen::app::gpuRenderBackendFactory(avgen::app::GpuBackendOptions{runningExecutable(argv[0]), {}, true});
+        avgen::app::GpuBackendOptions gpuOptions;
+        gpuOptions.executable = runningExecutable(argv[0]);
+        auto gpu = avgen::app::gpuRenderBackendFactory(std::move(gpuOptions));
         const std::string sub = argv[1];
         if (sub == "mcp") {
             return avgen::api::runServeCommand(argc, argv, std::move(gpu), avgen::api::ServeProtocol::Mcp);

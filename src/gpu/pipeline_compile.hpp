@@ -38,6 +38,8 @@ struct PipelineCompileProgress {
 // Called, on the thread that installed it only, about every 30 ms while that thread waits for a pipeline. Not called
 // re-entrantly. An empty function removes it.
 void setPipelineWaitHook(std::function<void(const PipelineCompileProgress&)> hook);
+// The hook installed now (empty when none), so a caller that installs its own for a while can put it back.
+[[nodiscard]] std::function<void(const PipelineCompileProgress&)> pipelineWaitHook();
 
 // While one is alive (on the creating thread), start*Pipeline begins compiles on Dawn's workers; with none, it creates
 // synchronously, so a renderer initialised on its own (a test, a tool) behaves exactly as before. The destructor waits

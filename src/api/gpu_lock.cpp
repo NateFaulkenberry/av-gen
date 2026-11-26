@@ -224,6 +224,17 @@ GpuLockAttempt GpuLock::tryAcquire() {
     return GpuLockAttempt::Busy;
 }
 
+void GpuLock::setHolderName(std::string name) {
+    if (name.empty() || name == holderName_) {
+        return;
+    }
+    holderName_ = std::move(name);
+    if (owned_ && readLockPid(used_) == static_cast<long>(::getpid())) {
+        std::ofstream out(used_ / "holder");
+        out << holderName_ << "\n";
+    }
+}
+
 void GpuLock::release() {
     ancestor_ = false;
     if (!owned_) {
