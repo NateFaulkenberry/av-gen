@@ -269,7 +269,11 @@ public:
                 const SplineBuffers* splines = nullptr);
     // Draws every enabled system into the current render pass (additive/alpha, depth test only). ADR-2127: the systems
     // whose `overClouds` equals `overClouds` -- the scene pass draws the others, the pass after the Environments these.
-    void draw(wgpu::RenderPassEncoder& pass, const scene::Scene& scene, bool overClouds = false);
+    // Returns whether it bound its own group 0, which the caller must then rebind before any draw that reads the frame
+    // group there. That is a fact of THIS call, not of `stats().systems`: a system the live distance cull skipped
+    // (ADR-1098) is not counted by update() and is still drawn here (Neon Dreams' headless live profile drew a blended
+    // skinned mesh through the particles' group, a wgpu validation error on every frame).
+    [[nodiscard]] bool draw(wgpu::RenderPassEncoder& pass, const scene::Scene& scene, bool overClouds = false);
     // ADR-2127: true when an enabled system with a pool is drawn after the Environments.
     bool anyOverClouds(const scene::Scene& scene) const;
     // Resets all pools (kills every particle); used on seek/offline restarts. The next update()

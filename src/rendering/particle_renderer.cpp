@@ -1569,9 +1569,10 @@ bool ParticleRenderer::anyOverClouds(const scene::Scene& scene) const {
     return false;
 }
 
-void ParticleRenderer::draw(wgpu::RenderPassEncoder& pass, const scene::Scene& scene, bool overClouds) {
+bool ParticleRenderer::draw(wgpu::RenderPassEncoder& pass, const scene::Scene& scene, bool overClouds) {
+    bool bound = false;
     if (!initialised_) {
-        return;
+        return bound;
     }
     for (std::size_t i = 0; i < scene.particles.size() && i < pools_.size(); ++i) {
         const auto& sys = scene.particles[i];
@@ -1582,6 +1583,7 @@ void ParticleRenderer::draw(wgpu::RenderPassEncoder& pass, const scene::Scene& s
         ensureRenderGroup(pool);
         const bool additive = sys.blend == scene::ParticleBlend::Additive;
         pass.SetBindGroup(0, pool.renderGroup);
+        bound = true;
         // Ribbons first so an alpha-blended head sits on top of its own trail; additive systems
         // do not care about the order. The ribbon draw's instance count is 0 when trails are off.
         if (pool.historyPoints > 0) {
@@ -1601,6 +1603,7 @@ void ParticleRenderer::draw(wgpu::RenderPassEncoder& pass, const scene::Scene& s
         }
         pass.DrawIndirect(pool.counters, kBillboardIndirectOffset);
     }
+    return bound;
 }
 
 Result<ParticleCounts> ParticleRenderer::readCounts(std::size_t systemIndex) {

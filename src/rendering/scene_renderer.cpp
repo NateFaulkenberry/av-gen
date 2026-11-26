@@ -5483,8 +5483,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // ADR-1073: wire lines, over every opaque surface and the sky, before the grid and the particles.
         procedurals_->drawWire(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); });
         drawItems(grid, false);
+        bool particlesBoundGroup0 = false;
         if (toggles_.particles) {
-            particles_->draw(rp, scene);
+            particlesBoundGroup0 = particles_->draw(rp, scene);
             stats_.drawCalls += particles_->stats().systems;
         }
         // ADR-703: the camera-facing strips, beside the particles and before the blended meshes.
@@ -5509,8 +5510,10 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // upload -- when the frame has no shell (the gate); group 2 is rebound by every lit draw after.
         shells_->draw(rp, frameBindGroup_, iblBindGroup_, scene.shells, needsDepthPrepass);
         stats_.drawCalls += shells_->stats().draws;
-        if (toggles_.particles && !blended.empty() && particles_->stats().systems > 0) {
-            rp.SetBindGroup(0, frameBindGroup_); // the particle pass rebinds group 0 with its own layout
+        // The particle draw rebinds group 0 with its own layout. Asked of the draw itself, not of `stats().systems`:
+        // update() does not count a system the live distance cull skipped, and draw() still binds for it.
+        if (particlesBoundGroup0 && !blended.empty()) {
+            rp.SetBindGroup(0, frameBindGroup_);
         }
         drawItems(blended, true);
         rp.End();
@@ -5571,7 +5574,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         pass.colorAttachments = attachments.data();
         pass.depthStencilAttachment = &depth;
         wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
-        particles_->draw(rp, scene, true);
+        (void)particles_->draw(rp, scene, true); // nothing is drawn after it in this pass
         rp.End();
     }
 
