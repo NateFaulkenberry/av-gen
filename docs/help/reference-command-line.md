@@ -45,6 +45,20 @@ This page covers the flags most work needs; it is not complete. `avgen --help` p
 | `--tier <t>` | `preview`, `realtime`, `high` or `offline` |
 | `--headless` | no window; `--render` and `--queue` imply it |
 
+**A render waits its turn on the GPU** (ADR-2165). `--render`, `--queue` and the Render panel run on the engine
+host's job queue and take the machine's GPU lock -- `tools/gpu-lock.sh`'s -- for as long as each job renders. Run
+under `tools/gpu-lock.sh` the lock is already yours. Otherwise, while another process holds it, the run logs
+`waiting for the GPU lock (held by ...)` (the Render panel shows it) and waits up to `AVGEN_GPU_LOCK_TIMEOUT`.
+
+**`--capture` is the headless loop's last frame, not a render's** (ADR-2168). It is drawn by the editor's own
+renderer (the live path, no warm-up, no pre-roll), which is what lets it show a `--debug-target` view; a render
+job's frame at the same time is a different image (measured: see ADR-2168). For the deliverable's pixels at a time,
+render one frame: `--render out/ --range t:t+1/fps`, or `render.capture` through `avgen call`.
+
+**Runs that draw no frames create no GPU device** (ADR-2166): `--render`, `--queue` (until their job starts),
+`--pathtrace`, the audits (`--audit-routes`, `--propose-reactivity`, `--sonic-trace`, `--validate-space`,
+`--trace-jumps`), and `--headless ... --frames 0` (an `--ai-script` or `--save-project` run that renders nothing).
+
 ## Audio and control
 
 | Flag | Does |
@@ -81,7 +95,7 @@ This page covers the flags most work needs; it is not complete. `avgen --help` p
 | `--canvas-scale <f>` | render at this fraction of the canvas's pixels, 0.25 to 1 |
 | `--stress <seed>` | apply random slider-like actions every frame |
 | `--ui-script <arms>` | drive the editor repeatably: `hover`, `sliders`, `panels`, `select`, `scrub`, `camera`, `tabs`, `viewpoint` (take the editor viewpoint, drag, play and seek; fails if anything but the drag moves the frame), or `idle` or `all` |
-| `--frames <n>` | exit after n frames |
+| `--frames <n>` | exit after n frames. Headless, `--frames 0` draws none (ADR-2166; before, 0 meant the default 120) |
 | `--log <level>` | `trace`, `debug`, `info`, `warn`, `error` |
 
 ## Session
@@ -95,6 +109,17 @@ the audits) opens neither unless `--osc-port`/`--osc-bind` or `--midi` asks.
 `--save-project <f>` writes the project on exit; `--export-bundle <d>` writes a bundle. With
 `--drop-pinned-overrides` the save leaves out values that only repeat the scene's (what a save before
 ADR-2132 wrote), so scene-file edits reach them again.
+
+## Shows and the GPU
+
+While Studio is running a show (ADR-2167) -- the transport playing, live audio input, an output or projection
+window open, or a Syphon/NDI share -- it holds the machine's GPU lock (holder `avgen-studio-show`) and starts no GPU
+job of its own: a Render press or a render-queue entry waits, phase `held: show active (...)`; a render already
+running pauses between frames and resumes when the show stops; the assistant's `render.*` and `performance.*`
+calls answer `BUSY` with `details {field: "show", reasons}`. Agents' `tools/gpu-lock.sh` runs and `avgen serve`
+renders wait for the show to end. Studio takes the lock with one non-blocking attempt; if another process already
+holds it the show runs anyway, logs `show: the machine GPU lock ... is held by '<holder>'`, and takes the lock
+when it frees. `session.info` reports `show {active, reasons, remainingSeconds, gpuLock}`.
 
 ## Version and contracts
 
@@ -148,8 +173,8 @@ not be created.
 | Variable | Does |
 |---|---|
 | `AVGEN_SHADER_DIR` | prepended to the shader search path |
-| `AVGEN_AGENT` | `serve` and `call`: the name a render job writes into the machine GPU lock's `holder` file (else `avgen-<pid>`), as `tools/gpu-lock.sh` does |
-| `AVGEN_GPU_LOCK_TIMEOUT` | `serve` and `call`: seconds a render job waits for the machine GPU lock before it fails `BUSY` (default 3600, as `tools/gpu-lock.sh`) |
+| `AVGEN_AGENT` | `serve`, `call`, `--render`, `--queue` and Studio's Render panel: the name a render job writes into the machine GPU lock's `holder` file (else `avgen-<pid>`), as `tools/gpu-lock.sh` does |
+| `AVGEN_GPU_LOCK_TIMEOUT` | `serve`, `call`, `--render`, `--queue` and Studio's Render panel: seconds a render job waits for the machine GPU lock before it fails `BUSY` (default 3600, as `tools/gpu-lock.sh`) |
 | `AVGEN_EXAMPLES_DIR` | prepended to the examples search path — **and to the asset browser's scan roots** |
 | `AVGEN_HELP_DIR` | where this Help system looks for its content first |
 | `AVGEN_TIMELINE_RAW` | dump raw GPU timestamps to standard error |

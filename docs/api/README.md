@@ -241,6 +241,13 @@ When a process above `avgen` already holds the lock (a wrapper that took it and 
 sees its own ancestor's pid in the lock and runs without waiting (`lock.heldByAncestor: true`). The protocol, for
 a client that wants to take the lock itself: [api/protocol.md](api/protocol.md), "The machine's GPU lock".
 
+**A live show holds the lock.** While AV Gen Studio is performing -- the transport playing, live audio input, an
+output or projection window open, or a Syphon/NDI share -- it holds this lock (holder `avgen-studio-show`), so your
+render job waits in `preparing` with the phase `waiting for the GPU lock (held by 'avgen-studio-show' ...)` until the
+show stops (or `AVGEN_GPU_LOCK_TIMEOUT` passes). A session on a host that is itself running a show refuses
+`render.*` with `BUSY` and `details {field: "show", reasons: [...]}`, and holds jobs queued before the show;
+`session.info.show` says whether a show is running, why, and who holds the lock.
+
 Other variables `avgen` reads: `AVGEN_SHADER_DIR` (a shader folder searched before `bin/shaders`) and
 `AVGEN_PIPELINE_CACHE` (the compiled-pipeline cache folder, default `~/Library/Caches/avgen/pipeline-cache`;
 `off` disables it).
