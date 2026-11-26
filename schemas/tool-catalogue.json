@@ -4507,7 +4507,7 @@
             "type": "integer"
           },
           "show": {
-            "description": "ADR-2167: {active, reasons[] (transport | liveInput | output | share), remainingSeconds|null, gpuLock: null | {held, contended, holder: null | {pid, name}, path, attempts, lastAttemptMs, maxAttemptMs}}"
+            "description": "ADR-2167/2176: {active, reasons[] (output | share | performance), remainingSeconds|null, gpuLock: null | {held, contended, holder: null | {pid, name}, path, attempts, lastAttemptMs, maxAttemptMs}}"
           },
           "showRunning": {
             "description": "A live host is running a show now",

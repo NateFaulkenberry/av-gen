@@ -6,12 +6,11 @@ namespace avgen::api {
 
 const char* showReasonName(ShowReason reason) {
     switch (reason) {
-    case ShowReason::Transport: return "transport";
-    case ShowReason::LiveInput: return "liveInput";
     case ShowReason::Output: return "output";
     case ShowReason::Share: return "share";
+    case ShowReason::Performance: return "performance";
     }
-    return "transport";
+    return "output";
 }
 
 std::string ShowState::reasonsText() const {
@@ -33,12 +32,7 @@ nlohmann::json ShowState::reasonsJson() const {
 
 ShowState showStateFor(const ShowFacts& f) {
     ShowState s;
-    if (f.transportPlaying) {
-        s.reasons.push_back(ShowReason::Transport);
-    }
-    if (f.liveInput) {
-        s.reasons.push_back(ShowReason::LiveInput);
-    }
+    // ADR-2176: the transport playing and live input are not reasons; an audience output is.
     if (f.outputsOpen > 0) {
         s.reasons.push_back(ShowReason::Output);
     }
@@ -48,7 +42,7 @@ ShowState showStateFor(const ShowFacts& f) {
     s.active = !s.reasons.empty();
     // Only a file that plays to its end ends the show at a known time: a loop never ends, live input has no end, and
     // under live input the position is frames captured, not a place in a file.
-    if (f.transportPlaying && f.hasAudio && !f.looping && !f.liveInput && f.durationSeconds > 0.0) {
+    if (s.active && f.transportPlaying && f.hasAudio && !f.looping && !f.liveInput && f.durationSeconds > 0.0) {
         s.remainingSeconds = std::max(f.durationSeconds - f.positionSeconds, 0.0);
     }
     return s;

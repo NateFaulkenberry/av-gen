@@ -709,29 +709,38 @@ void stepUntilFinished(Rig& rig, const api::JobTable& table, const std::string& 
 
 } // namespace
 
-TEST_CASE("show state: each fact is a reason; a known end only for a file that plays to its end", "[api][show]") {
+TEST_CASE("show state (ADR-2176): an audience output, a share or performance mode is a show; the transport playing and "
+          "live input are not",
+          "[api][show][adr2176]") {
     CHECK_FALSE(api::showStateFor({}).active);
     CHECK(api::showStateFor({}).reasons.empty());
+    // The owner plays the transport all the time while editing, and live input stays plugged in: neither is a show.
+    CHECK_FALSE(api::showStateFor({.transportPlaying = true}).active);
+    CHECK_FALSE(api::showStateFor({.liveInput = true}).active);
+    CHECK_FALSE(api::showStateFor({.transportPlaying = true, .liveInput = true, .hasAudio = true,
+                                   .durationSeconds = 100.0})
+                    .active);
+    CHECK(api::showStateFor({.transportPlaying = true, .liveInput = true}).reasons.empty());
     const auto only = [](api::ShowFacts f, api::ShowReason r) {
         const api::ShowState s = api::showStateFor(f);
         CHECK(s.active);
         REQUIRE(s.reasons.size() == 1);
         CHECK(s.reasons[0] == r);
     };
-    only({.transportPlaying = true}, api::ShowReason::Transport);
-    only({.liveInput = true}, api::ShowReason::LiveInput);
     only({.outputsOpen = 2}, api::ShowReason::Output);
     only({.shareOpen = true}, api::ShowReason::Share);
-    // Paused with a projector open is a show (the parked clock still moves the world); so is live input, which never
-    // sets the transport playing.
-    const api::ShowState all = api::showStateFor(
-        {.transportPlaying = true, .liveInput = true, .outputsOpen = 1, .shareOpen = true});
-    CHECK(all.reasonsText() == "transport, liveInput, output, share");
-    CHECK(all.reasonsJson() == json::array({"transport", "liveInput", "output", "share"}));
-    // The end is known only for a file playing to its end.
-    const api::ShowFacts file{.transportPlaying = true, .hasAudio = true, .durationSeconds = 100.0, .positionSeconds = 40.0};
+    // Paused with a projector open is a show (the parked clock still moves the world).
+    const api::ShowState both = api::showStateFor({.outputsOpen = 1, .shareOpen = true, .transportPlaying = true});
+    CHECK(both.reasonsText() == "output, share");
+    CHECK(both.reasonsJson() == json::array({"output", "share"}));
+    // The end is known only for a show whose transport plays a file to its end.
+    const api::ShowFacts file{.outputsOpen = 1, .transportPlaying = true, .hasAudio = true, .durationSeconds = 100.0,
+                              .positionSeconds = 40.0};
     REQUIRE(api::showStateFor(file).remainingSeconds.has_value());
     CHECK(*api::showStateFor(file).remainingSeconds == 60.0);
+    api::ShowFacts noShow = file;
+    noShow.outputsOpen = 0;
+    CHECK_FALSE(api::showStateFor(noShow).remainingSeconds.has_value());
     api::ShowFacts looping = file;
     looping.looping = true;
     CHECK_FALSE(api::showStateFor(looping).remainingSeconds.has_value());
@@ -740,9 +749,43 @@ TEST_CASE("show state: each fact is a reason; a known end only for a file that p
     CHECK_FALSE(api::showStateFor(live).remainingSeconds.has_value());
     api::ShowFacts paused = file;
     paused.transportPlaying = false;
-    paused.outputsOpen = 1;
     CHECK(api::showStateFor(paused).active);
     CHECK_FALSE(api::showStateFor(paused).remainingSeconds.has_value());
+}
+
+TEST_CASE("show state (ADR-2176): performance mode is a show whatever is open, reported as `performance`",
+          "[api][show][adr2176]") {
+    app::Engine engine(app::EngineMode::Offline);
+    api::LocalHost host(engine);
+    host.queue().bindToCurrentThread();
+    // Studio's provider with the transport playing and live input: not a show.
+    host.setShowState([] { return api::showStateFor({.transportPlaying = true, .liveInput = true}); });
+    CHECK_FALSE(host.performanceMode());
+    CHECK_FALSE(host.showRunning());
+    host.setPerformanceMode(true);
+    CHECK(host.showRunning());
+    CHECK(host.showState().reasonsJson() == json::array({"performance"}));
+    // Beside an output, both are reported.
+    host.setShowState([] { return api::showStateFor({.outputsOpen = 1}); });
+    CHECK(host.showState().reasonsJson() == json::array({"output", "performance"}));
+    host.setPerformanceMode(false);
+    CHECK(host.showState().reasonsJson() == json::array({"output"}));
+    // With no provider at all (an API host) the flag alone still makes the show.
+    api::LocalHost bare(engine);
+    bare.setPerformanceMode(true);
+    CHECK(bare.showRunning());
+    // session.info reports it.
+    host.setShowState({});
+    host.setPerformanceMode(true);
+    api::SessionOptions so;
+    so.client = api::ClientInfo{api::ClientKind::Test, "performance", "1"};
+    auto session = api::Session::create(std::move(so), host);
+    REQUIRE(session.has_value());
+    const api::CallResult info = (*session)->call("session.info", json::object());
+    REQUIRE(info.success);
+    CHECK(info.result.at("show").at("active") == true);
+    CHECK(info.result.at("show").at("reasons") == json::array({"performance"}));
+    (*session)->close();
 }
 
 TEST_CASE("show: an API render is refused Busy with the reasons, and session.info reports the show",
@@ -751,7 +794,7 @@ TEST_CASE("show: an API render is refused Busy with the reasons, and session.inf
     ShowSwitch show;
     show.install(*rig.host);
     show.on = true;
-    show.facts = api::ShowFacts{.transportPlaying = true, .outputsOpen = 1};
+    show.facts = api::ShowFacts{.outputsOpen = 1, .transportPlaying = true};
     for (const auto& [tool, args] :
          {std::pair{"render.capture", json{{"frame", 0}, {"path", "c.png"}}},
           std::pair{"render.start", json{{"path", "renders/s"}, {"range", "0:1"}, {"output", "png"}}}}) {
@@ -760,13 +803,13 @@ TEST_CASE("show: an API render is refused Busy with the reasons, and session.inf
         REQUIRE_FALSE(r.success);
         CHECK(r.error->code == ai::ToolErrorCode::Busy);
         CHECK(r.error->details.at("field") == "show");
-        CHECK(r.error->details.at("reasons") == json::array({"transport", "output"}));
+        CHECK(r.error->details.at("reasons") == json::array({"output"})); // the transport playing is not a reason (ADR-2176)
     }
     CHECK(rig.stats.created == 0); // refused before any snapshot load or GPU work
     CHECK(rig.call("job.list").result.at("jobs").empty());
     const json info = rig.call("session.info").result;
     CHECK(info.at("show").at("active") == true);
-    CHECK(info.at("show").at("reasons") == json::array({"transport", "output"}));
+    CHECK(info.at("show").at("reasons") == json::array({"output"}));
     CHECK(info.at("show").at("gpuLock").is_object());
     // When the show stops the same call succeeds.
     show.on = false;

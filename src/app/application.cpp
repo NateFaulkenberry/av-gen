@@ -1958,8 +1958,9 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             initControlPlane(std::move(session));
         }
         // Owner decision 3: while a show runs, a client other than the editor's own assistant is refused
-        // structural edits, jobs, project calls and seeks. ADR-2167: the show is the transport playing, live
-        // input, an output or projection window, or a Syphon/NDI share (api/show_state.hpp), and while it runs no
+        // structural edits, jobs, project calls and seeks. ADR-2176: the show is an output or projection window,
+        // a Syphon/NDI share, or performance mode (api/show_state.hpp) -- not the transport playing, not live
+        // input -- and while it runs no
         // GPU job starts -- the assistant's included -- and the host holds the machine GPU lock (updateShow, in
         // the frame loop).
         host_->local().setShowState([this] { return currentShowState(); });

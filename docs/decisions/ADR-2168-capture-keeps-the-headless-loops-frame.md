@@ -1,7 +1,8 @@
-# ADR-2168: `--capture` keeps the headless loop's frame (byte-identical after S10); re-pointing it at a one-frame render job is measured and left to the owner
+# ADR-2168: `--capture` keeps the headless loop's frame (byte-identical after S10); it is not re-pointed at a one-frame render job
 
-- Status: Proposed (2026-11-26), eng/engine-api-s10 (Engine API stage S10; 04-poc-plan.md section 5 "the probe",
-  03-boundaries.md section 2.4). The keep half is in force; the re-point is an open decision.
+- Status: Accepted (2026-11-26; proposed on eng/engine-api-s10, accepted by the coordinator on eng/show-definition:
+  `--capture` is not re-pointed), Engine API stage S10; 04-poc-plan.md section 5 "the probe", 03-boundaries.md
+  section 2.4
 - Code: none beyond ADR-2165 (the headless loop's renderer is built from the host's device)
 - Measured: `~/Desktop/av-gen-review/113-engine-architecture/04-implementation/s10/measurements/` (`capture-*.png`, `play-A/`, `seek-A/`), 2026-11-26
 
@@ -32,7 +33,7 @@ tier raising anisotropy to 16x and the sky cubes to 1024 px, which the capture's
 pre-rolls. The difference is spread over the whole frame (bounding box = the frame), not in one object, which fits
 a tier/quality difference rather than a state difference; the played-vs-seeked control differs by at most 1.
 
-## The decision left open
+## The decision (accepted: keep)
 
 - **Keep (what S10 ships).** `--capture` stays the live frame: byte-identical to before, cheap (no second renderer),
   and the only command-line way to photograph a `--debug-target`, a `--quality-arm` or a `--disable` arm, which a
@@ -46,4 +47,4 @@ The command-line reference now says what `--capture` is and how to get the deliv
 
 ## Revisit triggers
 
-- The owner's choice between the two.
+- A need for `--capture` to produce the deliverable's pixels (then re-point it, or add a flag that does).

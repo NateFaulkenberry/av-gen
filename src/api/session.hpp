@@ -193,11 +193,10 @@ public:
     [[nodiscard]] app::Engine& engine() override { return *engine_; }
     [[nodiscard]] ai::MainThreadQueue& queue() override { return queue_; }
     void installHooks(ai::ToolContext& ctx) override;
-    [[nodiscard]] bool showRunning() override { return show_ ? show_().active : false; }
-    [[nodiscard]] std::optional<double> showRemainingSeconds() override {
-        return show_ ? show_().remainingSeconds : std::nullopt;
-    }
-    [[nodiscard]] ShowState showState() override { return show_ ? show_() : ShowState{}; }
+    [[nodiscard]] bool showRunning() override { return showState().active; }
+    [[nodiscard]] std::optional<double> showRemainingSeconds() override { return showState().remainingSeconds; }
+    // The provider's show, plus `performance` while performance mode is on (ADR-2176).
+    [[nodiscard]] ShowState showState() override;
     // Empty (the default): only the engine's current setting -- a headless run's Offline engine is
     // ticked by its fixed-step loop and honours nothing else. Studio offers StoppedAmbient and
     // StoppedFrozen; a test may offer Stepped.
@@ -222,6 +221,10 @@ public:
     }
     // ADR-2167: the show with its reasons (Studio's: transport, live input, outputs, share).
     void setShowState(std::function<ShowState()> show) { show_ = std::move(show); }
+    // ADR-2176: explicit performance mode, the operator's statement that this is a show whatever is open. Host
+    // thread. The live workspace will set it; no tool sets it yet (ADR-2176 proposes the contract of one).
+    void setPerformanceMode(bool on) { performanceMode_ = on; }
+    [[nodiscard]] bool performanceMode() const { return performanceMode_; }
 
 private:
     app::Engine* engine_;
@@ -232,6 +235,7 @@ private:
     ai::EvaluationHook evaluation_;
     ai::ProfileHook profile_;
     std::function<ShowState()> show_;
+    bool performanceMode_ = false;
     std::vector<app::TimePolicy> offered_;
 };
 

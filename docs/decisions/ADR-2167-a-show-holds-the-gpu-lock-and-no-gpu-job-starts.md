@@ -1,6 +1,7 @@
 # ADR-2167: the show is a host state with reasons; while it runs Studio holds the machine GPU lock (never waiting for it) and no GPU job starts
 
-- Status: Accepted (2026-11-26), eng/engine-api-s10 (Engine API stage S10, the addition the orchestrator decided;
+- Status: Accepted (2026-11-26), eng/engine-api-s10. **Its definition of the show (decision 1: the reasons and
+  "transport alone counts") is superseded by ADR-2176**; the rest stands. (Engine API stage S10, the addition the orchestrator decided;
   05-ui-readiness/05-live-safety.md G1 and G4, sections 2.3, 2.7, 4.1, 4.2)
 - Code: `api/show_state.{hpp,cpp}` (`ShowReason`, `ShowState`, `ShowFacts`, `showStateFor`, `ShowLockState`),
   `api/session.{hpp,cpp}` (`Host::showState`, `Host::showLock`, `LocalHost::setShowState`; `session.info.show`),

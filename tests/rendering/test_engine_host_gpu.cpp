@@ -251,7 +251,10 @@ TEST_CASE("engine host: while a show runs no render starts or steps, the show ho
     GpuRig rig("show");
     bool on = false;
     rig.host->local().setShowState([&on] {
-        return on ? api::showStateFor(api::ShowFacts{.transportPlaying = true, .outputsOpen = 1}) : api::ShowState{};
+        // ADR-2176: off is the owner editing with the transport playing and live input open -- not a show, so the
+        // reference render below runs; on is an output window open.
+        return on ? api::showStateFor(api::ShowFacts{.outputsOpen = 1, .transportPlaying = true})
+                  : api::showStateFor(api::ShowFacts{.transportPlaying = true, .liveInput = true});
     });
     // Long enough that one 50 ms slice cannot finish it (a 160x90 frame takes about a millisecond).
     const json args{{"range", "0:20"}, {"fps", 24}, {"width", 160}, {"height", 90}, {"output", "png"}};

@@ -1,22 +1,21 @@
 #pragma once
 
 // "Is a show running?" as a structured host state, with reasons (ADR-2167, Engine API stage S10; 05-live-safety.md
-// G1).
+// G1; the definition is ADR-2176's).
 //
 // Before this the question was one boolean, `Engine::isPlaying()`, and it was wrong in both directions for a live
 // performance: a live-input show never sets the transport playing, and a paused frame on a projector or a Syphon/NDI
 // feed is still a picture in front of an audience (the parked clock keeps the world moving, ADR-2154). The host now
-// answers with the facts that hold, from a closed set:
+// answers with the facts that hold, from a closed set (ADR-2176):
 //
-//   transport   the transport is playing a file
-//   liveInput   an audio input drives the visuals (a capture device, live Sonic input)
-//   output      an output or projection window is open
-//   share       the frame is published over Syphon or NDI
+//   output       an output or projection window is open
+//   share        the frame is published over Syphon or NDI
+//   performance  the host is in performance mode (`LocalHost::setPerformanceMode`; the live workspace sets it)
 //
 // `active` is true when any of them holds. One meaning drives everything a show changes: the live policy (Session),
 // the machine GPU lock Studio holds while it lasts, and the GPU jobs that may not start meanwhile (EngineHost).
-// Transport alone counts: an owner who mirrors the editor's display onto a projector has no output window open,
-// and the safe reading of "the transport plays" is that somebody may be watching.
+// NOT a show on their own (ADR-2176, owner decision): the transport playing (the owner plays it all the time while
+// editing), live audio input, and live control input (MIDI/OSC controllers stay plugged in).
 
 #include <nlohmann/json.hpp>
 
@@ -27,7 +26,7 @@
 
 namespace avgen::api {
 
-enum class ShowReason : std::uint8_t { Transport, LiveInput, Output, Share };
+enum class ShowReason : std::uint8_t { Output, Share, Performance };
 [[nodiscard]] const char* showReasonName(ShowReason reason);
 
 struct ShowState {
@@ -41,12 +40,14 @@ struct ShowState {
     [[nodiscard]] nlohmann::json reasonsJson() const;
 };
 
-// The facts Studio reads each frame; all of them already exist in Application and Engine.
+// The facts Studio reads each frame; all of them already exist in Application and Engine. Only `outputsOpen` and
+// `shareOpen` are reasons; the transport and live input only say when a running show ends (`remainingSeconds`).
+// Performance mode is the host's own flag (LocalHost), not a fact Studio reads.
 struct ShowFacts {
-    bool transportPlaying = false;
-    bool liveInput = false;   // Engine::hasLiveInput() or live Sonic input running
     std::size_t outputsOpen = 0; // OutputManager::openCount(): output windows and the projection
     bool shareOpen = false;   // TextureShare::isOpen()
+    bool transportPlaying = false;
+    bool liveInput = false;   // Engine::hasLiveInput() or live Sonic input running
     bool hasAudio = false;
     bool looping = false;
     double durationSeconds = 0.0;

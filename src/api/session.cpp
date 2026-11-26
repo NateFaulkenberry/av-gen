@@ -172,6 +172,15 @@ static json showInfoJson(Host& host) {
     return out;
 }
 
+ShowState LocalHost::showState() {
+    ShowState s = show_ ? show_() : ShowState{};
+    if (performanceMode_) {
+        s.reasons.push_back(ShowReason::Performance);
+        s.active = true;
+    }
+    return s;
+}
+
 ShowState Host::showState() {
     ShowState s;
     s.active = showRunning();

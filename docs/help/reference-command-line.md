@@ -114,14 +114,16 @@ ADR-2132 wrote), so scene-file edits reach them again.
 
 ## Shows and the GPU
 
-While Studio is running a show (ADR-2167) -- the transport playing, live audio input, an output or projection
-window open, or a Syphon/NDI share -- it holds the machine's GPU lock (holder `avgen-studio-show`) and starts no GPU
+While Studio is running a show (ADR-2176) -- an output or projection window open, a Syphon/NDI share, or performance
+mode on (set by the live workspace; reasons `output`, `share`, `performance`) -- it holds the machine's GPU lock (holder `avgen-studio-show`) and starts no GPU
 job of its own: a Render press or a render-queue entry waits, phase `held: show active (...)`; a render already
 running pauses between frames and resumes when the show stops; the assistant's `render.*` and `performance.*`
 calls answer `BUSY` with `details {field: "show", reasons}`. Agents' `tools/gpu-lock.sh` runs and `avgen serve`
 renders wait for the show to end. Studio takes the lock with one non-blocking attempt; if another process already
 holds it the show runs anyway, logs `show: the machine GPU lock ... is held by '<holder>'`, and takes the lock
 when it frees. `session.info` reports `show {active, reasons, remainingSeconds, gpuLock}`.
+Playing the transport while editing, live audio input, and MIDI/OSC controllers being connected are not a show on
+their own: renders and agents' GPU work are not held for them.
 
 ## Version and contracts
 
