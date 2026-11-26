@@ -253,7 +253,8 @@ TEST_CASE("engine host: while a show runs no render starts or steps, the show ho
     rig.host->local().setShowState([&on] {
         return on ? api::showStateFor(api::ShowFacts{.transportPlaying = true, .outputsOpen = 1}) : api::ShowState{};
     });
-    const json args{{"range", "0:0.5"}, {"fps", 24}, {"width", 160}, {"height", 90}, {"output", "png"}};
+    // Long enough that one 50 ms slice cannot finish it (a 160x90 frame takes about a millisecond).
+    const json args{{"range", "0:20"}, {"fps", 24}, {"width", 160}, {"height", 90}, {"output", "png"}};
     // The reference, with no show.
     json ref = args;
     ref["path"] = "ref";
@@ -283,6 +284,8 @@ TEST_CASE("engine host: while a show runs no render starts or steps, the show ho
         before = rig.session->call("job.status", json{{"id", *started.job}}).result.value("framesDone", std::uint64_t{0});
     }
     REQUIRE(before >= 3);
+    REQUIRE(rig.session->call("job.status", json{{"id", *started.job}}).result.at("state") == "running");
+    REQUIRE(before < 480);
     on = true;
     rig.host->updateShow();
     for (int i = 0; i < 30; ++i) {
