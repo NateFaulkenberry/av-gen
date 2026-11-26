@@ -36,8 +36,9 @@ never reaches into the realtime post chain. Colour management is downstream of t
 | 4 | OIDN denoising | **done** (opt-in) |
 | 5 | Scene integration: CPU skinning, procedural scatter | **done** |
 | 6 | AOVs: albedo, normal, emission, depth, id, motion | **done** |
-| 7 | Glowmere | not started |
+| 7 | Glowmere | traced as geometry (`test_pathtrace_glowmere.cpp`) |
 | 8 | Embree instancing | **partly** |
+| H1 | Hybrid RT restoration, phase 1: environment map, world-space procedural records, emitter lookup, coverage table, no-GPU CLI, sorted AOV channels | **done** (ADR-2240..2245) |
 
 ## From the Render panel
 
@@ -75,7 +76,8 @@ samples per pixel, path depth, seed, threads, AOVs, denoise, and the ADR-352 alb
 
 **No GPU is involved.** The tracer is CPU-only and `EngineMode::Offline` evaluates a scene without a
 device, so a trace runs while the GPU is busy with something else -- which, on a machine shared by
-several agents, it usually is.
+several agents, it usually is. Since ADR-2244 that is true of the command too: `--pathtrace` runs before the
+Application exists (`app/pathtrace_cli.cpp`), creates no device and loads the project once.
 
 `pathtrace::TraceJob` is the entry point behind that flag, with the states spec section 36 names:
 `Queued -> BuildingScene -> BuildingAcceleration -> Rendering -> Denoising -> Writing ->
@@ -145,7 +147,8 @@ pixels rather than after somebody notices they are wrong.
 | Water surface | **degraded** | the mesh is a real CPU sheet, but ripples, swell, foam and refraction live in `shaders/water.wgsl` |
 | Point / spot lights | **degraded** | treated as delta positions, so their shadows are hard; the realtime path softens them |
 | Volumetrics | **unsupported** | a stated non-goal for now (spec section 72) |
-| HDR environment map | **degraded** | the analytic sky (`scene::skyRadiance`, ADR-036) is used; image-based lighting needs section 46 importance sampling |
+| HDR environment map | **supported** | importance-sampled and MIS-weighted, at `environmentIntensity` and `environmentRotation`; the camera sees the raster's background rule (ADR-2240) |
+| Clouds, material programs, effect lights, Stars, pulses, ... | **unsupported** | every `Scene` member and `Material` field has a row in `pathtrace/coverage.cpp`, checked against the headers by a test; what the frame contains is reported (ADR-2243) |
 | DWAA / DWAB EXR compression | unavailable | tinyexr declares them "not yet supported"; ZIP, PIZ and PXR24 are available |
 
 Three realtime per-frame decisions are deliberately **overridden rather than inherited**, because
@@ -178,6 +181,9 @@ the whole range, so each frame rebuilds only what its snapshot changed.
   level was rebuilt, how many transforms moved, and the compare/build split.
 
 ## Phase 8 in particular (partly)
+
+**The records are world space** (ADR-2241): generation composes `distributionTransform` onto every placement and
+the raster draws them under an identity model, so the tracer applies only the record's own transform.
 
 **Embree instancing for procedural scatter.** Each `ProceduralGeometry` becomes one child `RTCScene`
 holding its triangles once, plus one `RTC_GEOMETRY_TYPE_INSTANCE` per copy. Measured on Glowmere
@@ -323,7 +329,7 @@ estimator stays unbiased whichever lobe it picked -- and a test checks the retur
 `evaluateBsdf(...) * cos / bsdfPdf(...)` recomputed independently, because a disagreement there is a
 bias no image inspection would reveal.
 
-Textures (`texture.hpp`): all five glTF slots, wrap modes, bilinear or nearest.
+Textures (`texture.hpp`): base colour, metallic-roughness, emissive and occlusion slots (occlusion is read and not used: a path tracer computes its own), wrap modes, bilinear or nearest. The normal slot is not used (no normal mapping; reported, ADR-2243).
 
 **The colour-space rule (section 18) is taken from the loader, not guessed.**
 `assets::gltf_loader` already tags base colour and emissive as sRGB and metallic-roughness, normal

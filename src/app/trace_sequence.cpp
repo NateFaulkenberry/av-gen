@@ -8,6 +8,7 @@
 #include "pathtrace/denoise.hpp"
 #include "pathtrace/path_tracer.hpp"
 #include "pathtrace/snapshot.hpp"
+#include "scene/detail_limits.hpp"
 #include "scene/tonemap.hpp"
 
 #include <fmt/format.h>
@@ -323,6 +324,9 @@ Result<void> TraceSequence::start() {
     if (auto ok = impl_->engine->loadProject(impl_->request.project); !ok) {
         return fail("trace sequence: {}", ok.error().message);
     }
+    // ADR-2244: an offline render's detail limits, as `RenderJob` sets them (ADR-186/191). Without them the rigs pose
+    // at the live distance rates and a rig frozen by `cullDistance` reaches the snapshot unposed and is refused.
+    impl_->engine->setDetailLimits(scene::DetailLimits::offlineDefault());
 
     const FrameRange range = impl_->request.trace.frameRange();
 

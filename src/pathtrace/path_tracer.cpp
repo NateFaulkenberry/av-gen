@@ -33,11 +33,6 @@ struct Counters {
     std::uint64_t bsdfHitsOnLights = 0;
 };
 
-[[nodiscard]] glm::vec3 environmentRadiance(const Snapshot& snap, const glm::vec3& dir) {
-    if (!snap.skyEnabled) return snap.backgroundColor;
-    return scene::skyRadiance(snap.sky, dir);
-}
-
 // glTF: every texture MULTIPLIES its factor. Base colour and emissive arrive already linear from
 // `sampleSlot` (it decodes iff the format is sRGB); metallic-roughness and occlusion are linear
 // data and are never decoded. The channel assignment -- roughness in G, metallic in B -- is the
@@ -112,8 +107,9 @@ struct Counters {
     if (settings.strategy == TraceSettings::Strategy::BsdfOnly) return sum;
 
     // --- analytic lights: weight 1, always ---
-    for (const auto& light : snap.lights) {
-        const LightSample ls = sampleLight(light, hit.position, sampler.next2D());
+    for (std::size_t li = 0; li < snap.lights.size(); ++li) {
+        const scene::PunctualLight& light = snap.lights[li];
+        const LightSample ls = sampleLight(light, snap.lightEmission[li], hit.position, sampler.next2D());
         if (!ls.valid) continue;
         const float nDotL = glm::dot(hit.shadingNormal, ls.direction);
         if (nDotL <= 0.0f) continue;
@@ -145,6 +141,27 @@ struct Counters {
                                             : powerHeuristic(es.pdf, bPdf);
                         sum += f * es.radiance * nDotL * (w / es.pdf);
                     }
+                }
+            }
+        }
+    }
+    // --- the environment map: MIS against BSDF sampling (ADR-2240) ---
+    //
+    // Only a map is sampled. The analytic sky and the flat background keep the Phase 1 treatment (found by BSDF rays
+    // alone), so a scene without a map draws exactly the random numbers it always drew.
+    if (snap.environment.sampled()) {
+        const EnvironmentSample es = snap.environment.sample(sampler.next2D());
+        if (es.valid) {
+            const float nDotL = glm::dot(hit.shadingNormal, es.direction);
+            if (nDotL > 0.0f) {
+                const glm::vec3 f = evaluateBsdf(m, hit.shadingNormal, view, es.direction);
+                if ((f.x > 0.0f || f.y > 0.0f || f.z > 0.0f) &&
+                    visible(embree, hit, es.direction, std::numeric_limits<float>::infinity(), counters)) {
+                    const float bPdf = bsdfPdf(m, hit.shadingNormal, view, es.direction);
+                    const float w = settings.strategy == TraceSettings::Strategy::LightOnly
+                                        ? 1.0f
+                                        : powerHeuristic(es.pdf, bPdf);
+                    sum += f * es.radiance * nDotL * (w / es.pdf);
                 }
             }
         }
@@ -237,17 +254,29 @@ struct PathResult {
             embree.intersect(snap, ray.origin, ray.direction, 0.0f, std::numeric_limits<float>::infinity());
 
         if (!hit.hit) {
-            const glm::vec3 env = environmentRadiance(snap, ray.direction);
-            result += throughput * env;
             if (!firstHitRecorded) {
+                // The camera sees the background the raster draws (scene::skyBackgroundFor), not the lighting.
+                const glm::vec3 bg = snap.environment.backgroundRadiance(ray.direction);
+                result += throughput * bg;
                 // The background IS the albedo the denoiser should see for a pixel that hit nothing:
                 // giving it black would tell the filter there is an edge where there is only sky.
-                path.albedo = env;
+                path.albedo = bg;
                 path.normal = -ray.direction;
                 path.depth = -1.0f;      // a miss has no depth; 0 would read as "at the camera"
                 path.objectId = -1.0f;
                 firstHitRecorded = true;
+                break;
             }
+            // A scattered ray that escaped sees the lighting environment. When the map is light-sampled the escape is
+            // MIS-weighted against that sampler, as a BSDF ray that lands on emissive geometry is.
+            float w = 1.0f;
+            if (snap.environment.sampled() && !takeFullEmission &&
+                settings.strategy != TraceSettings::Strategy::BsdfOnly) {
+                w = settings.strategy == TraceSettings::Strategy::LightOnly
+                        ? 0.0f
+                        : powerHeuristic(prevBsdfPdf, snap.environment.pdf(ray.direction));
+            }
+            result += throughput * snap.environment.radiance(ray.direction) * w;
             break;
         }
 
@@ -301,7 +330,8 @@ struct PathResult {
         if (m.emission.x > 0.0f || m.emission.y > 0.0f || m.emission.z > 0.0f) {
             float w = 1.0f;
             if (!takeFullEmission && settings.strategy != TraceSettings::Strategy::BsdfOnly) {
-                const float lPdf = emissivePdf(snap, hit.meshIndex, hit.primIndex, ray.direction, hit.t);
+                const float lPdf =
+                    emissivePdf(snap, hit.meshIndex, hit.primIndex, hit.instanced, ray.direction, hit.t);
                 if (lPdf > 0.0f) {
                     ++counters.bsdfHitsOnLights;
                     // LightOnly must drop this entirely: the light sampler already counted this

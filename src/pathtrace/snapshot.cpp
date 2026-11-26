@@ -1,6 +1,7 @@
 #include "pathtrace/snapshot.hpp"
 
 #include "core/log.hpp"
+#include "pathtrace/lights.hpp"
 #include "scene/procedural.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -128,20 +129,30 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
         snap.hasMotion = true;
         snap.previousCamera = previous->camera;
     }
-    snap.backgroundColor = scene.environment.backgroundColor;
+    snap.textures = scene.textures;
 
-    // Environment. The sky is resolved against the scene's own lights by the project's own
-    // resolver, so the sun the tracer sees is the sun the rasteriser sees.
-    snap.skyEnabled = scene.environment.sky.enabled;
-    snap.sky = scene::resolveSky(scene.environment.sky, scene.lights);
-    if (scene.environment.environmentMap != scene::kInvalidTexture) {
-        snap.capabilities.note("environment map", Support::Degraded,
-                               "an HDR environment map is present but image-based lighting is not built yet; "
-                               "the analytic sky (ADR-036) is used instead",
+    // Environment (ADR-2240): the map when there is one, never a substitute for it.
+    snap.environment = Environment::build(scene.environment, scene.lights, snap.textures);
+    switch (snap.environment.lighting()) {
+    case Environment::Lighting::Map:
+        snap.capabilities.note("environment map", Support::Full,
+                               fmt::format("{}x{} HDR map, importance-sampled, at environmentIntensity and "
+                                           "environmentRotation; the camera sees it at skyIntensity and skyTint",
+                                           snap.environment.mapWidth(), snap.environment.mapHeight()),
                                1);
-    } else if (snap.skyEnabled) {
+        break;
+    case Environment::Lighting::AnalyticSky:
         snap.capabilities.note("analytic sky", Support::Full,
                                "scene::skyRadiance, the same model shaders/environment.wgsl draws", 1);
+        break;
+    case Environment::Lighting::Background: break;
+    }
+    if (scene.environment.environmentMap != scene::kInvalidTexture &&
+        snap.environment.lighting() != Environment::Lighting::Map) {
+        snap.capabilities.note("environment map", Support::Unsupported,
+                               "the scene names an environment map that is not a loaded HDR texture; the raster does "
+                               "not use it either",
+                               1);
     }
 
     // Renderer-level caveats, printed on every render whatever the scene holds. This one is here
@@ -153,8 +164,9 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
         "bright, smooth, non-metallic surface. It compounds per bounce. If an interior render looks "
         "inexplicably bright, check this first.");
 
-    snap.textures = scene.textures;
     snap.lights = scene.lights;
+    snap.lightEmission.reserve(scene.lights.size());
+    for (const auto& l : scene.lights) snap.lightEmission.push_back(lightEmission(l));
     int directional = 0;
     int punctual = 0;
     int area = 0;
@@ -354,9 +366,24 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
     {
         int thinFilm = 0;
         int anisotropic = 0;
+        // ADR-2243: the material fields coverage.cpp lists as unsupported, counted where the frame has them.
+        int programs = 0;
+        int transparent = 0;
+        int normalMapped = 0;
+        int toon = 0;
+        int wire = 0;
+        int refractive = 0;
+        int regions = 0;
         const auto count = [&](const scene::Material& m) {
             thinFilm += m.thinFilm.enabled() ? 1 : 0;
             anisotropic += m.anisotropy.enabled() ? 1 : 0;
+            programs += m.program.empty() ? 0 : 1;
+            transparent += (m.opacity < 1.0f || m.alphaMode != scene::AlphaMode::Opaque) ? 1 : 0;
+            normalMapped += m.normalTexture.valid() ? 1 : 0;
+            toon += m.toon.enabled() ? 1 : 0;
+            wire += m.wire.enabled() ? 1 : 0;
+            refractive += m.refraction.enabled() ? 1 : 0;
+            regions += m.regions.enabled() ? 1 : 0;
         };
         for (const scene::Entity& e : scene.entities) {
             if (e.visible) count(e.material);
@@ -377,6 +404,36 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
             snap.capabilities.note("anisotropic material", Support::Degraded,
                                    "the BSDF's GGX lobe is isotropic (ADR-1143): the highlight is not stretched",
                                    anisotropic);
+        }
+        if (programs > 0) {
+            snap.capabilities.note("material program", Support::Unsupported,
+                                   "per-fragment material programs (ADR-030) are not evaluated: traced as the bare "
+                                   "material, so a program's colour, emission and lit/dark choice are lost",
+                                   programs);
+        }
+        if (transparent > 0) {
+            snap.capabilities.note("transparent / alpha-masked material", Support::Unsupported,
+                                   "opacity, alpha mask and alpha blend are not traced: the surface is opaque",
+                                   transparent);
+        }
+        if (normalMapped > 0) {
+            snap.capabilities.note("normal map", Support::Unsupported,
+                                   "no normal mapping: shaded with the interpolated vertex normal", normalMapped);
+        }
+        if (toon > 0) {
+            snap.capabilities.note("toon material", Support::Unsupported,
+                                   "cel lighting is a raster shading model: traced as the glTF BRDF", toon);
+        }
+        if (wire > 0) {
+            snap.capabilities.note("wire lines", Support::Unsupported, "edge lines are a raster pass: not drawn", wire);
+        }
+        if (refractive > 0) {
+            snap.capabilities.note("refractive material", Support::Unsupported,
+                                   "no transmission: traced opaque", refractive);
+        }
+        if (regions > 0) {
+            snap.capabilities.note("surface regions", Support::Degraded,
+                                   "per-region temper and polish (ADR-1149) are not applied", regions);
         }
     }
     // ADR-1151..1153: the reflection-only bands, an SDF material's engraving and flake particles are terms of the
@@ -423,13 +480,18 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
         }
 
         // The instance transform is composed exactly as shaders/procedural.wgsl composes it --
-        // `inst.position + quatRotate(inst.rotation, p * inst.scale)`, under the object model --
+        // `inst.position + quatRotate(inst.rotation, p * inst.scale)`, under the object model, which the raster passes
+        // as the IDENTITY (scene_renderer.cpp `procedurals_->update(..., identity, ...)`) --
         // and NOT with `ProceduralGeometry::instanceMatrix`, which derives placement from the
         // distribution by contract and never reads `instances[i]`. The realtime renderer uploads
         // `object.instances` (procedural_renderer.cpp:1418), so that is what the tracer must read
         // or the two renderers draw different worlds. Measured the hard way: `instanceMatrix` put
         // twelve cubes spanning 22 m into a 7 m span.
-        const glm::mat4 objectModel = proc.distributionTransform.matrix();
+        //
+        // The records are WORLD space: generation composes `distributionTransform` onto every placement
+        // (procedural.cpp generateCloud; ADR-2138 re-transforms them on a move the same way). Until ADR-2241 this
+        // composed `distributionTransform` again, which was invisible while it was the identity (every unit test,
+        // Glowmere's scatter) and moved every bobbing island, vehicle and moved node in Neon Dreams.
         const glm::mat4 sourceXf = proc.sourceTransform.matrix();
 
         InstancedObject obj;
@@ -458,7 +520,7 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
         obj.normalMatrices.reserve(proc.instances.size());
         for (const spatial::InstanceRecord& rec : proc.instances) {
             const glm::quat q{rec.rotation.w, rec.rotation.x, rec.rotation.y, rec.rotation.z};
-            const glm::mat4 xf = objectModel * glm::translate(glm::mat4(1.0f), glm::vec3(rec.position)) *
+            const glm::mat4 xf = glm::translate(glm::mat4(1.0f), glm::vec3(rec.position)) *
                                  glm::mat4_cast(q) *
                                  glm::scale(glm::mat4(1.0f), glm::vec3(rec.scale));
             obj.transforms.push_back(xf);
@@ -495,6 +557,50 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
                                "participating media are a stated non-goal for now (spec section 72)", 1);
     }
 
+    // ---- the rest of the scene the tracer does not represent (ADR-2243; pathtrace/coverage.cpp) ----------
+    const auto unsupported = [&](bool present, std::string feature, std::string detail, int count) {
+        if (present) snap.capabilities.note(std::move(feature), Support::Unsupported, std::move(detail), count);
+    };
+    unsupported(scene.clouds.active(), "clouds",
+                "Cloud Environment v2 (sea, lobes, glows, beams) is a GPU ray march with no CPU density: absent",
+                static_cast<int>(scene.clouds.lobes.size() + scene.clouds.farLobes.size()) +
+                    (scene.clouds.sea.enabled ? 1 : 0));
+    unsupported(scene.ecosystem.active(), "ecosystem environment", "GPU emitters and splats (ADR-1200): absent", 1);
+    unsupported(scene.astral.active(), "astral environment", "GPU particles (ADR-1221): absent", 1);
+    unsupported(scene.meshWire.active(), "mesh wire", "a blended line pass (ADR-1862): absent",
+                static_cast<int>(scene.meshWire.targets.size()));
+    unsupported(scene.corruption.active(), "corruption", "a raster vertex and shading term (ADR-1873): absent",
+                static_cast<int>(scene.corruption.targets.size()));
+    unsupported(scene.portal.active() || scene.portalClip != glm::vec4(0.0f), "portal",
+                "another world through an opening, and its clip plane (ADR-1879): absent", 1);
+    unsupported(scene.temporal.anyEnabled(), "temporal effects", "frame echo and the temporal family are raster post",
+                1);
+    unsupported(scene.waves.count > 0, "wave effect", "a surface term of the lit pass (ADR-207): absent",
+                static_cast<int>(scene.waves.count));
+    unsupported(scene.atmospherics.cometCount + scene.atmospherics.auroraCount + scene.atmospherics.mediumCount > 0,
+                "atmospherics", "comets, auroras and placed media: absent",
+                static_cast<int>(scene.atmospherics.cometCount + scene.atmospherics.auroraCount +
+                                 scene.atmospherics.mediumCount));
+    unsupported(scene.distortion.count > 0, "distortion", "screen-space distortion: absent",
+                static_cast<int>(scene.distortion.count));
+    unsupported(scene.pulses.count > 0, "shockwave pulse",
+                "the fronts displace vertices and add light in the raster's shaders (ADR-2124): absent",
+                static_cast<int>(scene.pulses.count));
+    unsupported(scene.entityFx.lights.count > 0, "effect light",
+                "the effect-light pool the raster appends to the scene's lights (ADR-703): not lit",
+                static_cast<int>(scene.entityFx.lights.count));
+    unsupported(!scene.entityFx.empty(), "entity effect lane",
+                "Glow, Pulse and Bloom Source lanes (ADR-703) are raster shading terms: absent",
+                static_cast<int>(scene.entityFx.records.size()) - 1);
+    unsupported(!scene.ribbons.empty(), "ribbon", "camera-facing strips: absent",
+                static_cast<int>(scene.ribbons.strips.size()));
+    unsupported(scene.stars.on, "stars", "the Stars effect's field is drawn by the background pass: absent", 1);
+    unsupported(!scene.shells.empty(), "shell", "analytic proxy shells: absent",
+                static_cast<int>(scene.shells.instances.size()));
+    snap.capabilities.caveat(
+        "the camera is a pinhole at the camera's pose and field of view: its near plane, depth of field and motion "
+        "blur are not modelled, and the output is scene-linear radiance with no exposure, bloom, grade or tone map");
+
     // ---- emissive geometry ------------------------------------------------------------------
     //
     // Collected AFTER the meshes, because it indexes into them. A triangle is a light if its
@@ -529,7 +635,12 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
             running += e.area;
             e.cdf = running / snap.totalEmissiveArea;
         }
-        snap.emissiveTriangles.back().cdf = 1.0f;   // exact, so a u of 0.999999 cannot fall off the end
+        snap.emissiveTriangles.back().cdf = 1.0f;
+        snap.emissiveIndex.reserve(snap.emissiveTriangles.size());
+        for (std::uint32_t i = 0; i < snap.emissiveTriangles.size(); ++i) {
+            const auto& e = snap.emissiveTriangles[i];
+            snap.emissiveIndex.emplace((static_cast<std::uint64_t>(e.meshIndex) << 32) | e.primIndex, i);
+        }   // exact, so a u of 0.999999 cannot fall off the end
         snap.capabilities.note("emissive geometry", Support::Full,
                                "sampled directly and combined with BSDF sampling by MIS",
                                static_cast<int>(snap.emissiveTriangles.size()));

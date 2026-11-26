@@ -1813,11 +1813,12 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
     // ADR-2165: the GPU device and shader library are the host's. A run that draws frames itself -- the editor, the
     // headless frame loop and its --capture, the headless live profile -- has them made now, exactly as
     // `Application::init` always made them (the window's layer, Dawn's pipeline cache, AVGEN_PIPELINE_CACHE), and
-    // builds its live renderer from them. A run that does not -- --render, --queue, --pathtrace, --frames 0 (an
-    // --ai-script or --save-project with no frames) -- creates no device here: a render job creates it, under the
-    // machine's GPU lock, when the first one starts, and a CPU-only run never does.
+    // builds its live renderer from them. A run that does not -- --render, --queue, --frames 0 (an --ai-script or
+    // --save-project with no frames) -- creates no device here: a render job creates it, under the machine's GPU lock,
+    // when the first one starts, and a CPU-only run never does. (--pathtrace never reaches the Application: it runs
+    // from main, ADR-2244.)
     const bool drawsFrames = !options.headless || options.liveProfile.enabled ||
-                             (!options.queue && !options.pathtrace && !options.render && options.frames != 0);
+                             (!options.queue && !options.render && options.frames != 0);
     if (!drawsFrames) {
         log::info("headless: this run draws no frames of its own; no GPU device until a render job needs one");
         if (auto r = validateRendererOptions(); !r) {
@@ -6919,140 +6920,6 @@ void Application::startPathTraceFromUi() {
     panel_->setStatus(fmt::format("path tracing to {}", out.filename().string()));
 }
 
-// ADR-383. A path-traced range, through `app::TraceSequence`: one project load, the shared
-// `FrameSequenceDriver`, and either an EXR per frame or -- via the CPU output transform -- a movie.
-int Application::runTraceSequence(const std::filesystem::path& projectFile,
-                                  const PathTraceSettings& authored) {
-    // The SAME decision the Render panel makes, through the same function: name it .mov and get a
-    // movie, name it anything else and get a folder of scene-linear EXRs. Two spellings of that
-    // rule is how a flag and a button come to disagree about what a path means.
-    RenderSettings video = engine_ != nullptr ? engine_->renderSettings() : RenderSettings{};
-    if (options_.codec) video.codec = *options_.codec;
-    TraceSequenceRequest request =
-        traceSequenceRequestFrom(projectFile, authored, options_.width, options_.height,
-                                 *options_.pathtrace, video);
-
-    request.reuseAcceleration = !options_.ptRebuildBvh;
-    if (auto ok = request.validate(); !ok) {
-        log::error("pathtrace: {}", ok.error().message);
-        return 2;
-    }
-
-    TraceSequence sequence(std::move(request));
-    if (auto ok = sequence.start(); !ok) {
-        log::error("pathtrace: {}", ok.error().message);
-        return 2;
-    }
-    log::info("pathtrace: denoise {}", pathtrace::denoiseVersion());
-
-    // Progress that is honest at both levels: which frame, and how far into it. A path-traced frame
-    // takes long enough that a frame counter on its own looks like a hang (ADR-351's rule, one
-    // level up from where it was written).
-    std::uint64_t lastFrame = ~0ull;
-    while (!sequence.step(1)) {
-        const SequenceProgress p = sequence.progress();
-        if (p.framesSubmitted != lastFrame) {
-            lastFrame = p.framesSubmitted;
-            const double remaining = p.estimatedRemainingSeconds;
-            log::info("pathtrace: frame {}/{} ({:.0f}%), {:.1f}s elapsed{}", p.framesSubmitted,
-                      p.framesTotal, p.fraction() * 100.0, p.elapsedSeconds,
-                      remaining >= 0.0 ? fmt::format(", about {:.0f}s left", remaining) : std::string());
-        }
-    }
-    const SequenceProgress p = sequence.progress();
-    if (!p.error.empty()) {
-        log::error("pathtrace: {}", p.error);
-        return 4;
-    }
-    if (p.cancelled) {
-        log::warn("pathtrace: cancelled after {} frame(s)", p.framesWritten);
-        return 3;
-    }
-    log::info("pathtrace: {} frame(s) written, sequence hash {:016x}", p.framesWritten,
-              p.sequenceHash);
-    return 0;
-}
-
-int Application::runPathTrace() {
-    // Same rule as `--render`: the job loads the project itself, so a session with no project file
-    // is snapshotted to a temporary one first. Loading from the file rather than from live state is
-    // what makes a trace reproducible (ADR-020's reasoning, and it applies here unchanged).
-    std::filesystem::path projectFile = engine_ != nullptr ? engine_->projectPath() : std::filesystem::path{};
-    if (options_.project) projectFile = *options_.project;
-    if (projectFile.empty()) {
-        log::error("--pathtrace needs a project: pass --project <file.json>");
-        return 2;
-    }
-
-    // Start from what the project says and override with what was typed -- the shape
-    // `renderSettingsFromOptions` already had, and it matters now that a project carries a
-    // `pathtrace` block (ADR-366). Before this, `--pathtrace out.exr` on a project authored at 512
-    // samples traced 32, because 32 was a struct default nobody had asked for.
-    PathTraceSettings authored = engine_ != nullptr ? engine_->pathTraceSettings() : PathTraceSettings{};
-    if (options_.ptSeconds) authored.seconds = *options_.ptSeconds;
-    if (options_.ptSamples) authored.samplesPerPixel = std::max(1u, *options_.ptSamples);
-    if (options_.ptDepth) authored.maxDepth = *options_.ptDepth;
-    if (options_.ptSeed) authored.seed = *options_.ptSeed;
-    if (options_.ptThreads) authored.threads = *options_.ptThreads;
-    if (options_.ptDenoise) authored.denoise = *options_.ptDenoise;
-    if (options_.ptAovs) authored.writeAovs = *options_.ptAovs;
-    if (options_.ptProbe) authored.albedoProbe = *options_.ptProbe;
-    // ADR-383: `--range a:b` makes it a sequence. Deliberately the SAME flag `--render` uses rather
-    // than a `--pt-range`: it is the same question about the same timeline, and a second vocabulary
-    // for it is a second thing to get wrong. `--fps` likewise.
-    if (options_.rangeStart) authored.seconds = *options_.rangeStart;
-    if (options_.rangeEnd) authored.endSeconds = *options_.rangeEnd;
-    if (options_.fpsGiven && options_.offlineFps > 0.0) authored.fps = options_.offlineFps;
-
-    if (authored.isSequence()) {
-        return runTraceSequence(projectFile, authored);
-    }
-
-    pathtrace::TraceJobRequest request;
-    request.project = projectFile;
-    request.seconds = authored.seconds;
-    request.output = *options_.pathtrace;
-    request.writeAovs = authored.writeAovs;
-    request.denoise = authored.denoise;
-    request.settings = traceSettingsFrom(authored, options_.width, options_.height);
-
-    log::info("pathtrace: {} at second {:.3f}, {}x{} at {} spp, depth {}, seed {}",
-              projectFile.string(), request.seconds, request.settings.width, request.settings.height,
-              request.settings.samplesPerPixel, request.settings.maxDepth, request.settings.seed);
-    log::info("pathtrace: denoise {}", pathtrace::denoiseVersion());
-
-    pathtrace::TraceJob job(std::move(request));
-    // Started on the job's own thread rather than run inline, so this path exercises exactly the
-    // code a UI would: if progress or cancellation were broken, the CLI would show it.
-    job.start();
-
-    // Poll and log real progress. The stages that cannot report say so rather than creeping.
-    pathtrace::TraceJobState lastState = pathtrace::TraceJobState::Queued;
-    std::uint32_t lastSamples = 0;
-    while (!job.done()) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(250));
-        const auto p = job.progress();
-        if (p.state != lastState) {
-            lastState = p.state;
-            log::info("pathtrace: {}", p.stage);
-        } else if (p.state == pathtrace::TraceJobState::Rendering && p.samplesDone != lastSamples) {
-            lastSamples = p.samplesDone;
-            log::info("pathtrace: {}/{} samples ({:.0f}%), {:.1f} s elapsed", p.samplesDone,
-                      p.samplesTotal, p.fraction * 100.0f, p.elapsedSeconds);
-        }
-    }
-    job.wait();
-
-    const auto final = job.progress();
-    if (final.state == pathtrace::TraceJobState::Complete) return 0;
-    if (final.state == pathtrace::TraceJobState::Cancelled) {
-        log::warn("pathtrace: cancelled");
-        return 8;
-    }
-    log::error("pathtrace: {}", final.error.empty() ? "failed" : final.error);
-    return 7;
-}
-
 int Application::runQueue(const std::filesystem::path& queueFile) {
     std::ifstream in(queueFile);
     nlohmann::json doc = nlohmann::json::parse(in, nullptr, false);
@@ -7139,9 +7006,6 @@ int Application::runHeadless() {
     }
     if (options_.queue) {
         return runQueue(*options_.queue);
-    }
-    if (options_.pathtrace) {
-        return runPathTrace();
     }
     if (options_.render) {
         // The offline engine builds its own renderer, so a debug view selected on the command line

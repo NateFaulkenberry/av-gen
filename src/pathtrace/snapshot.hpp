@@ -12,11 +12,13 @@
 
 #include "scene/scene.hpp"
 #include "scene/scene_types.hpp"
+#include "pathtrace/environment.hpp"
 #include "scene/sky.hpp"
 
 #include <glm/glm.hpp>
 
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace avgen::pathtrace {
@@ -150,6 +152,9 @@ struct Snapshot {
     // hit has to be resolved differently. Both end up in one top-level scene.
     std::vector<InstancedObject> instanced;
     std::vector<scene::PunctualLight> lights;
+    // Each light's emitted colour (colour x temperature x intensity), parallel to `lights` (ADR-2242). It was
+    // recomputed per light per sample -- 7% of a Neon Dreams trace -- and depends on nothing a sample changes.
+    std::vector<glm::vec3> lightEmission;
 
     // Copied from the scene. `scene::Material`'s texture slots are indices into this, so the two
     // must travel together -- a snapshot that referenced the live scene's texture table would be
@@ -158,10 +163,6 @@ struct Snapshot {
 
     scene::Camera camera;
 
-    // Environment. Phase 1 is analytic only: `scene::SkyRuntime` is the project's own CPU reference
-    // for the sky the GPU pass draws (ADR-036), so a realtime/offline comparison shows transport
-    // differences rather than two different skies. An image-based environment arrives with
-    // section 46's importance sampling and is not built yet.
     // Motion (spec section 62). `previousCamera` is the camera one frame earlier; a motion vector is
     // the screen-space difference between where a surface point is now and where it was then, so
     // BOTH the geometry and the camera have to be remembered -- a camera-only or geometry-only
@@ -169,13 +170,15 @@ struct Snapshot {
     bool hasMotion = false;
     scene::Camera previousCamera;
 
-    bool skyEnabled = false;
-    scene::SkyRuntime sky;
-    glm::vec3 backgroundColor{0.0f};
+    // What lights the scene from infinity and what the camera sees behind it (ADR-2240).
+    Environment environment;
 
     // Every emissive triangle in the scene, with an area CDF for uniform-by-area selection.
     std::vector<EmissiveTriangle> emissiveTriangles;
     float totalEmissiveArea = 0.0f;
+    // (meshIndex << 32 | primIndex) -> index into `emissiveTriangles` (ADR-2242). What `emissivePdf` looks a BSDF hit
+    // up in: a scan of the list was 82% of a Neon Dreams trace, which has 4.4 million emissive triangles.
+    std::unordered_map<std::uint64_t, std::uint32_t> emissiveIndex;
 
     CapabilityReport capabilities;
 

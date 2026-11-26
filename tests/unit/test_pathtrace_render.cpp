@@ -133,7 +133,7 @@ TEST_CASE("the snapshot reports what it can and cannot see", "[unit][pathtrace][
     REQUIRE(snap.meshes.size() == 4); // ground + three spheres; the invisible cube is not one
     REQUIRE(snap.triangleCount() > 100);
     REQUIRE(snap.lights.size() == 1);
-    REQUIRE(snap.skyEnabled);
+    REQUIRE(snap.environment.lighting() == pathtrace::Environment::Lighting::AnalyticSky);
 
     const auto find = [&](std::string_view f) -> const pathtrace::Capability* {
         for (const auto& c : snap.capabilities.entries) {

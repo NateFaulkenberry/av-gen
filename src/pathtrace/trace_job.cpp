@@ -3,6 +3,7 @@
 #include "app/engine.hpp"
 #include "core/log.hpp"
 #include "core/time.hpp"
+#include "scene/detail_limits.hpp"
 
 #include <fmt/format.h>
 
@@ -161,6 +162,9 @@ Result<void> TraceJob::execute() {
     if (!engine.loadProject(request_.project)) {
         return failWith(Error{fmt::format("could not load project '{}'", request_.project.string())});
     }
+    // ADR-2244: an offline render's detail limits (ADR-186/191), as `app::RenderJob` sets them. The live ones pose a
+    // distant rig at its reduced rate, and one frozen by `cullDistance` arrives unposed and is refused.
+    engine.setDetailLimits(scene::DetailLimits::offlineDefault());
     // A warm-up step at dt 0 then the real one, which is what app::RenderJob does: some systems
     // need a frame to settle, and a snapshot of frame zero is not a snapshot of the scene.
     engine.update(FrameTime{request_.seconds, 0.0, 0});

@@ -11,10 +11,6 @@ namespace {
 
 constexpr float kEps = 1e-9f;
 
-[[nodiscard]] glm::vec3 emitterRadiance(const scene::PunctualLight& l) {
-    return l.color * scene::colorTemperatureToRgb(l.temperature, l.tint) * l.intensity;
-}
-
 // Transcribed from shaders/lighting.wgsl so the two renderers agree about where a light stops.
 [[nodiscard]] float rangeWindow(float dist2, float range) {
     if (range <= 0.0f) return 1.0f;
@@ -57,11 +53,14 @@ float powerHeuristic(float pdfA, float pdfB) {
     return 1.0f / (1.0f + r * r);
 }
 
-LightSample sampleLight(const scene::PunctualLight& light, const glm::vec3& p, glm::vec2 u) {
+glm::vec3 lightEmission(const scene::PunctualLight& l) {
+    return l.color * scene::colorTemperatureToRgb(l.temperature, l.tint) * l.intensity;
+}
+
+LightSample sampleLight(const scene::PunctualLight& light, const glm::vec3& emit, const glm::vec3& p, glm::vec2 u) {
     LightSample s;
     if (!light.enabled) return s;
 
-    const glm::vec3 emit = emitterRadiance(light);
     if (emit.x <= 0.0f && emit.y <= 0.0f && emit.z <= 0.0f) return s;
 
     using T = scene::PunctualLight::Type;
@@ -217,20 +216,17 @@ EmissiveSample sampleEmissive(const Snapshot& snap, const glm::vec3& p, glm::vec
     return s;
 }
 
-float emissivePdf(const Snapshot& snap, std::uint32_t meshIndex, std::uint32_t primIndex,
+float emissivePdf(const Snapshot& snap, std::uint32_t meshIndex, std::uint32_t primIndex, bool instanced,
                   const glm::vec3& direction, float distance) {
+    if (instanced) return 0.0f;
     if (snap.emissiveTriangles.empty() || snap.totalEmissiveArea <= kEps) return 0.0f;
     if (!(distance > 0.0f) || !std::isfinite(distance)) return 0.0f;
-
-    // Find the triangle. Linear for now: this runs only when a BSDF ray actually lands on an
-    // emitter, which is rare, and a map would cost memory on every scene to save time on few.
-    for (const auto& e : snap.emissiveTriangles) {
-        if (e.meshIndex != meshIndex || e.primIndex != primIndex) continue;
-        const float cosEmitter = std::abs(glm::dot(e.normal, -direction));
-        if (cosEmitter <= kEps) return 0.0f;
-        return (distance * distance) / (cosEmitter * snap.totalEmissiveArea);
-    }
-    return 0.0f;   // not an emitter: the BSDF strategy is the only one that could have found it
+    const auto it = snap.emissiveIndex.find((static_cast<std::uint64_t>(meshIndex) << 32) | primIndex);
+    if (it == snap.emissiveIndex.end()) return 0.0f; // not an emitter: only the BSDF strategy could have found it
+    const EmissiveTriangle& e = snap.emissiveTriangles[it->second];
+    const float cosEmitter = std::abs(glm::dot(e.normal, -direction));
+    if (cosEmitter <= kEps) return 0.0f;
+    return (distance * distance) / (cosEmitter * snap.totalEmissiveArea);
 }
 
 } // namespace avgen::pathtrace

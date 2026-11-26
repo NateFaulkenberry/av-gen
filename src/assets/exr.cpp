@@ -2,6 +2,7 @@
 
 #include <tinyexr.h>
 
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
@@ -90,13 +91,24 @@ Result<void> writeExrLayers(const std::filesystem::path& path, std::uint32_t wid
 
     const int n = static_cast<int>(channels.size());
     image.num_channels = n;
+
+    // ADR-2245: the channel list goes into the file sorted by name, byte-wise. OpenEXR keeps a header's channels in a
+    // sorted map and lays the pixel data out in that order, so a file whose list is in any other order is read with
+    // every channel's data under another channel's name -- the path tracer's AOV file put `R,G,B,albedo.*,normal.*,
+    // ...` in the order given, and a sorted reader (this repo's own tools/read_exr.py among them) read the normals as
+    // infinities and the depth as +-0.008. tinyexr writes data in header order, so sorting the header is sufficient.
+    std::vector<std::size_t> order(channels.size());
+    for (std::size_t i = 0; i < order.size(); ++i) order[i] = i;
+    std::sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
+        return std::strcmp(channels[a].name.c_str(), channels[b].name.c_str()) < 0;
+    });
     image.width = static_cast<int>(width);
     image.height = static_cast<int>(height);
 
     // tinyexr wants planar data, one pointer per channel. The spans are already planar, so this is
     // only an array of pointers -- no copy.
     std::vector<const float*> planes(static_cast<std::size_t>(n));
-    for (int c = 0; c < n; ++c) planes[static_cast<std::size_t>(c)] = channels[static_cast<std::size_t>(c)].data.data();
+    for (std::size_t c = 0; c < order.size(); ++c) planes[c] = channels[order[c]].data.data();
     image.images = reinterpret_cast<unsigned char**>(const_cast<float**>(planes.data()));
 
     std::vector<EXRChannelInfo> infos(static_cast<std::size_t>(n));
@@ -104,12 +116,13 @@ Result<void> writeExrLayers(const std::filesystem::path& path, std::uint32_t wid
     std::vector<int> requested(static_cast<std::size_t>(n));
     for (int c = 0; c < n; ++c) {
         const auto ci = static_cast<std::size_t>(c);
+        const ExrChannel& channel = channels[order[ci]];
         std::memset(infos[ci].name, 0, sizeof(infos[ci].name));
-        std::strncpy(infos[ci].name, channels[ci].name.c_str(), sizeof(infos[ci].name) - 1);
+        std::strncpy(infos[ci].name, channel.name.c_str(), sizeof(infos[ci].name) - 1);
         // The caller always hands us float; `requested_pixel_types` is what lands in the file, so
         // this is where per-channel half lives -- something writeExr cannot express at all.
         pixelTypes[ci] = TINYEXR_PIXELTYPE_FLOAT;
-        requested[ci] = channels[ci].half ? TINYEXR_PIXELTYPE_HALF : TINYEXR_PIXELTYPE_FLOAT;
+        requested[ci] = channel.half ? TINYEXR_PIXELTYPE_HALF : TINYEXR_PIXELTYPE_FLOAT;
     }
     header.num_channels = n;
     header.channels = infos.data();

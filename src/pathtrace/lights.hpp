@@ -37,8 +37,13 @@ struct LightSample {
     bool valid = false;
 };
 
-// Samples one light. `u` is a 2-D uniform sample.
-[[nodiscard]] LightSample sampleLight(const scene::PunctualLight& light, const glm::vec3& p, glm::vec2 u);
+// A light's emitted colour: colour x temperature x intensity. Constant over a render, so the snapshot computes it once
+// per light (`Snapshot::lightEmission`, ADR-2242) rather than once per light per sample.
+[[nodiscard]] glm::vec3 lightEmission(const scene::PunctualLight& light);
+
+// Samples one light whose emitted colour is `emission` (`lightEmission(light)`). `u` is a 2-D uniform sample.
+[[nodiscard]] LightSample sampleLight(const scene::PunctualLight& light, const glm::vec3& emission,
+                                      const glm::vec3& p, glm::vec2 u);
 
 // The solid-angle density this sampler would have had for `direction` from `p`. Zero for delta
 // lights and for directions that miss the emitter. This is the half of MIS that Phase 1 lacked.
@@ -73,7 +78,12 @@ struct EmissiveSample {
 // (meshIndex, primIndex) at `distance` travelling along `direction`. This is the other half of MIS:
 // without it a BSDF ray that lands on an emitter cannot be weighted and its energy is double
 // counted.
-[[nodiscard]] float emissivePdf(const Snapshot& snap, std::uint32_t meshIndex, std::uint32_t primIndex,
+//
+// `meshIndex` indexes `Snapshot::meshes`. An INSTANCED hit's index is into `Snapshot::instanced`, a different list,
+// and instanced emitters are not in `emissiveTriangles`: no light sampler can find them, so their density is 0 and the
+// BSDF strategy takes them whole (`instanced` true). Before ADR-2242 the instanced index was looked up as a mesh index
+// and could take the MIS weight of an unrelated triangle. A lookup, not a scan (ADR-2242).
+[[nodiscard]] float emissivePdf(const Snapshot& snap, std::uint32_t meshIndex, std::uint32_t primIndex, bool instanced,
                                 const glm::vec3& direction, float distance);
 
 } // namespace avgen::pathtrace

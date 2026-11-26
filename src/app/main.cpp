@@ -4,6 +4,7 @@
 #include "api/version.hpp"
 #include "app/application.hpp"
 #include "app/offline_render.hpp"
+#include "app/pathtrace_cli.hpp"
 #include "app/reactivity_cli.hpp"
 #include "app/route_audit_cli.hpp"
 #include "app/sonic_trace_cli.hpp"
@@ -166,6 +167,17 @@ int main(int argc, char** argv) {
     if (options->sonicTrace) {
         return avgen::app::runSonicTraceCommand(options->project.value_or(std::filesystem::path{}), *options->sonicTrace,
                                                 options->fpsGiven ? options->offlineFps : 0.0, options->traceFinals);
+    }
+    // ADR-2244: a path trace, the same way -- no window, no GPU, one project load (app/pathtrace_cli.hpp). The flags that
+    // only mean something to a running application are refused rather than silently ignored.
+    if (options->pathtrace) {
+        if (options->saveProject || options->saveScene || options->bundle || options->aiScript ||
+            !options->aiPrompt.empty() || options->render || options->queue) {
+            avgen::log::error("--pathtrace runs on its own: it cannot be combined with --save-project, --save-scene, "
+                              "--export-bundle, --ai-script, --ai-prompt, --render or --queue");
+            return 2;
+        }
+        return avgen::app::runPathTraceCommand(*options);
     }
     avgen::log::info("{} starting ({} mode)", avgen::api::versionLine(), options->headless ? "headless" : "live");
     // ADR-1803: an exported A/B arm changes the program; say so where every run's log starts.

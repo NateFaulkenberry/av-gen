@@ -194,13 +194,13 @@ TEST_CASE("the emissive sampler's PDF integrates to one over the sphere",
         const auto es = pathtrace::sampleEmissive(snap, p, s.next2D(), s.next1D());
         if (!es.valid) continue;
         ++checked;
-        const float q = pathtrace::emissivePdf(snap, es.meshIndex, es.primIndex, es.direction, es.distance);
+        const float q = pathtrace::emissivePdf(snap, es.meshIndex, es.primIndex, false, es.direction, es.distance);
         REQUIRE(q == Approx(es.pdf).epsilon(1e-4));
     }
     REQUIRE(checked > 400); // live arm
 
     // A triangle that is not an emitter has no density under this strategy.
-    REQUIRE(pathtrace::emissivePdf(snap, 999, 0, glm::vec3(0, 1, 0), 1.0f) == 0.0f);
+    REQUIRE(pathtrace::emissivePdf(snap, 999, 0, false, glm::vec3(0, 1, 0), 1.0f) == 0.0f);
 }
 
 TEST_CASE("the emissive area CDF selects triangles in proportion to area",

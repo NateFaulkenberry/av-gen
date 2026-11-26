@@ -548,8 +548,6 @@ private:
     // Writes the session to a fresh scratch copy for a render to load (never the person's file).
     [[nodiscard]] Result<RenderSource> writeRenderSource(std::string_view tag);
     void startPathTraceFromUi();
-    int runPathTrace();
-    int runTraceSequence(const std::filesystem::path& projectFile, const PathTraceSettings& authored);
     int runQueue(const std::filesystem::path& queueFile);
     void startRenderFromUi();
     bool renderInAppStarted_ = false; // `--render-in-app` fires once
