@@ -77,7 +77,7 @@ def e01():
     scattering (anisotropy 0.6) makes the lit air between the columns bright and the air in each column's
     shadow dark -- the shafts are the shadow map seen in the medium, which a fog overlay cannot draw. A spot
     behind a grille wall on the right throws barred beams across the floor."""
-    nodes = [box("floor", [0.0, -0.1, -30.0], [120.0, 0.2, 140.0], [0.32, 0.31, 0.3])]
+    nodes = [box("floor", [0.0, -0.1, -30.0], [120.0, 0.2, 140.0], [0.16, 0.155, 0.15])]
     for i in range(9):
         x = -24.0 + i * 6.0
         nodes.append(box(f"column-{i:02d}", [x, 6.0, -28.0], [1.6, 12.0, 1.6], [0.55, 0.52, 0.47]))
@@ -93,11 +93,13 @@ def e01():
         "_note": e01.__doc__.replace("\n    ", " ").strip(),
         "camera": {"mode": 1, "position": [0.0, 3.0, 14.0], "target": [0.0, 6.0, -40.0], "fov": 55.0,
                    "orbitSpeed": 0.0},
-        "environment": dark_environment(volumeDensity=0.022, volumeAnisotropy=0.6, shadowRange=120.0,
+        # Thin air (an optical depth under 1 across the hall) so the lit and shadowed air differ, rather than
+        # saturating to a white-out as 0.022 did in the first gate's still; the sun slants across the view.
+        "environment": dark_environment(volumeDensity=0.008, volumeAnisotropy=0.55, shadowRange=120.0,
                                         shadowCascades=4),
         "lights": [
-            {"name": "sun", "type": "directional", "direction": [0.18, -0.32, 0.93],
-             "color": [1.0, 0.82, 0.62], "intensity": 9.0, "castsShadow": True, "volumetric": 1.0},
+            {"name": "sun", "type": "directional", "direction": [0.5, -0.38, 0.78],
+             "color": [1.0, 0.82, 0.62], "intensity": 6.0, "castsShadow": True, "volumetric": 1.0},
             {"name": "grille-spot", "type": "spot", "position": [17.0, 7.0, -22.0], "direction": [-0.05, -0.45, 0.89],
              "color": [0.7, 0.85, 1.0], "intensity": 900.0, "range": 45.0, "innerCone": 14.0, "outerCone": 24.0,
              "castsShadow": True, "volumetric": 1.0},

@@ -42,8 +42,8 @@
    "enabled": true,
    "distance": 160.0
   },
-  "volumeDensity": 0.022,
-  "volumeAnisotropy": 0.6,
+  "volumeDensity": 0.008,
+  "volumeAnisotropy": 0.55,
   "shadowRange": 120.0,
   "shadowCascades": 4
  },
@@ -52,16 +52,16 @@
    "name": "sun",
    "type": "directional",
    "direction": [
-    0.18,
-    -0.32,
-    0.93
+    0.5,
+    -0.38,
+    0.78
    ],
    "color": [
     1.0,
     0.82,
     0.62
    ],
-   "intensity": 9.0,
+   "intensity": 6.0,
    "castsShadow": true,
    "volumetric": 1.0
   },
@@ -116,9 +116,9 @@
     "castsShadow": true,
     "material": {
      "baseColor": [
-      0.32,
-      0.31,
-      0.3
+      0.16,
+      0.155,
+      0.15
      ],
      "roughness": 0.9,
      "metallic": 0.0
