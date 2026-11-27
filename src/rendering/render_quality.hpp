@@ -178,6 +178,17 @@ struct QualitySettings {
     //
     // Each floor is logged where it takes effect, from and to, so a render says what it raised.
     std::uint32_t volumeStepFloor = 0;   // the march takes at least this many steps (when it runs)
+    // ADR-2213: volumetric lighting's sampling -- resolutions and sample counts only, so a tier never changes
+    // whether a light lights the air, whether the air is shadowed, or what the air is. The grid's xy is the
+    // frame's size over `volumetricLightTile` (pixels per froxel), its z `volumetricLightSlices`; the shadow
+    // taps are 1 or a 2x2 box (4); `volumetricLightSubsamples` jittered samples per froxel (fixed offsets, no
+    // history, ADR-2212); `volumetricLightLocalLights` a froxel's clustered lights (the march's cap is 6).
+    // Realtime is 160x90x64 at 1080p.
+    float volumetricLightTile = 12.0f;
+    std::uint32_t volumetricLightSlices = 64;
+    std::uint32_t volumetricLightShadowTaps = 1;
+    std::uint32_t volumetricLightSubsamples = 1;
+    std::uint32_t volumetricLightLocalLights = 8;
     std::uint32_t textureAnisotropy = 8; // material textures' anisotropic filtering (the old fixed 8x)
     std::uint32_t skyCubeFloor = 0;      // the procedural sky's cube and its prefiltered specular
                                          // cube, whose first mip IS the visible sky, are at least
@@ -443,6 +454,9 @@ struct QualitySettings {
             // to 50 seconds of playback to reach the vortex (ADR-380), so a tier that cut them
             // hard would make a working effect look broken to anyone previewing it.
             q.particleSpawnScale = 0.25f;
+            q.volumetricLightTile = 24.0f; // ADR-2213: 80x45x32 at 1080p
+            q.volumetricLightSlices = 32;
+            q.volumetricLightLocalLights = 4;
             break;
         case QualityTier::Realtime:
             // ADR-450: the nebulae at a quarter of each axis. Measured against a control in which
@@ -477,6 +491,10 @@ struct QualitySettings {
             q.temporalHistoryScale = 0.5f;
             q.volumeResolutionScale = 1.0f;
             q.cosmicOctaveScale = 1.25f; // 4 nebula octaves -> 5
+            q.volumetricLightTile = 8.0f; // ADR-2213: 240x135x128 at 1080p
+            q.volumetricLightSlices = 128;
+            q.volumetricLightShadowTaps = 4;
+            q.volumetricLightLocalLights = 16;
             break;
         case QualityTier::Offline:
             q.astralTier = 0; // ADR-1222
@@ -516,6 +534,11 @@ struct QualitySettings {
             // §5.9 / ADR-146: and it carries no history in the LOD ladder either, so the frame
             // does not depend on which way the camera arrived at it.
             q.lodHysteresisAllowed = false;
+            q.volumetricLightTile = 8.0f; // ADR-2213: High's grid, four samples a froxel
+            q.volumetricLightSlices = 128;
+            q.volumetricLightShadowTaps = 4;
+            q.volumetricLightSubsamples = 4;
+            q.volumetricLightLocalLights = 32;
             break;
         }
         return q;
