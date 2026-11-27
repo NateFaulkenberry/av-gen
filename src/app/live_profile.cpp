@@ -21,7 +21,7 @@ using nlohmann::json;
 
 std::string headlessTraceHeader() {
     return "phase,pieceT,frameMs,gpuMs,cpuWorkMs,sceneMs,depthMs,shadowMs,cullMs,otherMs,triangles,drawCalls,"
-           "shadowDraws,visibleInstances,compiles,compiledMaterials\n";
+           "shadowDraws,visibleInstances,compiles,compiledMaterials,unwrittenSlots\n";
 }
 
 std::string headlessTraceRow(char phase, double pieceT, const LiveProfileFrame& f, const HeadlessTraceCounts& counts,
@@ -40,10 +40,10 @@ std::string headlessTraceRow(char phase, double pieceT, const LiveProfileFrame& 
             other += p.ms;
         }
     }
-    return fmt::format("{},{:.4f},{:.3f},{:.3f},{:.3f},{:.3f},{:.3f},{:.3f},{:.3f},{:.3f},{},{},{},{},{},{}\n", phase,
+    return fmt::format("{},{:.4f},{:.3f},{:.3f},{:.3f},{:.3f},{:.3f},{:.3f},{:.3f},{:.3f},{},{},{},{},{},{},{}\n", phase,
                        pieceT, f.frameMs, f.gpuMs, f.cpuWorkMs, scene, depth, shadow, cull, other, counts.triangles,
                        counts.drawCalls, counts.shadowDraws, counts.visibleInstances, compiles,
-                       compiledMaterials ? 1 : 0);
+                       compiledMaterials ? 1 : 0, f.unwritten.size());
 }
 
 // ---- the command line ----------------------------------------------------------------------------------------------
@@ -810,6 +810,20 @@ void buildLiveProfile(LiveProfileRecord& record, const std::vector<LiveProfileFr
                          [](const auto& a, const auto& b) { return a.ms > b.ms; });
     }
     record.gpu = groupGpuCategories(record.passMedians);
+    // ADR-2232: a 0 ms pass whose slot was never written is a hole in the instrument, not a free pass. Counted per label
+    // and said in the limits, so a budget is never read off it.
+    record.unwrittenSlots.clear();
+    for (const auto& f : frames) {
+        for (const std::string& label : f.unwritten) {
+            auto it = std::find_if(record.unwrittenSlots.begin(), record.unwrittenSlots.end(),
+                                   [&](const auto& u) { return u.label == label; });
+            if (it == record.unwrittenSlots.end()) {
+                record.unwrittenSlots.push_back({label, 1});
+            } else {
+                ++it->frames;
+            }
+        }
+    }
     // Status. "AT RISK": the median fits but more than 5% of frames do not.
     const double p50 = live ? record.frameMs.p50 : std::max(gpuMedian, record.cpuWorkMs.p50);
     // Live with the display's refresh known (ADR-1107's cap holds the interval AT the budget): a frame interval within
@@ -847,6 +861,16 @@ void buildLiveProfile(LiveProfileRecord& record, const std::vector<LiveProfileFr
     if (!live) {
         record.limits.push_back("Headless has no present, no Fifo and no UI: it cannot show deadline misses. Use "
                                 "--mode live for a touring prediction.");
+    }
+    if (!record.unwrittenSlots.empty()) {
+        std::string list;
+        for (const auto& u : record.unwrittenSlots) {
+            list += fmt::format("{}{} ({}/{} frames)", list.empty() ? "" : ", ", u.label, u.frames, frames.size());
+        }
+        record.limits.push_back(fmt::format(
+            "unwritten GPU timestamp slots: {}. Their 0 ms is not a measurement: the cost is charged to the next pass or "
+            "hides in overlap. Budget such a pass by amplification or a frame A/B, never by its own label (ADR-2232)",
+            list));
     }
 }
 
@@ -978,6 +1002,11 @@ json liveProfileJson(const LiveProfileRecord& r) {
         gpu.push_back({{"category", g.name}, {"medianMs", g.medianMs}, {"basis", "measured"}, {"labels", labels}});
     }
     j["gpu"] = gpu;
+    json unwrittenSlots = json::array();
+    for (const auto& u : r.unwrittenSlots) {
+        unwrittenSlots.push_back({{"label", u.label}, {"unwrittenFrames", u.frames}});
+    }
+    j["unwrittenSlots"] = unwrittenSlots; // ADR-2232: always present, so an empty list is a statement
     const auto& s = r.resources;
     json largest = json::array();
     for (const auto& t : s.largestTextures) {

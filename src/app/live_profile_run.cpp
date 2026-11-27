@@ -488,6 +488,7 @@ int Application::runLiveProfileHeadless() {
         f.render = st.cpu;
         f.renderRecordMs = std::max(0.0, st.cpu.totalMs - st.cpu.queueWaitMs);
         f.passes = framePasses(*renderer_);
+        f.unwritten = renderer_->timeline().unwrittenLabels(); // ADR-2232
         fillFromProbe(f);
         return true;
     };

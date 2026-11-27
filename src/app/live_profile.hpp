@@ -134,6 +134,10 @@ struct LiveProfileFrame {
     double engineUpdateMs = 0.0, renderRecordMs = 0.0, uiMs = 0.0;
     rendering::CpuFrameBreakdown render;
     std::vector<gpu::TimelineInterval> passes; // this frame's passes, summed per label
+    // ADR-2232: the passes whose timestamp slot the driver left unwritten in this frame (`FrameTimeline::
+    // unwrittenLabels`). Their `ms` above reads 0 and is not a measurement: on this Dawn/Metal path a compute pass's
+    // slot comes back unwritten and its cost lands on the next pass or hides in overlap.
+    std::vector<std::string> unwritten;
 };
 
 // ADR-1571: the headless per-frame trace (`--trace` with `--mode headless`). One row per warm-up ('w') and measured
@@ -392,6 +396,12 @@ struct LiveProfileRecord {
     std::vector<CpuCategory> cpu;
     std::vector<GpuCategory> gpu;
     std::vector<gpu::TimelineInterval> passMedians;
+    // ADR-2232: every pass label whose timestamp slot came back unwritten in at least one measured frame, with how many.
+    struct UnwrittenSlot {
+        std::string label;
+        std::uint32_t frames = 0; // measured frames in which it was unwritten
+    };
+    std::vector<UnwrittenSlot> unwrittenSlots;
     LiveProfileResources resources;
     std::vector<LiveProfileCandidate> candidates;
     std::vector<std::string> limits;   // what this run cannot see, said plainly

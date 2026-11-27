@@ -293,7 +293,7 @@ TEST_CASE("live profile: a headless trace row puts each pass in its column and t
     const std::string header = headlessTraceHeader();
     const std::string row = headlessTraceRow('m', 259.8333, f, HeadlessTraceCounts{1400000, 210, 40, 380000}, 4, true);
     CHECK(header.starts_with("phase,pieceT,frameMs,gpuMs,cpuWorkMs,sceneMs,depthMs,shadowMs,cullMs,otherMs,"));
-    CHECK(row == "m,259.8333,31.000,28.500,4.250,15.000,6.000,2.500,1.250,0.750,1400000,210,40,380000,4,1\n");
+    CHECK(row == "m,259.8333,31.000,28.500,4.250,15.000,6.000,2.500,1.250,0.750,1400000,210,40,380000,4,1,0\n");
     // As many fields as the header names.
     const auto commas = [](const std::string& s) { return std::count(s.begin(), s.end(), ','); };
     CHECK(commas(row) == commas(header));

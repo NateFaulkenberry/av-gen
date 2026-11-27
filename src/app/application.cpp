@@ -6557,6 +6557,7 @@ int Application::runLive() {
                     it->ms += entry.ms;
                 }
             }
+            f.unwritten = renderer_->timeline().unwrittenLabels(); // ADR-2232
             notePerformanceFrame(f); // ADR-1100: the Performance panel's rolling medians
             if (liveProfileRunning) {
                 liveProfileDone = !noteLiveProfileFrame(f);

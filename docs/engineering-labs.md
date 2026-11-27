@@ -446,6 +446,17 @@ or it will be refused. Then:
 avgen --lab-case <lab>:<n>          # open the fixture at the case's time with the lab's overlays
 ```
 
+A case's `camera` is either the name of one of the fixture's authored cameras (`"camera": "cam-overview"`, the
+form new labs use: the pose lives once, in the fixture) or a fixed `{"eye": [...], "aim": [...]}`. `--lab-case`
+applies it and the logged reproduce line carries it (`--camera <name>` or `--camera-pose ...`) plus a `--render`
+output. Before ADR-2231 neither was true: 15 shipped case cameras were parsed and never used, so those cases
+reproduced through the fixture's own camera. `tests/integration/test_render_camera.cpp` pins every shipped case's
+camera on its fixture.
+
+`tools/labs/run.py` (ADR-2232) runs a lab's cases or benchmarks headless through the same flags and writes one
+`avgen-lab-run/1` row per run (exit code, sequence hash, frame md5s, GPU medians and p95, compiles in the window,
+unwritten timestamp slots). Run it under `tools/gpu-lock.sh`.
+
 ### Turn a reproduction into a regression
 
 Write a new file in `tests/unit/` or `tests/rendering/` — no CMake edit, and a new file is the
