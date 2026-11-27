@@ -2024,6 +2024,9 @@ private:
     // automatable and modulatable like every other control on this pass.
     params::Parameter<float>* volumeLocalLights_ = nullptr;
     params::Parameter<float>* volumeMaxDistance_ = nullptr;
+    params::Parameter<bool>* volumetricEnabled_ = nullptr;   // ADR-2210 scene/volumetric/enabled
+    params::Parameter<float>* volumetricDistance_ = nullptr;  // scene/volumetric/distance
+    params::Parameter<float>* volumetricIntensity_ = nullptr; // scene/volumetric/intensity
     // ADR-574: ADR-058's surface/volume coupling. Unreachable until the reason recorded
     // for its omission was tested and turned out to be false about its own code.
     params::Parameter<float>* fogHeightAmount_ = nullptr;

@@ -81,7 +81,7 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
     "shadowCascades", "shadowResolution", "shadowRange", "shadowCasterReach", "shadowSplitLambda", "aoFadeStart", "aoFadeEnd", "aoRadius", "horizonFill", "tileDynamics", "ambientOcclusion", "contactShadows", "depthPrepass", "glossyReflections", "volumeSteps", "volumeJitter", "volumeDensityField",
     "volumeShadowSteps", "volumeShadowStrength",
-    "volumeColorField", "sky",
+    "volumeColorField", "sky", "volumetricLight",
     "vortex", "bands"};
 constexpr std::string_view kSkyKeys[] = {
     "enabled", "background", "useKeyLight", "zenithColor", "horizonColor", "groundColor",
@@ -97,7 +97,7 @@ constexpr std::string_view kAuthoredLightKeys[] = {
     "up",          "color",         "intensity",      "temperature", "tint",      "range",
     "innerCone",   "outerCone",     "width",          "height",     "radius",     "castsShadow",
     "contactShadow", "shadowStrength", "shadowBias",  "softness",   "volumetric", "diffuseOnly",
-    "specularOnly", "enabled", "id", "flicker", "flickerRate"};
+    "specularOnly", "enabled", "id", "flicker", "flickerRate", "volumetricShadow"};
 
 std::span<const std::string_view> sceneFileKeys() { return kSceneKeys; }
 std::span<const std::string_view> sceneEnvironmentKeys() { return kEnvironmentKeys; }
@@ -453,7 +453,8 @@ Result<Composition::AuthoredLight> authoredLightFromJson(const json& e, std::str
                               BoolField{"contactShadow", &l.contactShadow},
                               BoolField{"diffuseOnly", &l.diffuseOnly},
                               BoolField{"specularOnly", &l.specularOnly},
-                              BoolField{"enabled", &l.enabled}}) {
+                              BoolField{"enabled", &l.enabled},
+                              BoolField{"volumetricShadow", &l.volumetricShadow}}) { // ADR-2214
         auto value = readBool(e, b.key, *b.target);
         if (!value) {
             return fail("light '{}': {}", l.name, value.error().message);
@@ -530,6 +531,7 @@ json authoredLightToJson(const Composition::AuthoredLight& a) {
     if (l.shadowBias != def.shadowBias) e["shadowBias"] = l.shadowBias;
     if (l.softness != def.softness) e["softness"] = l.softness;
     if (l.volumetricStrength != def.volumetricStrength) e["volumetric"] = l.volumetricStrength;
+    if (l.volumetricShadow != def.volumetricShadow) e["volumetricShadow"] = l.volumetricShadow; // ADR-2214
     if (l.flicker != def.flicker) e["flicker"] = l.flicker;
     if (l.flickerRate != def.flickerRate) e["flickerRate"] = l.flickerRate;
     if (l.diffuseOnly != def.diffuseOnly) e["diffuseOnly"] = l.diffuseOnly;
@@ -5452,6 +5454,16 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     // presets, OSC/MIDI and macros drive fog through the usual routes.
     volumeDensity_ = &params.add(
         floatDesc(prefix_ + "scene/volumeDensity", volumeSetting_.volumeDensity, 0.0f, 2.0f, 0.0f, 0.2f));
+    // ADR-2210: volumetric lighting. The switch, how far the froxel grid carries the air, and how bright the
+    // light it scatters is. The air itself is the environment's own (scene/volume*, scene/fog*; ADR-2211).
+    volumetricEnabled_ = &params.add(
+        boolDesc(prefix_ + "scene/volumetric/enabled", volumeSetting_.volumetricLight.enabled));
+    volumetricDistance_ = &params.add(floatDesc(prefix_ + "scene/volumetric/distance",
+                                                volumeSetting_.volumetricLight.distance,
+                                                scene::kVolumetricLightMinDistance,
+                                                scene::kVolumetricLightMaxDistance, 10.0f, 1000.0f));
+    volumetricIntensity_ = &params.add(floatDesc(prefix_ + "scene/volumetric/intensity",
+                                                 volumeSetting_.volumetricLight.intensity, 0.0f, 100.0f, 0.0f, 4.0f));
     fogHeight_ = &params.add(floatDesc(prefix_ + "scene/fogHeight", volumeSetting_.fogHeight, -1e4f, 1e4f,
                                        -20.0f, 40.0f));
     fogHeightFalloff_ = &params.add(floatDesc(prefix_ + "scene/fogHeightFalloff", volumeSetting_.fogHeightFalloff,
@@ -6722,6 +6734,9 @@ void Composition::detach() {
     styledSkyAmbient_ = nullptr;
     styledGroundAmbient_ = nullptr;
     volumeDensity_ = nullptr;
+    volumetricEnabled_ = nullptr; // ADR-2210
+    volumetricDistance_ = nullptr;
+    volumetricIntensity_ = nullptr;
     fogHeight_ = nullptr;
     fogHeightFalloff_ = nullptr;
     fogUpperDensity_ = nullptr;
@@ -10636,6 +10651,7 @@ void Composition::applyParameters() {
         live.tint = p.tint != nullptr ? p.tint->value() : rest.tint;
         live.castsShadow = rest.castsShadow;
         live.contactShadow = rest.contactShadow;
+        live.volumetricShadow = rest.volumetricShadow; // ADR-2214
         live.shadowBias = p.shadowBias != nullptr ? p.shadowBias->value() : rest.shadowBias;
         live.volumetricStrength = p.volumetric != nullptr ? p.volumetric->value() : rest.volumetricStrength;
         if (p.range != nullptr) live.range = p.range->value();
@@ -10950,6 +10966,14 @@ void Composition::applyParameters() {
         env.depthPrepass = volumeSetting_.depthPrepass;
         env.glossyReflections = volumeSetting_.glossyReflections; // ADR-1820
         env.volumeMaxDistance = pick(volumeMaxDistance_, volumeSetting_.volumeMaxDistance);
+        // ADR-2210
+        env.volumetricLight.enabled =
+            volumetricEnabled_ != nullptr ? volumetricEnabled_->value() : volumeSetting_.volumetricLight.enabled;
+        env.volumetricLight.distance =
+            std::clamp(pick(volumetricDistance_, volumeSetting_.volumetricLight.distance),
+                       scene::kVolumetricLightMinDistance, scene::kVolumetricLightMaxDistance);
+        env.volumetricLight.intensity =
+            std::max(pick(volumetricIntensity_, volumeSetting_.volumetricLight.intensity), 0.0f);
         // ADR-573 (§27): picked, not copied. It used not to be assigned here at all.
         env.volumeLocalLights = pick(volumeLocalLights_, volumeSetting_.volumeLocalLights);
         // Field names are prefixed like every other reference so a nested scene stays self-contained.
@@ -12183,6 +12207,22 @@ nlohmann::json Composition::toJson() const {
         const float follow = fogGroundFollow_ != nullptr ? fogGroundFollow_->base() : volumeSetting_.fogGroundFollow;
         if (follow != 0.0f) {
             environment["fogGroundFollow"] = follow;
+        }
+        // ADR-2210: only when it differs from the default, so every scene saved before the block existed
+        // round-trips to the same bytes.
+        {
+            scene::VolumetricLight vl = volumeSetting_.volumetricLight;
+            if (volumetricEnabled_ != nullptr) vl.enabled = volumetricEnabled_->base();
+            if (volumetricDistance_ != nullptr) vl.distance = volumetricDistance_->base();
+            if (volumetricIntensity_ != nullptr) vl.intensity = volumetricIntensity_->base();
+            const scene::VolumetricLight def{};
+            if (vl != def) {
+                json block = json::object();
+                if (vl.enabled != def.enabled) block["enabled"] = vl.enabled;
+                if (vl.distance != def.distance) block["distance"] = vl.distance;
+                if (vl.intensity != def.intensity) block["intensity"] = vl.intensity;
+                environment["volumetricLight"] = block;
+            }
         }
         // ADR-717, by the same rule: only when not 0.
         const float pooling = fogPooling_ != nullptr ? fogPooling_->base() : volumeSetting_.fogPooling;
@@ -13673,6 +13713,30 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                     return std::unexpected(value.error());
                 }
                 *target = *value;
+            }
+            if (e.contains("volumetricLight")) { // ADR-2210
+                const nlohmann::json& vj = e.at("volumetricLight");
+                if (!vj.is_object()) {
+                    return fail("environment.volumetricLight must be an object");
+                }
+                static constexpr std::string_view kVolumetricLightKeys[] = {"enabled", "distance", "intensity"};
+                json_keys::warnUnknownKeys(vj, kVolumetricLightKeys, "environment.volumetricLight");
+                scene::VolumetricLight& vl = v.volumetricLight;
+                auto enabled = readBool(vj, "enabled", vl.enabled);
+                if (!enabled) {
+                    return std::unexpected(enabled.error());
+                }
+                vl.enabled = *enabled;
+                for (const FloatKey fk : {FloatKey{"distance", &vl.distance}, FloatKey{"intensity", &vl.intensity}}) {
+                    auto value = readFloat(vj, fk.key, *fk.target);
+                    if (!value) {
+                        return std::unexpected(value.error());
+                    }
+                    *fk.target = *value;
+                }
+                vl.distance = std::clamp(vl.distance, scene::kVolumetricLightMinDistance,
+                                         scene::kVolumetricLightMaxDistance);
+                vl.intensity = std::max(vl.intensity, 0.0f);
             }
             if (e.contains("bands")) { // ADR-1151
                 auto bands = scene::readReflectionBands(e.at("bands"));

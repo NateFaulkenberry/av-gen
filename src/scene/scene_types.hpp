@@ -12,6 +12,7 @@
 #include "core/wind.hpp"
 #include "scene/importance.hpp"
 #include "scene/tile_dynamics.hpp"
+#include "scene/volumetric_light.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -602,6 +603,10 @@ struct PunctualLight {
     // behaves the obvious way; light rigs set it per light and default their own to 0, so a rig
     // opts each source into the haze deliberately.
     float volumetricStrength = 1.0f;
+    // ADR-2214: whether this light's shadow views also shadow the air it lights (volumetric lighting). It
+    // shares the surface's views -- there are no volumetric-only shadow maps -- so it means something only
+    // with `castsShadow`.
+    bool volumetricShadow = true;
     bool diffuseOnly = false;
     bool specularOnly = false;
     bool enabled = true;
@@ -1008,6 +1013,9 @@ struct Environment {
     // `fogColor`. 0 means no march at all -- the whole ray is integrated analytically, which is
     // what a scene that only wants distance fog asks for, at none of the march's cost.
     float volumeMaxDistance = 200.0f;
+    // ADR-2210: the froxel lighting (scene/volumetric_light.hpp). Off by default; with it on, the froxel
+    // carries this environment's air out to `volumetricLight.distance` and the march keeps only the media.
+    VolumetricLight volumetricLight;
     // ADR-387: the cosmic vortex used to live here, as a singleton on the environment. It is an
     // authored `world::EffectInstance` of kind `Vortex` now, for the reason the consolidation
     // spec gives: a scene's artistic phenomena are instances inside a reusable system, not fields
