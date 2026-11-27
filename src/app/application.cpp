@@ -6083,6 +6083,10 @@ int Application::runLive() {
                 rendering::readProceduralLodLevels(renderer_->procedurals(), engine_->scene(), options);
             rendering::buildDebugGeometry(renderer_->debugDraw(), engine_->scene(), options, time.renderTime,
                                           &transformHistory_, &lodLevels, renderer_->shadows().views());
+            if (const scene::Composition* crowdHost = engine_->composition()) {
+                rendering::buildCrowdDebug(renderer_->debugDraw(), options, crowdHost->crowdDebugPoints(),
+                                           crowdHost->crowdDebugColors()); // ADR-2228
+            }
         }
         const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
                                                         engine_->hasFrame() ? &engine_->latestFrame() : nullptr,
@@ -7295,6 +7299,10 @@ int Application::runHeadless() {
                 rendering::readProceduralLodLevels(renderer_->procedurals(), engine_->scene(), options);
                 rendering::buildDebugGeometry(renderer_->debugDraw(), engine_->scene(), options, time.renderTime,
                                               nullptr, &lodLevels, renderer_->shadows().views());
+                if (const scene::Composition* crowdHost = engine_->composition()) {
+                    rendering::buildCrowdDebug(renderer_->debugDraw(), options, crowdHost->crowdDebugPoints(),
+                                               crowdHost->crowdDebugColors()); // ADR-2228
+                }
             }
             const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
                                                             engine_->hasFrame() ? &engine_->latestFrame() : nullptr,

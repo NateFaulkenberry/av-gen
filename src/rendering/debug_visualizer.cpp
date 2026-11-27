@@ -422,13 +422,6 @@ void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugV
         draw.point(glm::vec3(0.0f), options.pointSize * 0.12f, kOriginColour);
     }
 
-    if (options.crowd) {
-        const auto& cd = scene.crowdDebug;
-        for (std::size_t i = 0; i + 1 < cd.points.size() && i / 2 < cd.colors.size(); i += 2) {
-            draw.line(cd.points[i], cd.points[i + 1], cd.colors[i / 2]);
-        }
-    }
-
     if (options.beams) {
         // The same integration `tests/unit/test_beam_lab.cpp` asserts against, spelled here so the
         // overlay and the test cannot disagree about where the column ends.
@@ -999,6 +992,16 @@ void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugV
     }
     if (options.vortex) {
         buildVortexDebug(draw, scene, time);
+    }
+}
+
+void buildCrowdDebug(DebugDraw& draw, const DebugViewOptions& options, std::span<const glm::vec3> points,
+                     std::span<const glm::vec4> colors) {
+    if (!options.crowd) {
+        return;
+    }
+    for (std::size_t i = 0; i + 1 < points.size() && i / 2 < colors.size(); i += 2) {
+        draw.line(points[i], points[i + 1], colors[i / 2]);
     }
 }
 

@@ -9084,8 +9084,8 @@ void Composition::installCrowd() {
 }
 
 void Composition::driveNavigatedCrowd(double seconds) {
-    scene_.crowdDebug.points.clear();
-    scene_.crowdDebug.colors.clear();
+    crowdDebugPoints_.clear();
+    crowdDebugColors_.clear();
     if (crowd_.empty() || params_ == nullptr) {
         return;
     }
@@ -9124,11 +9124,10 @@ void Composition::driveNavigatedCrowd(double seconds) {
         if (mode == crowd::AgentMode::Moving && st.slowFor[i] > 2.0f) {
             colour = glm::vec4(1.0f, 0.5f, 0.0f, 1.0f); // wedged
         }
-        auto& dbg = scene_.crowdDebug;
         const auto seg = [&](glm::vec3 a, glm::vec3 b, glm::vec4 c) {
-            dbg.points.push_back(a);
-            dbg.points.push_back(b);
-            dbg.colors.push_back(c);
+            crowdDebugPoints_.push_back(a);
+            crowdDebugPoints_.push_back(b);
+            crowdDebugColors_.push_back(c);
         };
         const float r = crowdDesc_.groups[static_cast<std::size_t>(crowd_.agents()[i].group)].radius;
         const glm::vec3 base = pose.position + glm::vec3(0.0f, 0.05f, 0.0f);
@@ -9157,9 +9156,9 @@ void Composition::driveNavigatedCrowd(double seconds) {
     }
     for (const crowd::OrcaSegment& w : crowd_.walls()) {
         const float y = 0.05f;
-        scene_.crowdDebug.points.emplace_back(w.a.x, y, w.a.y);
-        scene_.crowdDebug.points.emplace_back(w.b.x, y, w.b.y);
-        scene_.crowdDebug.colors.emplace_back(1.0f, 1.0f, 1.0f, 1.0f);
+        crowdDebugPoints_.emplace_back(w.a.x, y, w.a.y);
+        crowdDebugPoints_.emplace_back(w.b.x, y, w.b.y);
+        crowdDebugColors_.emplace_back(1.0f, 1.0f, 1.0f, 1.0f);
     }
 }
 

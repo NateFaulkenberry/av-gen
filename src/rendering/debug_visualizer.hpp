@@ -37,6 +37,11 @@ using ProceduralLodLevels = std::unordered_map<std::string, std::vector<int>>;
 // the thing that owns them should hand them over rather than have the builder fit its own. An
 // empty span turns the two shadow overlays into nothing, which is the honest picture of a frame
 // that has no shadow views.
+// ADR-2228 (115): the navigated crowd's layer -- segments the composition builds each frame (points in pairs,
+// a colour per segment). Draws nothing unless `options.crowd`.
+void buildCrowdDebug(DebugDraw& draw, const DebugViewOptions& options, std::span<const glm::vec3> points,
+                     std::span<const glm::vec4> colors);
+
 void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugViewOptions& options, double time,
                         const TransformHistory* history = nullptr,
                         const ProceduralLodLevels* lodLevels = nullptr,

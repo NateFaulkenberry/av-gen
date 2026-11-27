@@ -840,6 +840,10 @@ public:
     // ADR-2223 (115): the navigated crowd, read-only (labs, tests, the debug view).
     [[nodiscard]] const crowd::CrowdWorld& navigatedCrowd() const { return crowd_; }
     [[nodiscard]] crowd::CrowdWorld& navigatedCrowd() { return crowd_; }
+    // ADR-2228: this frame's crowd diagnostics as line segments (points in pairs, a colour per segment). Kept
+    // here rather than in `Scene`: they are a debug layer's input, not something any renderer draws.
+    [[nodiscard]] const std::vector<glm::vec3>& crowdDebugPoints() const { return crowdDebugPoints_; }
+    [[nodiscard]] const std::vector<glm::vec4>& crowdDebugColors() const { return crowdDebugColors_; }
 
     // Re-parents `name` under `parent` ("" = root). Errors: unknown node, a cycle.
     Result<void> setParent(const std::string& name, const std::string& parent);
@@ -2171,6 +2175,8 @@ private:
     // ADR-2223/2225 (115): the navigated crowd. Its members are the nodes whose `animation.crowd`
     // names one of its groups (one crowd concept, 115 O2); it walks on `crowdSurface_` (ADR-2220).
     crowd::CrowdDesc crowdDesc_;
+    std::vector<glm::vec3> crowdDebugPoints_; // ADR-2228: a, b, a, b, ... (the `crowd` debug layer)
+    std::vector<glm::vec4> crowdDebugColors_; // one per segment
     crowd::CrowdWorld crowd_;
     std::unique_ptr<nav::GridNavSurface> crowdSurface_;
     std::vector<std::string> crowdNodes_;
