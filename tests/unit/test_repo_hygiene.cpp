@@ -174,7 +174,7 @@ TEST_CASE("every writer of a parameter final is a kind the Inspector can name", 
     const std::set<std::string> known{
         "params/modulation.cpp", "params/timeline.cpp", "entity/entity.cpp",
         "params/parameter_set.cpp", "ui/edit_history.cpp", "stage/staging.cpp", "params/palette.cpp",
-        "app/engine.cpp",
+        "app/engine.cpp", "scene/composition.cpp", // ADR-2223: the navigated crowd's members (Influence::Kind::Crowd)
     };
     std::vector<std::string> unexpected;
     std::set_difference(writers.begin(), writers.end(), known.begin(), known.end(),

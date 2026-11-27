@@ -200,6 +200,21 @@ std::vector<Influence> directInfluencesOf(app::Engine& engine, const std::string
     // transform. Deriving the paths here keeps the check in one place and means a behaviour that
     // writes nothing this frame is still listed -- the question is "what can move this", not "what
     // moved it in the last sixteen milliseconds".
+    // ADR-2223 (115): a navigated crowd writes its members' position and rotation finals
+    // (`Composition::driveNavigatedCrowd`), so a member is moved by its group.
+    if (const scene::Composition* comp = const_cast<app::Engine&>(engine).composition()) {
+        const crowd::CrowdWorld& navigated = comp->navigatedCrowd();
+        for (const crowd::AgentInit& a : navigated.agents()) {
+            const std::string base = "nodes/" + a.node + "/";
+            if (path == base + "position" || path == base + "rotation") {
+                Influence i;
+                i.kind = Influence::Kind::Crowd;
+                i.source = navigated.desc().groups[static_cast<std::size_t>(a.group)].name;
+                i.detail = "navigated crowd";
+                out.push_back(std::move(i));
+            }
+        }
+    }
     if (const scene::Composition* comp = const_cast<app::Engine&>(engine).composition()) {
         for (const auto& entity : comp->entityWorld().entities()) {
             if (entity == nullptr) {
@@ -646,6 +661,7 @@ void WorldPanel::drawInspector(app::Engine& engine, EditHistory* history) {
                 case Influence::Kind::Entity: kind = "entity"; break;
                 case Influence::Kind::Staging: kind = "staging"; break;
                 case Influence::Kind::Palette: kind = "palette"; break;
+                case Influence::Kind::Crowd: kind = "crowd"; break;
                 }
                 // Build the trailing value first: a temporary std::string's c_str() must not
                 // outlive the full expression it was created in.
@@ -1501,6 +1517,7 @@ void WorldPanel::drawDebugOptions(app::Engine& engine, WorldEditor* editor) {
     }
     ImGui::SameLine();
     ImGui::Checkbox("Vortex", &debug.vortex);
+    ImGui::Checkbox("Crowd (navigation)", &debug.crowd); // ADR-2228
     if (ImGui::IsItemHovered()) {
         tooltip("The funnel's mouth, throat, depth and the direction it turns -- the geometry the\n"
                 "volumetric march is sampling, drawn as lines so you can see where it actually is\n"

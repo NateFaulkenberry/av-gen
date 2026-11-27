@@ -30,7 +30,7 @@ struct Influence {
     // whole job is answering "why is this moving?" answered "nothing modulates this object; its
     // parameters are static" about a character that was visibly walking across the valley.
     // `Palette` is the project palette (ADR-1043), which replaces or multiplies its bound targets.
-    enum class Kind { Route, Timeline, Cue, State, Macro, Entity, Staging, Palette } kind = Kind::Route;
+    enum class Kind { Route, Timeline, Cue, State, Macro, Entity, Staging, Palette, Crowd } kind = Kind::Route;
     std::string source;      // signal / track / cue / state / macro / entity name
     std::string detail;      // amount, op, easing…
     float value = 0.0f;      // last contribution when known
