@@ -25,7 +25,11 @@ profile reported their 0 ms as the passes' cost.
    - the noise floor of an arm is the spread of its rep medians; a difference within twice it is no change;
    - every row is `avgen-lab-run/1` with pwd, HEAD, dirty count and load before and after, in `<out>/results.json`;
    - it refuses GPU work unless the machine lock's holder is itself or an ancestor (`src/api/gpu_lock.hpp`'s rule),
-     so it runs under one `tools/gpu-lock.sh` hold per batch.
+     so it runs under one `tools/gpu-lock.sh` hold per batch, and every row records the holder (`gpuLock`);
+   - `suite cpu|gpu|both [--midi-protocol]` runs the test binaries the same way. **The CPU suite needs the lock too**
+     (coordinator, 2026-11-27, reversing a one-day exemption): `avgen_tests` encodes video through the frameworks the
+     GPU work uses, and run beside it has crashed and failed determinism falsely (docs/testing.md 29). `--no-lock-check`
+     never applies to `suite`. An exit 0 with no verdict line is recorded as not a pass.
 2. **Unwritten slots are reported as unwritten.** Each live-profile frame carries `unwritten` (the labels); the record
    carries `unwrittenSlots` (label, frames) in its JSON (always present, so an empty list is a statement) and a limits
    line naming them; the headless trace gains a last column `unwrittenSlots` (the count). The pass's 0 ms stays in the

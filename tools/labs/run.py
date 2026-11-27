@@ -19,9 +19,13 @@ The method it encodes (plan section 2, rule 8, and docs/testing.md), so that nob
     0 ms -- on this Dawn/Metal path every compute pass's slot is unwritten;
   * the noise floor of an arm is the spread of its rep medians, and a difference smaller than twice it is no change.
 
-GPU work needs the machine lock: run this under tools/gpu-lock.sh (one hold for the whole batch). It refuses to run a
-GPU command unless the lock's holder is this process or one of its ancestors, which is the rule src/api/gpu_lock.hpp
-applies; `--no-lock-check` overrides it for a machine with no other GPU user. Standard library only.
+GPU work needs the machine lock, and so does the CPU suite: `avgen_tests` encodes video through the frameworks the GPU
+work uses (docs/testing.md 29). Run this under tools/gpu-lock.sh, one hold for the whole batch. It refuses to run a GPU
+command or a test binary unless the lock's holder is this process or one of its ancestors (src/api/gpu_lock.hpp's
+rule), and every row records the holder. `--no-lock-check` overrides it for renders and benchmarks on a machine with
+no other GPU user, never for `suite`. Standard library only.
+
+    python3 tools/labs/run.py suite both --midi-protocol --out <dir>              # the merge gate's two suites
 """
 import argparse
 import csv
@@ -54,11 +58,26 @@ def load_average():
         return None
 
 
+def lock_holder():
+    """Who holds the machine GPU lock: {pid, holder} as tools/gpu-lock.sh wrote them, or None."""
+    try:
+        with open(os.path.join(lock_dir(), "pid")) as f:
+            pid = int(f.read().strip())
+    except (OSError, ValueError):
+        return None
+    try:
+        with open(os.path.join(lock_dir(), "holder")) as f:
+            name = f.read().strip()
+    except OSError:
+        name = ""
+    return {"pid": pid, "holder": name}
+
+
 def header():
     dirty = git("status", "--porcelain")
     return {"pwd": ROOT, "head": git("rev-parse", "--short", "HEAD"),
             "dirty": len([l for l in dirty.splitlines() if l.strip()]), "load": load_average(),
-            "started": time.strftime("%Y-%m-%dT%H:%M:%S")}
+            "started": time.strftime("%Y-%m-%dT%H:%M:%S"), "gpuLock": lock_holder()}
 
 
 def lock_dir():
@@ -79,8 +98,10 @@ def ancestors():
     return out
 
 
-def require_lock(args):
-    if args.no_lock_check:
+def require_lock(args, cpu_suite=False):
+    # The CPU suite is GPU work too: it encodes video through the frameworks the GPU work uses, and run beside it has
+    # crashed (SIGTRAP) and failed determinism checks falsely (docs/testing.md 29). It is never exempt.
+    if args.no_lock_check and not cpu_suite:
         return
     try:
         with open(os.path.join(lock_dir(), "pid")) as f:
@@ -345,6 +366,43 @@ def cmd_noise(args):
     return 1 if any(r["exit"] != 0 for r in rows) else 0
 
 
+MIDI_WILDCARD = "MidiInput with a wildcard filter auto-connects sources that appear later"
+
+
+def suite_run(args, binary, spec, tag):
+    log = os.path.join(args.out, tag + ".log")
+    argv = [os.path.join(ROOT, args.bin, "tests", binary)] + ([spec] if spec else [])
+    rc, seconds = run_avgen(argv, log)
+    verdict = [m.group(0) for m in grep_log(log, r"^(test cases:.*|All tests passed.*)$")]
+    row = {"format": FORMAT, "kind": "suite", "binary": binary, "spec": spec, "exit": rc, "seconds": seconds,
+           "verdict": verdict[-1] if verdict else None, **header(), "loadAfter": load_average(), "log": log}
+    # An exit code with no verdict line is a crash; a verdict that disagrees with the exit code is a tooling fault.
+    # Neither is a pass (docs/testing.md 11, 18).
+    if verdict == [] and rc == 0:
+        row["note"] = "exit 0 with no verdict line: not a pass"
+    append(args.out, row)
+    print(f"{tag}: exit {rc}, {row['verdict']}, {seconds} s, lock {row['gpuLock']}")
+    return rc
+
+
+def cmd_suite(args):
+    """Both test binaries go through the machine lock, the CPU suite included (coordinator rule, 2026-11-27)."""
+    require_lock(args, cpu_suite=True)
+    os.makedirs(args.out, exist_ok=True)
+    rcs = []
+    if args.which in ("cpu", "both"):
+        if args.midi_protocol:
+            # The CoreMIDI wildcard flake protocol: the suite without it, then it alone three times; all must pass.
+            rcs.append(suite_run(args, "avgen_tests", "~" + MIDI_WILDCARD, "suite-cpu-excl-midi-wildcard"))
+            for r in (1, 2, 3):
+                rcs.append(suite_run(args, "avgen_tests", MIDI_WILDCARD, f"midi-wildcard-run{r}"))
+        else:
+            rcs.append(suite_run(args, "avgen_tests", args.filter, "suite-cpu"))
+    if args.which in ("gpu", "both"):
+        rcs.append(suite_run(args, "avgen_render_tests", args.filter, "suite-gpu"))
+    return 1 if any(rcs) else 0
+
+
 def cmd_stats(args):
     with open(args.results) as f:
         doc = json.load(f)
@@ -379,6 +437,12 @@ def main(argv=None):
         b.add_argument("--camera", help="a named camera for every arm")
         b.add_argument("--out", required=True)
         b.set_defaults(func=func)
+    t = sub.add_parser("suite", help="run avgen_tests and/or avgen_render_tests under the lock, exit codes recorded")
+    t.add_argument("which", choices=["cpu", "gpu", "both"])
+    t.add_argument("--midi-protocol", action="store_true", help="CPU: the CoreMIDI wildcard flake protocol")
+    t.add_argument("--filter", help="a Catch2 spec (tags are safer than names: a comma splits a name)")
+    t.add_argument("--out", required=True)
+    t.set_defaults(func=cmd_suite)
     s = sub.add_parser("stats", help="re-read a results.json")
     s.add_argument("results")
     s.set_defaults(func=cmd_stats)
