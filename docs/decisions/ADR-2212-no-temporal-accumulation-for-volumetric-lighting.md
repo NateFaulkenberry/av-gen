@@ -15,9 +15,12 @@ temporal's main motivation (Stage A: 0.1-1.6 ms).
 
 ## Decision
 
-No history at any tier. The sample positions inside a froxel are a fixed function of the froxel's index and the
-subsample number, never of the frame, so a still frame is a still picture and a frame is a pure function of the
-scene, the time and the camera. Quality comes from the grid, the shadow taps and in-frame subsamples (ADR-2213).
+No history at any tier. The sample positions inside a froxel are a fixed function of the subsample number alone --
+the froxel's centre for one sample, a stratified pattern for several -- never of the froxel or the frame, so a still
+frame is a still picture and a frame is a pure function of the scene, the time and the camera. (A per-froxel random
+depth offset was tried first and drew a spot's cone edge as froxel-sized blocks: independent noise per froxel is what
+temporal accumulation exists to average, and without it the noise stays.) Quality comes from the grid, the shadow
+taps and in-frame subsamples (ADR-2213).
 
 ## Revisit when (live only)
 

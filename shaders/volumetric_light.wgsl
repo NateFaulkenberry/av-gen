@@ -14,7 +14,7 @@
 //                 a = transmittance over the same span.
 //
 // No history at any tier (ADR-2212). The sample offsets inside a froxel are a fixed function of the
-// froxel's index and the subsample number -- not of the frame -- so a still frame is a still picture
+// subsample number alone -- not of the froxel or the frame -- so a still frame is a still picture
 // and a frame is a pure function of the scene, the time and the camera.
 //
 // Group 0 is the frame group's resources re-bound for compute (ADR-2210's compute-visible binding):
@@ -240,16 +240,18 @@ fn vlParticleGlow(p: vec3<f32>) -> vec3<f32> {
     return sum;
 }
 
-// A fixed in-froxel offset per subsample: a 4-point rotated grid in xy and a stratified depth, the
-// rotation chosen per froxel from its index so neighbouring froxels do not alias together. No time.
-fn vlOffset(id: vec3<u32>, k: u32, n: u32) -> vec3<f32> {
-    let h = pcg3d(id);
-    let r = f32(h.x & 0xFFFFu) * (1.0 / 65536.0);
+// A fixed in-froxel offset per subsample. One sample sits at the froxel's centre: a per-froxel random depth offset
+// (the first version) turned every froxel into an independent sample of a steep gradient -- a spot's cone edge, a
+// shadow boundary -- and the trilinear apply drew that as visible blocks the size of a froxel (lab e06). Several
+// samples are stratified: a 4-point rotated grid in xy and evenly spaced depths, with no randomness, so the
+// average converges smoothly as the tier adds samples. No time either way (ADR-2212).
+fn vlOffset(k: u32, n: u32) -> vec3<f32> {
+    if (n <= 1u) {
+        return vec3<f32>(0.5);
+    }
     var pattern = array<vec2<f32>, 4>(vec2<f32>(0.375, 0.125), vec2<f32>(0.875, 0.375), vec2<f32>(0.125, 0.625),
                                       vec2<f32>(0.625, 0.875));
-    let xy = select(vec2<f32>(0.5), pattern[(k + (h.y & 3u)) & 3u], n > 1u);
-    let z = fract((f32(k) + 0.5) / f32(n) + r);
-    return vec3<f32>(xy, z);
+    return vec3<f32>(pattern[k & 3u], (f32(k) + 0.5) / f32(n));
 }
 
 @compute @workgroup_size(4, 4, 4)
@@ -263,7 +265,7 @@ fn cs_inject(@builtin(global_invocation_id) id: vec3<u32>) {
     var source = vec3<f32>(0.0);
     var extinction = 0.0;
     for (var k = 0u; k < n; k = k + 1u) {
-        let uvw = (vec3<f32>(id) + vlOffset(id, k, n)) / vec3<f32>(dims);
+        let uvw = (vec3<f32>(id) + vlOffset(k, n)) / vec3<f32>(dims);
         let ray = vlRay(uvw.xy);
         let viewDepth = vlSliceDepth(uvw.z);
         let p = frame.cameraPos.xyz + ray * viewDepth;
