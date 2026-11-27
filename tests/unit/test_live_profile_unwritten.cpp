@@ -19,7 +19,7 @@ TEST_CASE("live profile: unwritten timestamp slots are reported as unwritten, no
         f.gpuMs = 12.0;
         f.cpuWorkMs = 6.0;
         f.passes = {{"clusters", 0.0}, {"scene", 9.0}, {"vfx.inject", 0.0}};
-        f.unwritten = {"clusters"};
+        f.unwritten = {"clusters", "clusters"}; // a label marked twice in a frame is one frame, not two
         if (i < 4) {
             f.unwritten.push_back("vfx.inject");
         }
@@ -45,7 +45,7 @@ TEST_CASE("live profile: unwritten timestamp slots are reported as unwritten, no
     CHECK(j["unwrittenSlots"][1]["unwrittenFrames"] == 4);
     // The trace row counts this frame's unwritten slots in its last column.
     const std::string row = headlessTraceRow('m', 1.0, frames[0], HeadlessTraceCounts{}, 0, false);
-    CHECK(row.ends_with(",2\n"));
+    CHECK(row.ends_with(",3\n")); // slots, not labels: the trace counts every unwritten slot
 
     // The control: a run where every slot was written reports an empty list and no such limit.
     for (auto& f : frames) {

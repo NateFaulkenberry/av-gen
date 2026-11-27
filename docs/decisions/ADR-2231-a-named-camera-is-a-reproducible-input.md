@@ -39,6 +39,9 @@ Every lab needs deterministic cameras, and nothing could select one:
 5. **A render job's camera is not project data.** It is not written to the project's `render` block, like `--range`.
 6. **The reproduce command reproduces**: it prints the camera flag and a `--render renders/labs/<lab>-<n>` output
    (before, a pasted case command drew one frame and wrote nothing).
+   And `--lab-case <c> --render` renders the case's one frame at its time, as that command does: it used to render
+   the fixture's whole default range from 0 (600 frames for a 10 s lab at 60 fps), because the case time was only a
+   seek for the editor. An explicit `--range` still wins.
 7. **The API half is ADR-2206's** (Agent 1, after API level 3): `render.capture` / `render.start` gain
    `camera: "shot" | "viewport" | {name} | {pose}`, filled into `RenderSettings::camera`; `{name}` resolves through
    `Engine::pinCamera`, so the CLI and the API cannot disagree about a name.

@@ -1322,6 +1322,13 @@ Result<AppOptions> parseArgsImpl(int argc, char** argv) {
         if (c.supersample != 1.0 && options.supersample <= 1.0) {
             options.supersample = static_cast<float>(c.supersample);
         }
+        // ADR-2231: a case is one frame at its time, and a render of it is that frame. `--lab-case <c> --render` rendered
+        // the fixture's whole default range from 0 instead (the time was only a seek for the editor), while the
+        // logged reproduce line said `--range t:t` -- two commands for one case that drew different frames.
+        if (options.render && !options.rangeStart && !options.rangeEnd) {
+            options.rangeStart = c.timeSeconds;
+            options.rangeEnd = c.timeSeconds;
+        }
         // ADR-2231: the case's camera. It was parsed and saved and applied by nothing, so every case that set one
         // reproduced through the fixture's own camera. A `--camera` typed beside the case wins, like every other flag.
         if (options.camera.film()) {

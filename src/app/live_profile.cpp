@@ -814,7 +814,14 @@ void buildLiveProfile(LiveProfileRecord& record, const std::vector<LiveProfileFr
     // and said in the limits, so a budget is never read off it.
     record.unwrittenSlots.clear();
     for (const auto& f : frames) {
+        // Per FRAME: a label marked several times in one frame (every particle system's pass is `particles`) counts
+        // once, or "frames" would read 5124 of 200.
+        std::vector<std::string> seen;
         for (const std::string& label : f.unwritten) {
+            if (std::find(seen.begin(), seen.end(), label) != seen.end()) {
+                continue;
+            }
+            seen.push_back(label);
             auto it = std::find_if(record.unwrittenSlots.begin(), record.unwrittenSlots.end(),
                                    [&](const auto& u) { return u.label == label; });
             if (it == record.unwrittenSlots.end()) {
