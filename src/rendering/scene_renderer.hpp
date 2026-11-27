@@ -188,6 +188,7 @@ struct RenderStats {
     ProceduralStats procedural; // ADR-023; its draws/triangles are also folded into the totals
     SdfStats sdf;               // ADR-027; its draws/triangles are also folded into the totals
     VolumeStats volume;         // ADR-032; the raymarched atmosphere (steps 0 = off)
+    VolumetricLightStats volumetricLight; // ADR-2210; the froxel grid (active false = off, decline says why)
     ShadowStats shadows;        // ADR-034; cascades and spot maps rendered this frame
     AoStats ao;                 // ADR-034; ground-truth ambient occlusion
     ShadowMaskStats shadowMask; // ADR-087; the half-resolution directional shadow mask
@@ -1126,6 +1127,7 @@ private:
     std::unique_ptr<ProceduralRenderer> procedurals_;
     std::unique_ptr<SdfRenderer> sdfs_;
     std::unique_ptr<VolumeRenderer> volumes_;
+    std::unique_ptr<VolumetricLightRenderer> volumetricLight_; // ADR-2210
     std::unique_ptr<DebugDraw> debug_;
     FrameOverlay* overlay_ = nullptr;
     bool debugDepthTest_ = true;

@@ -40,6 +40,7 @@ target_sources(avgen_tests PRIVATE
     "${CMAKE_SOURCE_DIR}/src/app/interactive_resolution.cpp"
     # ADR-2134: the cloud march's knobs under the live ladder's levers -- arithmetic on the clouds block, no device.
     "${CMAKE_SOURCE_DIR}/src/rendering/cloud_march_quality.cpp"
+    "${CMAKE_SOURCE_DIR}/src/rendering/volumetric_light_medium.cpp" # ADR-2210: the GPU-free half
     # ADR-1090: the live profiler's logic (statistics, categories, candidates, writers). No device.
     "${CMAKE_SOURCE_DIR}/src/app/live_drop_reason.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/live_profile.cpp"

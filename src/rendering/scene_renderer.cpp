@@ -198,6 +198,7 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
       procedurals_(std::make_unique<ProceduralRenderer>(context, shaders)),
       sdfs_(std::make_unique<SdfRenderer>(context, shaders)),
       volumes_(std::make_unique<VolumeRenderer>(context, shaders)),
+      volumetricLight_(std::make_unique<VolumetricLightRenderer>(context, shaders)),
       debug_(std::make_unique<DebugDraw>(context, shaders)),
       simulation_(std::make_unique<Simulation>(context, shaders)),
       shadows_(std::make_unique<ShadowRenderer>(context)),
@@ -601,6 +602,9 @@ Result<void> SceneRenderer::init() {
         !r) {
         return r;
     }
+    if (auto r = volumetricLight_->init(); !r) { // ADR-2210
+        return r;
+    }
     if (auto r = simulation_->init(fields_->gridBuffer()); !r) {
         return r;
     }
@@ -629,6 +633,7 @@ Result<void> SceneRenderer::init() {
     procedurals_->setTimeline(timeline_.get());
     sdfs_->setTimeline(timeline_.get());
     volumes_->setTimeline(timeline_.get());
+    volumetricLight_->setTimeline(timeline_.get());
     simulation_->setTimeline(timeline_.get());
     ao_->setTimeline(timeline_.get());
     shadowMask_->setTimeline(timeline_.get());
@@ -2535,6 +2540,9 @@ Result<void> SceneRenderer::reloadEngineShaders() {
     }
     if (auto r = volumes_->reload(); !r) {
         keep("volume.wgsl", r);
+    }
+    if (auto r = volumetricLight_->reload(); !r) {
+        keep("volumetric_light.wgsl", r);
     }
     if (auto r = simulation_->reload(); !r) {
         keep("simulate.wgsl", r);
@@ -4709,7 +4717,10 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             particleFrame.terrainHeight = terrainHeight_.valid() ? terrainHeight_.view : nullptr;
             particleFrame.horizonDensity = scene.environment.horizonDensity;
             particleFrame.fogAbsorption = scene.environment.volumeAbsorption;
-            particleFrame.fogMaxDistance = scene.environment.volumeMaxDistance;
+            // ADR-2210: the near air is the froxel grid's out to its distance when volumetric lighting is on.
+            particleFrame.fogMaxDistance = VolumetricLightRenderer::active(scene)
+                                               ? VolumeRenderer::surfaceFogStart(scene)
+                                               : scene.environment.volumeMaxDistance;
         }
         particleFrame.linearDepth = needsDepthPrepass ? linearDepth_.view : nullptr;
         // ADR-1147: the angle one pixel subtends (vertical), for a shard's footprint.
@@ -5584,11 +5595,47 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // `volume.composite`.
     // Skipped entirely when Environment::volumeDensity is 0, so scenes without fog are unchanged.
     if (toggles_.volume && !(portalOn && scene.portal.crossed)) { // ADR-1879: crossed, the frame is the other world's
+        // ADR-2210: volumetric lighting's froxel grid first; the volume composite applies it (ADR-2217).
+        {
+            // Each frame light's place in the packed light buffer (its shadow view and flags live there), in the
+            // order the frame uniforms hold them: `scene.lights`, enabled, at most eight -- the loop that fills
+            // `frame.lights`.
+            std::array<int, 8> packed{};
+            std::array<bool, 8> shadowsAir{};
+            packed.fill(-1);
+            std::size_t n = 0;
+            for (const auto& light : scene.lights) {
+                if (!light.enabled || n >= kMaxLights) {
+                    continue;
+                }
+                for (std::size_t j = 0; j < lightOrder_.size(); ++j) {
+                    if (lightOrder_[j] == &light) {
+                        packed[n] = static_cast<int>(j);
+                        break;
+                    }
+                }
+                shadowsAir[n] = light.castsShadow && light.volumetricShadow; // ADR-2214
+                ++n;
+            }
+            volumetricLight_->update(scene, time, hdr_.width(), hdr_.height(), packed, shadowsAir, qualitySettings_,
+                                     particles_->glowSystems());
+            VolumetricLightInputs in;
+            in.frameUniforms = frameUniforms_;
+            in.lights = lightBuffer_;
+            in.clusters = clusterBuffer_;
+            in.shadowUniforms = shadows_->uniforms();
+            in.shadowAtlas = shadows_->atlasView();
+            in.shadowSampler = shadows_->comparisonSampler();
+            in.terrainHeight = terrainHeightView();
+            in.particleGlow = particles_->glowBuffer();
+            volumetricLight_->encode(encoder, in);
+        }
         volumes_->update(scene, time, hdr_.width(), hdr_.height(), hdr_.depthView(), fields_.get(),
-                         particles_->glowSystems(), qualitySettings_);
+                         particles_->glowSystems(), qualitySettings_, volumetricLight_->apply());
         volumes_->encode(encoder, hdr_.colorView(), frameBindGroup_);
     }
     stats_.volume = volumes_->stats();
+    stats_.volumetricLight = volumetricLight_->stats();
 
     // ---- DF: screen-space distortion (Effect Library Wave 1) ----
     // After the volume composite and the debug pass, so fog, media and god rays bend with the scene;

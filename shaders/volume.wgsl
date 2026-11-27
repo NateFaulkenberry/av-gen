@@ -54,6 +54,11 @@ struct VolumeUniforms {
     glow: vec4<f32>,      // x = particle glow entries to read (ADR-040), y = local-light strength
     heightFog: vec4<f32>, // ADR-568: x = fogUpperDensity, y = fogHeightCurve; ADR-715: z = fogGroundFollow; ADR-705: w = horizonDensity
     selfShadow: vec4<f32>, // ADR-570: x = shadow march steps (0 = off), y = strength, zw = 0
+    // ADR-2217: volumetric lighting's froxel grid, applied here. x = 1 when it is on, y = the exponential's
+    // origin depth, z = log(far / origin), w = the hand-over distance along the ray.
+    froxel: vec4<f32>,
+    // x = slices, y = 1 when the march ran this frame (with the grid on, only placed media are marched), zw = 0.
+    froxelGrid: vec4<f32>,
     // ADR-562: the placed media, as lanes. `mediaInfo.x` is how many are live.
     //
     // Was twelve named `vortexN` members carrying exactly ONE medium, so the second placed medium
@@ -103,6 +108,9 @@ fn mediumVortexUniforms(s: u32) -> VortexUniformsWgsl {
 // ADR-040: two vec4 per particle system - (centre.xyz, spread radius) and (colour.rgb, power) -
 // written by particles.wgsl's cs_glow_top. Slots past vol.glow.x are zero.
 @group(1) @binding(5) var<storage, read> particleGlow: array<vec4<f32>>;
+// ADR-2217: the integrated froxel grid (volumetric_light.wgsl) and a linear sampler; a 1x1x1 placeholder when off.
+@group(1) @binding(6) var froxelTex: texture_3d<f32>;
+@group(1) @binding(7) var froxelSampler: sampler;
 
 struct FsIn {
     @builtin(position) pos: vec4<f32>,
@@ -1183,9 +1191,9 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
     return vec4<f32>(scattered, transmittance);
 }
 
-@fragment
-fn fs_composite(in: FsIn) -> @location(0) vec4<f32> {
-    let fullPx = vec2<i32>(floor(in.pos.xy));
+// The march's own composite, unchanged: what the half-resolution march says this pixel's air does.
+// (0, 0, 0, 1) is "nothing here", which the blend leaves exactly as the lit pass drew it.
+fn marchComposite(fullPx: vec2<i32>) -> vec4<f32> {
     let myDepth = linearDepth(textureLoad(sceneDepth, fullPx, 0));
     // Bilinear footprint in march-texel space. `invRatio` is 0.5 at the default half-resolution
     // scale and 1.0 when the march ran per pixel -- and at 1.0 `coord` lands exactly on an
@@ -1237,4 +1245,50 @@ fn fs_composite(in: FsIn) -> @location(0) vec4<f32> {
     }
     let result = accum / weightSum;
     return vec4<f32>(result.rgb, clamp(result.a, 0.0, 1.0));
+}
+
+// ADR-2217: the froxel grid's air in front of this pixel -- one trilinear tap. The grid's slices are view
+// depth; the tap is clamped to the hand-over distance ALONG THE RAY, so the grid carries exactly the metres
+// the surface fog does not (applyFog starts at that distance from the eye): no seam and no double count at
+// the edges of a wide frame, where view depth and distance differ.
+fn froxelComposite(fullPx: vec2<i32>) -> vec4<f32> {
+    let uv = (vec2<f32>(fullPx) + vec2<f32>(0.5)) / vol.sizes.zw;
+    let ndc = ndcOf(uv);
+    let direction = viewRayDirection(ndc);
+    let cosine = max(dot(direction, frame.cameraForward.xyz), 1e-3);
+    var reach = vol.froxel.w;
+    let z = textureLoad(sceneDepth, fullPx, 0);
+    if (z < 1.0) {
+        reach = min(reach, distance(worldAt(ndc, z), frame.cameraPos.xyz));
+    }
+    let viewDepth = reach * cosine;
+    let slices = vol.froxelGrid.x;
+    // Slice 0 runs from the eye to origin * exp(z / slices); inside it the stored integral (to its far
+    // end) is scaled by the fraction of the slice in front of this pixel -- the air there is one froxel.
+    let firstEnd = vol.froxel.y * exp(vol.froxel.z / slices);
+    if (viewDepth < firstEnd) {
+        let first = textureSampleLevel(froxelTex, froxelSampler, vec3<f32>(uv, 0.5 / slices), 0.0);
+        let f = clamp(viewDepth / firstEnd, 0.0, 1.0);
+        return vec4<f32>(first.rgb * f, pow(max(first.a, 1e-6), f));
+    }
+    // The grid stores the integral to the FAR end of each slice, so a depth inside slice k reads between
+    // the values of k-1 and k: half a slice back.
+    let w = log(viewDepth / vol.froxel.y) / vol.froxel.z;
+    let coord = clamp(w - 0.5 / slices, 0.5 / slices, 1.0 - 0.5 / slices);
+    return textureSampleLevel(froxelTex, froxelSampler, vec3<f32>(uv, coord), 0.0);
+}
+
+@fragment
+fn fs_composite(in: FsIn) -> @location(0) vec4<f32> {
+    let fullPx = vec2<i32>(floor(in.pos.xy));
+    if (vol.froxel.x < 0.5) {
+        return marchComposite(fullPx); // ADR-2217: with the grid off, the composite it always was
+    }
+    var march = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+    if (vol.froxelGrid.y > 0.5) {
+        march = marchComposite(fullPx);
+    }
+    // The grid's air is in front of the media's (it starts at the eye); over them: scatter + T * march.
+    let air = froxelComposite(fullPx);
+    return vec4<f32>(air.rgb + air.a * march.rgb, clamp(air.a * march.a, 0.0, 1.0));
 }

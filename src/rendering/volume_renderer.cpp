@@ -44,7 +44,7 @@ struct VolumeRenderer::Impl {
     Result<void> createPipelines(const wgpu::ShaderModule& module, bool start = false); // ADR-1562: start at init
     Result<wgpu::RenderPipeline> finish(const wgpu::RenderPipelineDescriptor& desc, const char* label);
     Result<void> ensureTarget(std::uint32_t width, std::uint32_t height, float scale);
-    void rebuildGroups(const wgpu::TextureView& sceneDepth);
+    void rebuildGroups(const wgpu::TextureView& sceneDepth, const wgpu::TextureView& froxel);
 
     gpu::Context& context;
     gpu::ShaderLibrary& shaders;
@@ -63,6 +63,11 @@ struct VolumeRenderer::Impl {
     wgpu::Texture placeholder;      // 1x1 stand-in for binding 4 in the march pass
     wgpu::TextureView placeholderView;
     wgpu::TextureView boundDepth;
+    wgpu::TextureView boundFroxel; // ADR-2217
+    wgpu::Sampler froxelSampler;
+    wgpu::Texture froxelPlaceholder; // a 1x1x1 grid the composite binds and never samples when the grid is off
+    wgpu::TextureView froxelPlaceholderView;
+    bool marchThisFrame = false;
     gpu::FrameTimeline* timeline = nullptr;
     double lastMs = -1.0;
     double lastMarchMs = -1.0;
@@ -94,10 +99,18 @@ bool VolumeRenderer::enabled(const scene::Environment& environment) {
 }
 
 bool VolumeRenderer::enabled(const scene::Scene& scene) {
-    return enabled(scene.environment) || scene.atmospherics.mediumCount > 0;
+    // ADR-2217: with volumetric lighting on, the composite runs for the froxel grid even when nothing is
+    // marched (an environment whose air the grid carries and no placed media).
+    return enabled(scene.environment) || scene.atmospherics.mediumCount > 0 || volumetricLightActive(scene);
 }
 
 float VolumeRenderer::surfaceFogStart(const scene::Scene& scene) {
+    // ADR-2211/2217: with volumetric lighting on, the froxel grid carries the air out to its distance and the
+    // surface fog takes over there -- one law, each metre counted once, whatever the march's own reach.
+    if (volumetricLightActive(scene)) {
+        return std::clamp(scene.environment.volumetricLight.distance, scene::kVolumetricLightMinDistance,
+                          scene::kVolumetricLightMaxDistance);
+    }
     // A surface-only environment (`volumeMaxDistance` 0, ADR-705) is the surface pass's alone, the
     // whole ray, whether or not a placed medium makes the march run -- see `marchReach` below.
     if (!enabled(scene) || scene.environment.volumeMaxDistance <= 0.0f) {
@@ -148,7 +161,7 @@ Result<void> VolumeRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Texture
     {
         // Group 1: 1 = VolumeUniforms, 2 = field block, 3 = scene depth, 4 = the half-res march
         // result. Binding 0 stays free (common.wgsl declares `object` there and nothing reads it).
-        std::array<wgpu::BindGroupLayoutEntry, 5> entries{};
+        std::array<wgpu::BindGroupLayoutEntry, 7> entries{};
         entries[0].binding = 1;
         entries[0].visibility = wgpu::ShaderStage::Fragment;
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
@@ -169,6 +182,13 @@ Result<void> VolumeRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Texture
         entries[4].visibility = wgpu::ShaderStage::Fragment;
         entries[4].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
         entries[4].buffer.minBindingSize = kParticleGlowBytes;
+        entries[5].binding = 6; // ADR-2217: the integrated froxel grid
+        entries[5].visibility = wgpu::ShaderStage::Fragment;
+        entries[5].texture.sampleType = wgpu::TextureSampleType::Float;
+        entries[5].texture.viewDimension = wgpu::TextureViewDimension::e3D;
+        entries[6].binding = 7;
+        entries[6].visibility = wgpu::ShaderStage::Fragment;
+        entries[6].sampler.type = wgpu::SamplerBindingType::Filtering;
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "volume-layout";
         desc.entryCount = entries.size();
@@ -182,6 +202,22 @@ Result<void> VolumeRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Texture
         desc.bindGroupLayoutCount = layouts.size();
         desc.bindGroupLayouts = layouts.data();
         im.pipelineLayout = device.CreatePipelineLayout(&desc);
+    }
+    {
+        wgpu::SamplerDescriptor desc{};
+        desc.label = "volume-froxel-sampler";
+        desc.magFilter = wgpu::FilterMode::Linear;
+        desc.minFilter = wgpu::FilterMode::Linear;
+        desc.addressModeU = desc.addressModeV = desc.addressModeW = wgpu::AddressMode::ClampToEdge;
+        im.froxelSampler = device.CreateSampler(&desc);
+        wgpu::TextureDescriptor td{};
+        td.label = "volume-froxel-placeholder";
+        td.usage = wgpu::TextureUsage::TextureBinding;
+        td.dimension = wgpu::TextureDimension::e3D;
+        td.size = {1, 1, 1};
+        td.format = wgpu::TextureFormat::RGBA16Float;
+        im.froxelPlaceholder = device.CreateTexture(&td);
+        im.froxelPlaceholderView = im.froxelPlaceholder.CreateView();
     }
     {
         // The march pass renders into the half-res texture, so it cannot also bind it; it binds
@@ -316,13 +352,13 @@ Result<void> VolumeRenderer::Impl::ensureTarget(std::uint32_t width, std::uint32
     return {};
 }
 
-void VolumeRenderer::Impl::rebuildGroups(const wgpu::TextureView& sceneDepth) {
-    if (marchGroup && compositeGroup && boundDepth.Get() == sceneDepth.Get()) {
+void VolumeRenderer::Impl::rebuildGroups(const wgpu::TextureView& sceneDepth, const wgpu::TextureView& froxel) {
+    if (marchGroup && compositeGroup && boundDepth.Get() == sceneDepth.Get() && boundFroxel.Get() == froxel.Get()) {
         return;
     }
     const auto& device = context.device();
     auto make = [&](const wgpu::TextureView& volumeView, const char* label) {
-        std::array<wgpu::BindGroupEntry, 5> entries{};
+        std::array<wgpu::BindGroupEntry, 7> entries{};
         entries[0].binding = 1;
         entries[0].buffer = uniforms;
         entries[0].size = sizeof(VolumeUniforms);
@@ -336,6 +372,10 @@ void VolumeRenderer::Impl::rebuildGroups(const wgpu::TextureView& sceneDepth) {
         entries[4].binding = 5;
         entries[4].buffer = this->particleGlow;
         entries[4].size = kParticleGlowBytes;
+        entries[5].binding = 6;
+        entries[5].textureView = froxel;
+        entries[6].binding = 7;
+        entries[6].sampler = froxelSampler;
         wgpu::BindGroupDescriptor desc{};
         desc.label = label;
         desc.layout = volumeLayout;
@@ -346,15 +386,18 @@ void VolumeRenderer::Impl::rebuildGroups(const wgpu::TextureView& sceneDepth) {
     marchGroup = make(placeholderView, "volume-march-group");
     compositeGroup = make(half.colorView(), "volume-composite-group");
     boundDepth = sceneDepth;
+    boundFroxel = froxel;
 }
 
 void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, std::uint32_t width,
                             std::uint32_t height, const wgpu::TextureView& sceneDepth, const FieldUniforms* fields,
-                            std::uint32_t particleGlowSystems, const QualitySettings& quality) {
+                            std::uint32_t particleGlowSystems, const QualitySettings& quality,
+                            const VolumetricLightApply& froxel) {
     Impl& im = *impl_;
     collectTimings();
     im.activeThisFrame = false;
     im.passThisFrame = false;
+    im.marchThisFrame = false;
     stats_ = VolumeStats{};
     const scene::Environment& env = scene.environment;
     if (!im.initialised || !enabled(scene) || width == 0 || height == 0) {
@@ -367,7 +410,12 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
         log::warn("volumetrics disabled this frame: {}", r.error().message);
         return;
     }
-    im.rebuildGroups(sceneDepth);
+    // ADR-2217: the composite always binds a grid; the placeholder when volumetric lighting is off.
+    const bool froxelOn = froxel.active && froxel.integrated != nullptr;
+    const wgpu::TextureView froxelView = froxelOn ? froxel.integrated : im.froxelPlaceholderView;
+    im.rebuildGroups(sceneDepth, froxelView);
+    // With the grid on, the march runs only for placed media; the environment's air is the grid's.
+    const bool march = froxelOn ? scene.atmospherics.mediumCount > 0 : true;
 
     const float stepScale = std::clamp(quality.volumeStepScale, 0.05f, 4.0f);
     const int scaledSteps =
@@ -397,7 +445,8 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
     // pass) -- so the environment fog is the same frame with or without a medium in it.
     float marchReach = std::max(env.volumeMaxDistance, 0.01f);
     float environmentDensity = std::max(env.volumeDensity, 0.0f);
-    if (env.volumeMaxDistance <= 0.0f && scene.atmospherics.mediumCount > 0) {
+    // ADR-2217: and the same when the froxel grid carries the environment's air -- the march keeps the media.
+    if ((env.volumeMaxDistance <= 0.0f || froxelOn) && scene.atmospherics.mediumCount > 0) {
         environmentDensity = 0.0f;
         const glm::vec3 eye = scene.camera.position;
         float farthest = 0.01f;
@@ -447,6 +496,10 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
     // If the cost needs a tier, it should be a tier that turns it off and says so.
     u.selfShadow = glm::vec4(static_cast<float>(std::clamp(env.volumeShadowSteps, 0, 16)),
                              std::max(env.volumeShadowStrength, 0.0f), 0.0f, 0.0f);
+    if (froxelOn) { // ADR-2217; zero otherwise, which `fs_composite` reads as "the composite it always was"
+        u.froxel = glm::vec4(1.0f, froxel.nearDepth, froxel.logRatio, froxel.distance);
+        u.froxelGrid = glm::vec4(static_cast<float>(froxel.slices), march ? 1.0f : 0.0f, 0.0f, 0.0f);
+    }
     // ADR-040: the march reads this many entries from the particle glow table.
     const std::uint32_t glowSystems = std::min(particleGlowSystems, kMaxParticleGlowSystems);
     u.glow = glm::vec4(static_cast<float>(glowSystems),
@@ -473,7 +526,8 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
     im.context.queue().WriteBuffer(im.uniforms, 0, &u, sizeof(u));
 
     im.activeThisFrame = true;
-    stats_.steps = static_cast<std::uint32_t>(steps);
+    im.marchThisFrame = march;
+    stats_.steps = march ? static_cast<std::uint32_t>(steps) : 0u;
     stats_.glowSystems = glowSystems;
     // ADR-578 (§39): the two numbers that decide this pass's cost and were not in any record.
     stats_.media = static_cast<std::uint32_t>(scene.atmospherics.mediumCount);
@@ -492,7 +546,7 @@ void VolumeRenderer::encode(wgpu::CommandEncoder& encoder, const wgpu::TextureVi
     if (!im.activeThisFrame) {
         return;
     }
-    {
+    if (im.marchThisFrame) {
         wgpu::RenderPassColorAttachment attachment{};
         attachment.view = im.half.colorView();
         attachment.loadOp = wgpu::LoadOp::Clear;

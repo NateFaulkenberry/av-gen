@@ -23,6 +23,7 @@
 #include "core/time.hpp"
 #include "gpu/render_target.hpp"
 #include "rendering/render_quality.hpp"
+#include "rendering/volumetric_light_renderer.hpp"
 #include "scene/scene.hpp"
 #include "world/atmospherics.hpp"
 
@@ -93,6 +94,11 @@ struct VolumeUniforms {
     // (0 = off and the shader returns 1.0 from its first branch, so every existing frame is
     // bit-identical), y = strength, zw = 0.
     glm::vec4 selfShadow;
+    // ADR-2217: volumetric lighting's froxel grid, applied by the composite. x = 1 when on, y = the slices'
+    // exponential origin, z = log(far / origin), w = the hand-over distance along the ray.
+    glm::vec4 froxel;
+    // x = slices, y = 1 when the march ran this frame (with the grid on it marches the placed media only).
+    glm::vec4 froxelGrid;
     // ADR-562: the placed media, as lanes. Was twelve named `vortexN` members carrying exactly one
     // medium; a slot is `world::kMediumLanes` `vec4` and there are `world::kMaxMedia` of them, so a
     // second medium is a slot rather than a rewrite. `mediaInfo.x` is how many are live and the
@@ -112,7 +118,8 @@ struct VolumeUniforms {
 // exists: the kind tag moved into each slot's own last lane (`MediumSlot::lane[15].x`, ADR-562),
 // which is why it costs nothing here. That stale comment is exactly why this one counts members
 // instead of describing them.
-static_assert(sizeof(VolumeUniforms) == 16 * (10 + 1 + world::kMaxMedia * world::kMediumLanes));
+// ADR-2217 adds `froxel` and `froxelGrid`: twelve shared lanes.
+static_assert(sizeof(VolumeUniforms) == 16 * (12 + 1 + world::kMaxMedia * world::kMediumLanes));
 
 class VolumeRenderer {
 public:
@@ -156,7 +163,8 @@ public:
     void update(const scene::Scene& scene, const FrameTime& time, std::uint32_t width, std::uint32_t height,
                 const wgpu::TextureView& sceneDepth, const FieldUniforms* fields = nullptr,
                 std::uint32_t particleGlowSystems = 0,
-                const QualitySettings& quality = QualitySettings{});
+                const QualitySettings& quality = QualitySettings{},
+                const VolumetricLightApply& froxel = VolumetricLightApply{});
     // Encodes the march pass and the composite pass onto `color` (loaded and stored). Call right
     // after the lit pass. No-op when the last update() found the fog off.
     void encode(wgpu::CommandEncoder& encoder, const wgpu::TextureView& color,
