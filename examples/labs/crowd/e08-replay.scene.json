@@ -1,0 +1,1814 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Crowd Lab e08: deterministic replay",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.0,
+   40.0,
+   24.0
+  ],
+  "target": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "fov": 50.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "background": [
+   0.03,
+   0.035,
+   0.05
+  ],
+  "skyIntensity": 0.0,
+  "lightFromEnvironment": false,
+  "volumeDensity": 0.0,
+  "shadowCascades": 2
+ },
+ "lights": [
+  {
+   "name": "sun",
+   "type": "directional",
+   "direction": [
+    -0.4,
+    -1.0,
+    -0.3
+   ],
+   "color": [
+    1.0,
+    0.97,
+    0.92
+   ],
+   "intensity": 3.0
+  }
+ ],
+ "navCellSize": 0.5,
+ "navBodyRadius": 0.3,
+ "nodes": [
+  {
+   "name": "ground",
+   "kind": "terrain",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "terrain": {
+    "chunkSize": 32.0,
+    "resolution": 16,
+    "lodLevels": 2,
+    "lodDistance": 120.0,
+    "viewDistance": 400.0,
+    "shadowDistance": 120.0,
+    "skirtDepth": 0.5,
+    "groundMottle": false,
+    "groundGlow": 0.0
+   },
+   "world": {
+    "name": "Crowd Lab e08: deterministic replay",
+    "seed": 2220,
+    "size": [
+     100.0,
+     100.0
+    ],
+    "baseHeight": 0.0,
+    "erosion": 0.0,
+    "seaLevel": -1000.0,
+    "layers": [
+     {
+      "frequency": 0.004,
+      "amplitude": 0.0
+     }
+    ],
+    "features": []
+   },
+   "material": {
+    "baseColor": [
+     0.18,
+     0.19,
+     0.21
+    ],
+    "roughness": 0.95,
+    "metallic": 0.0
+   }
+  },
+  {
+   "name": "w00",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -14.0,
+    0.0,
+    -6.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w01",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -12.6,
+    0.0,
+    -6.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w02",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -11.2,
+    0.0,
+    -6.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w03",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -9.8,
+    0.0,
+    -6.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w04",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -8.4,
+    0.0,
+    -6.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w05",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -7.0,
+    0.0,
+    -6.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w06",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -14.0,
+    0.0,
+    -4.6
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w07",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -12.6,
+    0.0,
+    -4.6
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w08",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -11.2,
+    0.0,
+    -4.6
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w09",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -9.8,
+    0.0,
+    -4.6
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w10",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -8.4,
+    0.0,
+    -4.6
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w11",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -7.0,
+    0.0,
+    -4.6
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w12",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -14.0,
+    0.0,
+    -3.2
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w13",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -12.6,
+    0.0,
+    -3.2
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w14",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -11.2,
+    0.0,
+    -3.2
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w15",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -9.8,
+    0.0,
+    -3.2
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w16",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -8.4,
+    0.0,
+    -3.2
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w17",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -7.0,
+    0.0,
+    -3.2
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w18",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -14.0,
+    0.0,
+    -1.8
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w19",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -12.6,
+    0.0,
+    -1.8
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w20",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -11.2,
+    0.0,
+    -1.8
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w21",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -9.8,
+    0.0,
+    -1.8
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w22",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -8.4,
+    0.0,
+    -1.8
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w23",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -7.0,
+    0.0,
+    -1.8
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w24",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -14.0,
+    0.0,
+    -0.4
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w25",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -12.6,
+    0.0,
+    -0.4
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w26",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -11.2,
+    0.0,
+    -0.4
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w27",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -9.8,
+    0.0,
+    -0.4
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w28",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -8.4,
+    0.0,
+    -0.4
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "w29",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -7.0,
+    0.0,
+    -0.4
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderA"
+   }
+  },
+  {
+   "name": "v00",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    6.0,
+    0.0,
+    -6.0
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v01",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    7.4,
+    0.0,
+    -6.0
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v02",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    8.8,
+    0.0,
+    -6.0
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v03",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    10.2,
+    0.0,
+    -6.0
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v04",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    11.6,
+    0.0,
+    -6.0
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v05",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    13.0,
+    0.0,
+    -6.0
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v06",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    6.0,
+    0.0,
+    -4.6
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v07",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    7.4,
+    0.0,
+    -4.6
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v08",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    8.8,
+    0.0,
+    -4.6
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v09",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    10.2,
+    0.0,
+    -4.6
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v10",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    11.6,
+    0.0,
+    -4.6
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v11",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    13.0,
+    0.0,
+    -4.6
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v12",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    6.0,
+    0.0,
+    -3.2
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v13",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    7.4,
+    0.0,
+    -3.2
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v14",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    8.8,
+    0.0,
+    -3.2
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v15",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    10.2,
+    0.0,
+    -3.2
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v16",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    11.6,
+    0.0,
+    -3.2
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v17",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    13.0,
+    0.0,
+    -3.2
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v18",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    6.0,
+    0.0,
+    -1.8
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v19",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    7.4,
+    0.0,
+    -1.8
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v20",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    8.8,
+    0.0,
+    -1.8
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v21",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    10.2,
+    0.0,
+    -1.8
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v22",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    11.6,
+    0.0,
+    -1.8
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v23",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    13.0,
+    0.0,
+    -1.8
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v24",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    6.0,
+    0.0,
+    -0.4
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v25",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    7.4,
+    0.0,
+    -0.4
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v26",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    8.8,
+    0.0,
+    -0.4
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v27",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    10.2,
+    0.0,
+    -0.4
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v28",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    11.6,
+    0.0,
+    -0.4
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  },
+  {
+   "name": "v29",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    13.0,
+    0.0,
+    -0.4
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "wanderB"
+   }
+  }
+ ],
+ "crowd": {
+  "walls": [
+   {
+    "points": [
+     [
+      -3.0,
+      -4.0
+     ],
+     [
+      3.0,
+      -4.0
+     ],
+     [
+      3.0,
+      4.0
+     ],
+     [
+      -3.0,
+      4.0
+     ],
+     [
+      -3.0,
+      -4.0
+     ]
+    ],
+    "thickness": 0.4,
+    "height": 2.0
+   }
+  ],
+  "groups": [
+   {
+    "name": "wanderA",
+    "radius": 0.3,
+    "speed": [
+     0.95,
+     1.15
+    ],
+    "speedBuckets": 3,
+    "maxSpeed": 1.6,
+    "neighbourDist": 3.0,
+    "maxNeighbours": 10,
+    "timeHorizon": 2.0,
+    "turnRate": 6.0,
+    "seed": 801,
+    "gait": {
+     "walkSpeed": 1.0624,
+     "runSpeed": 2.2854,
+     "matchRate": true,
+     "rateMin": 0.5,
+     "rateMax": 1.6,
+     "blend": 0.2
+    },
+    "clips": {
+     "idle": "Idle",
+     "walk": "Walk",
+     "run": "Run"
+    }
+   },
+   {
+    "name": "wanderB",
+    "radius": 0.3,
+    "speed": [
+     0.9,
+     1.3
+    ],
+    "speedBuckets": 3,
+    "maxSpeed": 1.6,
+    "neighbourDist": 3.0,
+    "maxNeighbours": 10,
+    "timeHorizon": 2.0,
+    "turnRate": 6.0,
+    "seed": 802,
+    "gait": {
+     "walkSpeed": 1.0624,
+     "runSpeed": 2.2854,
+     "matchRate": true,
+     "rateMin": 0.5,
+     "rateMax": 1.6,
+     "blend": 0.2
+    },
+    "clips": {
+     "idle": "Idle",
+     "walk": "Walk",
+     "run": "Run"
+    }
+   }
+  ],
+  "schedule": [
+   {
+    "at": 0.2,
+    "group": "wanderA",
+    "command": "wander",
+    "area": {
+     "center": [
+      0.0,
+      0.0
+     ],
+     "halfExtents": [
+      18.0,
+      14.0
+     ]
+    },
+    "stagger": 3.0,
+    "dwell": [
+     1.0,
+     4.0
+    ]
+   },
+   {
+    "at": 1.0,
+    "group": "wanderB",
+    "command": "wander",
+    "area": {
+     "center": [
+      0.0,
+      0.0
+     ],
+     "halfExtents": [
+      18.0,
+      14.0
+     ]
+    },
+    "stagger": 3.0,
+    "dwell": [
+     0.5,
+     3.0
+    ]
+   },
+   {
+    "at": 30.0,
+    "group": "wanderA",
+    "command": "goto",
+    "area": {
+     "center": [
+      -12.0,
+      10.0
+     ],
+     "halfExtents": [
+      4.0,
+      3.0
+     ]
+    },
+    "stagger": 1.0,
+    "face": [
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "at": 34.0,
+    "group": "wanderB",
+    "command": "hold"
+   }
+  ]
+ }
+}

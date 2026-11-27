@@ -133,6 +133,12 @@ rendering::DebugViewOptions overlaysFor(LabId id) {
     case LabId::Integration:
         o.worldAxes = true;
         break;
+    case LabId::Crowd:
+        // The crowd's own layer: walls, corridors, goals, and every agent's disc coloured by state
+        // (moving, arrived, waiting, wedged, unreachable). It is the lab's instrument, not decoration.
+        o.crowd = true;
+        o.worldAxes = true;
+        break;
     case LabId::Interaction:
         // Nothing, and for the same reason the Rendering Lab draws nothing, one step earlier in the
         // chain: this lab measures how long a frame takes to appear, and an overlay is work added

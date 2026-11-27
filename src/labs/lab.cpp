@@ -36,7 +36,7 @@ namespace {
 //     (ADR-333) and this is that rename. `decision.cpp:Selector` is where the choice is made now:
 //     `Explore` still *has* a goal model, but it calls `entity::goalWeight` for it and the class
 //     that decides between courses of action is here.
-constexpr std::array<LabDescriptor, 15> kLabs{{
+constexpr std::array<LabDescriptor, 16> kLabs{{
     {LabId::Animation, "animation", "Animation Lab", LabStatus::InProgress,
      "Is this pose the one the clip asked for at this time?",
      "clip sampling, blending and the joint palette a frame is skinned with",
@@ -163,6 +163,15 @@ constexpr std::array<LabDescriptor, 15> kLabs{{
      "src/core/interaction_latency.cpp:summarise",
      "docs/investigations/interaction-latency-lab.md",
      "examples/world/glowmere-valley-2-multicam.json", "examples/labs/interaction/cases.json"},
+
+    {LabId::Crowd, "crowd", "Crowd Navigation Lab", LabStatus::Built,
+     "Where did the crowd walk, why there, and did anyone walk through anyone?",
+     "the navigation surface a crowd plans on, its corridors, the schedule's destinations and slots, "
+     "the reciprocal avoidance, arrival and waiting, and whether a seek lands the crowd where a play does",
+     "how a walking body is posed -- that is the Animation Lab; what the surface is made of -- that is "
+     "the world's terrain and the authored walls",
+     "src/crowd/crowd_world.cpp:CrowdWorld::stepOnce", "docs/crowd-lab/README.md",
+     "examples/labs/crowd/e03-bottleneck.json", "examples/labs/crowd/cases.json"},
 }};
 
 } // namespace

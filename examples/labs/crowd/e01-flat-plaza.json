@@ -1,0 +1,29 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Crowd Lab e01: flat plaza"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "e01-flat-plaza.scene.json"
+  }
+ },
+ "parameters": {},
+ "sources": [],
+ "routes": [],
+ "presets": [],
+ "timeline": {
+  "enabled": false,
+  "tracks": [],
+  "cues": []
+ },
+ "render": {
+  "width": 960,
+  "height": 540,
+  "fps": 30,
+  "output": "sequence",
+  "duration": 105.0
+ }
+}

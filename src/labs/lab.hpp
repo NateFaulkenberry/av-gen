@@ -51,6 +51,9 @@ enum class LabId {
     // question "why does the editor feel slow" sends people to build a harness of their own, and
     // this repository has already paid for one of those (`src/core/phase2_probe.hpp`).
     Interaction,
+    // 115 (ADR-2229): where a navigated crowd walked, and why -- the first lab whose subject is a
+    // simulation rather than a frame or a latency.
+    Crowd,
 };
 
 // How much of the lab exists today. This field is the reason the registry can ship complete while

@@ -1,0 +1,2736 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Crowd Lab e02: obstacles and multiple paths",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.0,
+   40.0,
+   24.0
+  ],
+  "target": [
+   0.0,
+   0.0,
+   -1.0
+  ],
+  "fov": 50.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "background": [
+   0.03,
+   0.035,
+   0.05
+  ],
+  "skyIntensity": 0.0,
+  "lightFromEnvironment": false,
+  "volumeDensity": 0.0,
+  "shadowCascades": 2
+ },
+ "lights": [
+  {
+   "name": "sun",
+   "type": "directional",
+   "direction": [
+    -0.4,
+    -1.0,
+    -0.3
+   ],
+   "color": [
+    1.0,
+    0.97,
+    0.92
+   ],
+   "intensity": 3.0
+  }
+ ],
+ "navCellSize": 0.5,
+ "navBodyRadius": 0.3,
+ "nodes": [
+  {
+   "name": "ground",
+   "kind": "terrain",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "terrain": {
+    "chunkSize": 32.0,
+    "resolution": 16,
+    "lodLevels": 2,
+    "lodDistance": 120.0,
+    "viewDistance": 400.0,
+    "shadowDistance": 120.0,
+    "skirtDepth": 0.5,
+    "groundMottle": false,
+    "groundGlow": 0.0
+   },
+   "world": {
+    "name": "Crowd Lab e02: obstacles and multiple paths",
+    "seed": 2220,
+    "size": [
+     100.0,
+     100.0
+    ],
+    "baseHeight": 0.0,
+    "erosion": 0.0,
+    "seaLevel": -1000.0,
+    "layers": [
+     {
+      "frequency": 0.004,
+      "amplitude": 0.0
+     }
+    ],
+    "features": []
+   },
+   "material": {
+    "baseColor": [
+     0.18,
+     0.19,
+     0.21
+    ],
+    "roughness": 0.95,
+    "metallic": 0.0
+   }
+  },
+  {
+   "name": "e02-wall0-1",
+   "kind": "procedural",
+   "position": [
+    -14.75,
+    1.1,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    90.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.4,
+      2.2,
+      10.5
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall1-1",
+   "kind": "procedural",
+   "position": [
+    -0.25,
+    1.1,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    90.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.4,
+      2.2,
+      12.5
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall2-1",
+   "kind": "procedural",
+   "position": [
+    14.0,
+    1.1,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    90.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.4,
+      2.2,
+      12.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall3-1",
+   "kind": "procedural",
+   "position": [
+    -12.0,
+    1.0,
+    -8.0
+   ],
+   "rotation": [
+    0.0,
+    90.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall3-2",
+   "kind": "procedural",
+   "position": [
+    -11.0,
+    1.0,
+    -7.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall3-3",
+   "kind": "procedural",
+   "position": [
+    -12.0,
+    1.0,
+    -6.0
+   ],
+   "rotation": [
+    0.0,
+    -90.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall3-4",
+   "kind": "procedural",
+   "position": [
+    -13.0,
+    1.0,
+    -7.0
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall4-1",
+   "kind": "procedural",
+   "position": [
+    -12.0,
+    1.0,
+    -14.0
+   ],
+   "rotation": [
+    0.0,
+    90.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall4-2",
+   "kind": "procedural",
+   "position": [
+    -11.0,
+    1.0,
+    -13.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall4-3",
+   "kind": "procedural",
+   "position": [
+    -12.0,
+    1.0,
+    -12.0
+   ],
+   "rotation": [
+    0.0,
+    -90.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall4-4",
+   "kind": "procedural",
+   "position": [
+    -13.0,
+    1.0,
+    -13.0
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall5-1",
+   "kind": "procedural",
+   "position": [
+    -4.0,
+    1.0,
+    -8.0
+   ],
+   "rotation": [
+    0.0,
+    90.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall5-2",
+   "kind": "procedural",
+   "position": [
+    -3.0,
+    1.0,
+    -7.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall5-3",
+   "kind": "procedural",
+   "position": [
+    -4.0,
+    1.0,
+    -6.0
+   ],
+   "rotation": [
+    0.0,
+    -90.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall5-4",
+   "kind": "procedural",
+   "position": [
+    -5.0,
+    1.0,
+    -7.0
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall6-1",
+   "kind": "procedural",
+   "position": [
+    -4.0,
+    1.0,
+    -14.0
+   ],
+   "rotation": [
+    0.0,
+    90.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall6-2",
+   "kind": "procedural",
+   "position": [
+    -3.0,
+    1.0,
+    -13.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall6-3",
+   "kind": "procedural",
+   "position": [
+    -4.0,
+    1.0,
+    -12.0
+   ],
+   "rotation": [
+    0.0,
+    -90.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall6-4",
+   "kind": "procedural",
+   "position": [
+    -5.0,
+    1.0,
+    -13.0
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall7-1",
+   "kind": "procedural",
+   "position": [
+    4.0,
+    1.0,
+    -8.0
+   ],
+   "rotation": [
+    0.0,
+    90.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall7-2",
+   "kind": "procedural",
+   "position": [
+    5.0,
+    1.0,
+    -7.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall7-3",
+   "kind": "procedural",
+   "position": [
+    4.0,
+    1.0,
+    -6.0
+   ],
+   "rotation": [
+    0.0,
+    -90.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall7-4",
+   "kind": "procedural",
+   "position": [
+    3.0,
+    1.0,
+    -7.0
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall8-1",
+   "kind": "procedural",
+   "position": [
+    4.0,
+    1.0,
+    -14.0
+   ],
+   "rotation": [
+    0.0,
+    90.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall8-2",
+   "kind": "procedural",
+   "position": [
+    5.0,
+    1.0,
+    -13.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall8-3",
+   "kind": "procedural",
+   "position": [
+    4.0,
+    1.0,
+    -12.0
+   ],
+   "rotation": [
+    0.0,
+    -90.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall8-4",
+   "kind": "procedural",
+   "position": [
+    3.0,
+    1.0,
+    -13.0
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall9-1",
+   "kind": "procedural",
+   "position": [
+    12.0,
+    1.0,
+    -8.0
+   ],
+   "rotation": [
+    0.0,
+    90.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall9-2",
+   "kind": "procedural",
+   "position": [
+    13.0,
+    1.0,
+    -7.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall9-3",
+   "kind": "procedural",
+   "position": [
+    12.0,
+    1.0,
+    -6.0
+   ],
+   "rotation": [
+    0.0,
+    -90.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall9-4",
+   "kind": "procedural",
+   "position": [
+    11.0,
+    1.0,
+    -7.0
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall10-1",
+   "kind": "procedural",
+   "position": [
+    12.0,
+    1.0,
+    -14.0
+   ],
+   "rotation": [
+    0.0,
+    90.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall10-2",
+   "kind": "procedural",
+   "position": [
+    13.0,
+    1.0,
+    -13.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall10-3",
+   "kind": "procedural",
+   "position": [
+    12.0,
+    1.0,
+    -12.0
+   ],
+   "rotation": [
+    0.0,
+    -90.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "e02-wall10-4",
+   "kind": "procedural",
+   "position": [
+    11.0,
+    1.0,
+    -13.0
+   ],
+   "rotation": [
+    0.0,
+    180.0,
+    0.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.3,
+      2.0,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.48
+     ],
+     "roughness": 0.85
+    }
+   }
+  },
+  {
+   "name": "p00",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -12.0,
+    0.0,
+    -18.5
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p01",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -9.4,
+    0.0,
+    -18.5
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p02",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -6.8,
+    0.0,
+    -18.5
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p03",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -4.2,
+    0.0,
+    -18.5
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p04",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -1.6,
+    0.0,
+    -18.5
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p05",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    1.0,
+    0.0,
+    -18.5
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p06",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    3.6,
+    0.0,
+    -18.5
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p07",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    6.2,
+    0.0,
+    -18.5
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p08",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    8.8,
+    0.0,
+    -18.5
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p09",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    11.4,
+    0.0,
+    -18.5
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p10",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -12.0,
+    0.0,
+    -17.2
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p11",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -9.4,
+    0.0,
+    -17.2
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p12",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -6.8,
+    0.0,
+    -17.2
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p13",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -4.2,
+    0.0,
+    -17.2
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p14",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -1.6,
+    0.0,
+    -17.2
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p15",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    1.0,
+    0.0,
+    -17.2
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p16",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    3.6,
+    0.0,
+    -17.2
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p17",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    6.2,
+    0.0,
+    -17.2
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p18",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    8.8,
+    0.0,
+    -17.2
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p19",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    11.4,
+    0.0,
+    -17.2
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p20",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -12.0,
+    0.0,
+    -15.9
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p21",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -9.4,
+    0.0,
+    -15.9
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p22",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -6.8,
+    0.0,
+    -15.9
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p23",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -4.2,
+    0.0,
+    -15.9
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p24",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -1.6,
+    0.0,
+    -15.9
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p25",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    1.0,
+    0.0,
+    -15.9
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p26",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    3.6,
+    0.0,
+    -15.9
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p27",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    6.2,
+    0.0,
+    -15.9
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p28",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    8.8,
+    0.0,
+    -15.9
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p29",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    11.4,
+    0.0,
+    -15.9
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p30",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -12.0,
+    0.0,
+    -14.6
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p31",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -9.4,
+    0.0,
+    -14.6
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p32",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -6.8,
+    0.0,
+    -14.6
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p33",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -4.2,
+    0.0,
+    -14.6
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p34",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    -1.6,
+    0.0,
+    -14.6
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p35",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    1.0,
+    0.0,
+    -14.6
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p36",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    3.6,
+    0.0,
+    -14.6
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p37",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    6.2,
+    0.0,
+    -14.6
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p38",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    8.8,
+    0.0,
+    -14.6
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  },
+  {
+   "name": "p39",
+   "kind": "gltf",
+   "asset": "../../../assets/imported/alien.gltf",
+   "position": [
+    11.4,
+    0.0,
+    -14.6
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    0.02,
+    0.02,
+    0.02
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.2,
+    "cullDistance": 0.0,
+    "crowd": "crossers"
+   }
+  }
+ ],
+ "crowd": {
+  "walls": [
+   {
+    "points": [
+     [
+      -20.0,
+      0.0
+     ],
+     [
+      -9.5,
+      0.0
+     ]
+    ],
+    "thickness": 0.4,
+    "height": 2.2
+   },
+   {
+    "points": [
+     [
+      -6.5,
+      0.0
+     ],
+     [
+      6.0,
+      0.0
+     ]
+    ],
+    "thickness": 0.4,
+    "height": 2.2
+   },
+   {
+    "points": [
+     [
+      8.0,
+      0.0
+     ],
+     [
+      20.0,
+      0.0
+     ]
+    ],
+    "thickness": 0.4,
+    "height": 2.2
+   },
+   {
+    "points": [
+     [
+      -13.0,
+      -8.0
+     ],
+     [
+      -11.0,
+      -8.0
+     ],
+     [
+      -11.0,
+      -6.0
+     ],
+     [
+      -13.0,
+      -6.0
+     ],
+     [
+      -13.0,
+      -8.0
+     ]
+    ],
+    "thickness": 0.3,
+    "height": 2.0
+   },
+   {
+    "points": [
+     [
+      -13.0,
+      -14.0
+     ],
+     [
+      -11.0,
+      -14.0
+     ],
+     [
+      -11.0,
+      -12.0
+     ],
+     [
+      -13.0,
+      -12.0
+     ],
+     [
+      -13.0,
+      -14.0
+     ]
+    ],
+    "thickness": 0.3,
+    "height": 2.0
+   },
+   {
+    "points": [
+     [
+      -5.0,
+      -8.0
+     ],
+     [
+      -3.0,
+      -8.0
+     ],
+     [
+      -3.0,
+      -6.0
+     ],
+     [
+      -5.0,
+      -6.0
+     ],
+     [
+      -5.0,
+      -8.0
+     ]
+    ],
+    "thickness": 0.3,
+    "height": 2.0
+   },
+   {
+    "points": [
+     [
+      -5.0,
+      -14.0
+     ],
+     [
+      -3.0,
+      -14.0
+     ],
+     [
+      -3.0,
+      -12.0
+     ],
+     [
+      -5.0,
+      -12.0
+     ],
+     [
+      -5.0,
+      -14.0
+     ]
+    ],
+    "thickness": 0.3,
+    "height": 2.0
+   },
+   {
+    "points": [
+     [
+      3.0,
+      -8.0
+     ],
+     [
+      5.0,
+      -8.0
+     ],
+     [
+      5.0,
+      -6.0
+     ],
+     [
+      3.0,
+      -6.0
+     ],
+     [
+      3.0,
+      -8.0
+     ]
+    ],
+    "thickness": 0.3,
+    "height": 2.0
+   },
+   {
+    "points": [
+     [
+      3.0,
+      -14.0
+     ],
+     [
+      5.0,
+      -14.0
+     ],
+     [
+      5.0,
+      -12.0
+     ],
+     [
+      3.0,
+      -12.0
+     ],
+     [
+      3.0,
+      -14.0
+     ]
+    ],
+    "thickness": 0.3,
+    "height": 2.0
+   },
+   {
+    "points": [
+     [
+      11.0,
+      -8.0
+     ],
+     [
+      13.0,
+      -8.0
+     ],
+     [
+      13.0,
+      -6.0
+     ],
+     [
+      11.0,
+      -6.0
+     ],
+     [
+      11.0,
+      -8.0
+     ]
+    ],
+    "thickness": 0.3,
+    "height": 2.0
+   },
+   {
+    "points": [
+     [
+      11.0,
+      -14.0
+     ],
+     [
+      13.0,
+      -14.0
+     ],
+     [
+      13.0,
+      -12.0
+     ],
+     [
+      11.0,
+      -12.0
+     ],
+     [
+      11.0,
+      -14.0
+     ]
+    ],
+    "thickness": 0.3,
+    "height": 2.0
+   }
+  ],
+  "groups": [
+   {
+    "name": "crossers",
+    "radius": 0.3,
+    "speed": [
+     0.95,
+     1.15
+    ],
+    "speedBuckets": 3,
+    "maxSpeed": 1.6,
+    "neighbourDist": 3.0,
+    "maxNeighbours": 10,
+    "timeHorizon": 2.0,
+    "turnRate": 6.0,
+    "seed": 201,
+    "gait": {
+     "walkSpeed": 1.0624,
+     "runSpeed": 2.2854,
+     "matchRate": true,
+     "rateMin": 0.5,
+     "rateMax": 1.6,
+     "blend": 0.2
+    },
+    "clips": {
+     "idle": "Idle",
+     "walk": "Walk",
+     "run": "Run"
+    }
+   }
+  ],
+  "schedule": [
+   {
+    "at": 0.5,
+    "group": "crossers",
+    "command": "goto",
+    "area": {
+     "center": [
+      0.0,
+      13.0
+     ],
+     "halfExtents": [
+      10.0,
+      3.0
+     ]
+    },
+    "stagger": 2.0
+   }
+  ]
+ }
+}

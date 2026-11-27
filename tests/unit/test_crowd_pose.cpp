@@ -40,7 +40,7 @@ struct Crowd {
     std::unique_ptr<scene::Composition> composition;
 };
 
-std::unique_ptr<Crowd> crowd(const nlohmann::json& nodes) {
+std::unique_ptr<Crowd> makeCrowd(const nlohmann::json& nodes) {
     const nlohmann::json doc = {{"format", "avgen-scene"},
                                 {"version", 1},
                                 {"name", "crowd"},
@@ -69,7 +69,7 @@ TEST_CASE("a crowd in step shares one pose, and a phase puts a body out of step"
     if (!std::filesystem::is_regular_file(charactersDir() / "../../assets/imported/alien.gltf")) {
         SKIP("the imported alien is not present");
     }
-    auto c = crowd(nlohmann::json::array({alienNode("a", -1.0f, "Walk", 1.0f, 0.0f),
+    auto c = makeCrowd(nlohmann::json::array({alienNode("a", -1.0f, "Walk", 1.0f, 0.0f),
                                           alienNode("b", 0.0f, "Walk", 1.0f, 0.0f),
                                           alienNode("c", 1.0f, "Walk", 1.0f, 0.25f),
                                           alienNode("d", 2.0f, "Walk", 1.0f, 0.0f)}));
@@ -85,7 +85,7 @@ TEST_CASE("a crowd in step shares one pose, and a phase puts a body out of step"
     CHECK(rigOf(*c->composition, "c").sharedFrom == -1);
 
     // The phase is clip seconds at second 0: c at 0.5 s is where a is at 0.75 s.
-    auto ref = crowd(nlohmann::json::array({alienNode("a", -1.0f, "Walk", 1.0f, 0.0f)}));
+    auto ref = makeCrowd(nlohmann::json::array({alienNode("a", -1.0f, "Walk", 1.0f, 0.0f)}));
     FrameTime later;
     later.renderTime = 0.75;
     ref->composition->update(later);
@@ -98,7 +98,7 @@ TEST_CASE("a shared pose is the pose the rig would have computed, by seek and by
     }
     const auto nodes = nlohmann::json::array({alienNode("a", -1.0f, "Walk", 1.1f, 0.3f),
                                               alienNode("b", 1.0f, "Walk", 1.1f, 0.3f)});
-    auto played = crowd(nodes);
+    auto played = makeCrowd(nodes);
     FrameTime time;
     for (int f = 0; f <= 45; ++f) { // play 1.5 s at 30 fps
         time.renderTime = f / 30.0;
@@ -106,7 +106,7 @@ TEST_CASE("a shared pose is the pose the rig would have computed, by seek and by
     }
     CHECK(played->composition->rigStats().shared == 1);
     // A lone rig, sought straight to the same second, computes the same palette itself.
-    auto alone = crowd(nlohmann::json::array({alienNode("b", 1.0f, "Walk", 1.1f, 0.3f)}));
+    auto alone = makeCrowd(nlohmann::json::array({alienNode("b", 1.0f, "Walk", 1.1f, 0.3f)}));
     alone->composition->update(time);
     CHECK(alone->composition->rigStats().shared == 0);
     CHECK(rigOf(*alone->composition, "b").palette == rigOf(*played->composition, "b").palette);
@@ -116,7 +116,7 @@ TEST_CASE("the opening phase survives a save and reload", "[scene][composition][
     if (!std::filesystem::is_regular_file(charactersDir() / "../../assets/imported/alien.gltf")) {
         SKIP("the imported alien is not present");
     }
-    auto c = crowd(nlohmann::json::array({alienNode("a", 0.0f, "Walk", 1.0f, 0.4f)}));
+    auto c = makeCrowd(nlohmann::json::array({alienNode("a", 0.0f, "Walk", 1.0f, 0.4f)}));
     const nlohmann::json written = c->composition->toJson();
     assets::AssetRegistry registry{charactersDir()};
     auto again = scene::Composition::fromJson(written, registry);
@@ -143,8 +143,8 @@ TEST_CASE("a crowd turns its heads, sways and runs behind the timeline by its pa
     if (!std::filesystem::is_regular_file(charactersDir() / "../../assets/imported/alien.gltf")) {
         SKIP("the imported alien is not present");
     }
-    auto c = crowd(nlohmann::json::array({listener("a", -1.0f), listener("b", 1.0f)}));
-    auto ref = crowd(nlohmann::json::array({alienNode("a", -1.0f, "Walk", 1.0f, 0.0f)}));
+    auto c = makeCrowd(nlohmann::json::array({listener("a", -1.0f), listener("b", 1.0f)}));
+    auto ref = makeCrowd(nlohmann::json::array({alienNode("a", -1.0f, "Walk", 1.0f, 0.0f)}));
     FrameTime time;
     time.renderTime = 0.5;
     // Idle parameters: the layers do nothing, so the two share a pose and match a plain walker.

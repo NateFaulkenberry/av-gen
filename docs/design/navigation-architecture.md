@@ -44,3 +44,20 @@ choice fails fast and is suppressed. Open: area-biased and patrol modes.
   falling back to analytic queries — correct, slower.
 - Every scene node is a landmark, including terrain; aware deciders refuse the `terrain` tag, the
   legacy ones still may choose it.
+
+## Navigated crowds (115, ADR-2220/2223/2225)
+
+A crowd of a few hundred is not made of entities. `crowd::CrowdWorld` is a lean, fixed-step population:
+- it uses Jacobi ORCA;
+- it follows corridors and runs a schedule;
+- it walks on a `nav::INavSurface`.
+
+The surfaces:
+- `GridNavSurface` presents this document's `NavGrid` for heightfield worlds, unchanged.
+- A tiled navmesh backend for authored, multi-level geometry follows as ADR-2221.
+
+The scene's top-level `crowd` block holds groups, walls and a time-keyed schedule. Its members are the nodes whose
+`animation.crowd` names a group. The crowd at second t is a pure function of t; seeks use the crowd's own
+checkpoints. Lab and debug layer: `docs/crowd-lab/README.md`.
+
+The limitation above, "No ORCA/RVO", still holds for entities; the crowd has ORCA.

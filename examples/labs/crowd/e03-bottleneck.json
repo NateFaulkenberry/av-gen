@@ -1,0 +1,29 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Crowd Lab e03: bottleneck"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "e03-bottleneck.scene.json"
+  }
+ },
+ "parameters": {},
+ "sources": [],
+ "routes": [],
+ "presets": [],
+ "timeline": {
+  "enabled": false,
+  "tracks": [],
+  "cues": []
+ },
+ "render": {
+  "width": 960,
+  "height": 540,
+  "fps": 30,
+  "output": "sequence",
+  "duration": 120.0
+ }
+}

@@ -1,0 +1,29 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Crowd Lab e02: obstacles and multiple paths"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "e02-obstacles.scene.json"
+  }
+ },
+ "parameters": {},
+ "sources": [],
+ "routes": [],
+ "presets": [],
+ "timeline": {
+  "enabled": false,
+  "tracks": [],
+  "cues": []
+ },
+ "render": {
+  "width": 960,
+  "height": 540,
+  "fps": 30,
+  "output": "sequence",
+  "duration": 60.0
+ }
+}
