@@ -141,6 +141,13 @@ void environmentEntries(std::vector<TypingEntry>& e) {
         env(key, number());
     }
     env("tileDynamics", untyped("ADR-1953."));
+    env("volumetricLight",
+        described(object({{"enabled", boolean()},
+                          {"distance", range(number("Metres the froxel grid carries the air; clamped to 1..20000."), 1,
+                                             20000)},
+                          {"intensity", atLeast(number("Multiplies the light the air scatters."), 0)}},
+                         "warn-drop"),
+                  "Volumetric lighting (ADR-2210): the froxel grid lights the environment's own air."));
     env("bands", untyped("Reflection bands (ADR-1151)."));
     env("vortex", untyped("The pre-ADR-387 vortex, read and converted into an effect."), false,
         "migrated to an effect instance in `effects` (ADR-441); not written back here");
@@ -190,7 +197,8 @@ void lightEntries(std::vector<TypingEntry>& e) {
     }
     light("innerCone", number("Degrees."));
     light("outerCone", number("Degrees."));
-    for (const char* key : {"castsShadow", "contactShadow", "diffuseOnly", "specularOnly", "enabled"}) {
+    for (const char* key : {"castsShadow", "contactShadow", "diffuseOnly", "specularOnly", "enabled",
+                            "volumetricShadow"}) {
         light(key, boolean());
     }
 

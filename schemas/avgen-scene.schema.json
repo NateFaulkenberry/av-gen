@@ -353,6 +353,28 @@
           "description": "Clamped to 4..256.",
           "type": "integer"
         },
+        "volumetricLight": {
+          "additionalProperties": true,
+          "description": "Volumetric lighting (ADR-2210): the froxel grid lights the environment's own air.",
+          "properties": {
+            "distance": {
+              "description": "Metres the froxel grid carries the air; clamped to 1..20000.",
+              "maximum": 20000.0,
+              "minimum": 1.0,
+              "type": "number"
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "intensity": {
+              "description": "Multiplies the light the air scatters.",
+              "minimum": 0.0,
+              "type": "number"
+            }
+          },
+          "type": "object",
+          "x-avgen-unknownKeys": "warn-drop"
+        },
         "vortex": {
           "description": "The pre-ADR-387 vortex, read and converted into an effect.",
           "x-avgen-note": "migrated to an effect instance in `effects` (ADR-441); not written back here",
@@ -503,6 +525,9 @@
         },
         "volumetric": {
           "type": "number"
+        },
+        "volumetricShadow": {
+          "type": "boolean"
         },
         "width": {
           "type": "number"
