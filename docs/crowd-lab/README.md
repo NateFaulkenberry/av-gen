@@ -68,3 +68,5 @@ The crowd at second t is the state after `floor(t x 60)` fixed steps (ADR-2225):
 
 A seek restores the nearest checkpoint (one per second of film) and replays from it. The drawn pose between grid
 instants is extrapolated and never fed back.
+
+Destination areas must hold the group at a spacing a body can walk between (about 1.4 m for 0.3 m agents); a packed area wedges the last arrivals, who are then counted arrived within 2.4 m of their slot (ADR-2229).
