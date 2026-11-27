@@ -1,0 +1,239 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Volumetric Lighting Lab e02: dense atmosphere",
+ "_note": "Dense atmosphere. Five identical unlit slabs at 4, 12, 24, 40 and 60 m in front of a camera at z = 6, in a homogeneous medium (no height layer, no noise) that scatters nothing: the light is volumetric 0 and the emission is 0. So what reaches the eye from a slab is its own radiance times exp(-sigma_t * d), and the lab's analytic check compares the froxel grid's transmittance with that number. The slabs are staggered sideways so that all five are visible in one frame; the test reads each at its own known distance.",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.0,
+   1.0,
+   0.0
+  ],
+  "target": [
+   0.0,
+   1.0,
+   -30.0
+  ],
+  "fov": 70.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "background": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "skyIntensity": 0.0,
+  "skybox": false,
+  "lightFromEnvironment": false,
+  "intensity": 0.0,
+  "fogColor": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "fogHeightAmount": 0.0,
+  "volumeScattering": 1.0,
+  "volumeAbsorption": 1.0,
+  "volumeNoise": 0.0,
+  "volumeEmission": 0.0,
+  "volumetricLight": {
+   "enabled": true,
+   "distance": 160.0
+  },
+  "volumeDensity": 0.02,
+  "volumeAnisotropy": 0.0
+ },
+ "lights": [
+  {
+   "name": "key",
+   "type": "directional",
+   "direction": [
+    -0.55,
+    -0.62,
+    -0.56
+   ],
+   "color": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "intensity": 3.0,
+   "castsShadow": false,
+   "volumetric": 0.0
+  }
+ ],
+ "nodes": [
+  {
+   "name": "slab-004",
+   "kind": "procedural",
+   "position": [
+    0.0,
+    1.0,
+    -4.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.4,
+      6.0,
+      0.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": false,
+    "material": {
+     "baseColor": [
+      0.8,
+      0.8,
+      0.8
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "slab-012",
+   "kind": "procedural",
+   "position": [
+    0.0,
+    1.0,
+    -12.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.4,
+      6.0,
+      0.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": false,
+    "material": {
+     "baseColor": [
+      0.8,
+      0.8,
+      0.8
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "slab-024",
+   "kind": "procedural",
+   "position": [
+    0.0,
+    1.0,
+    -24.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.4,
+      6.0,
+      0.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": false,
+    "material": {
+     "baseColor": [
+      0.8,
+      0.8,
+      0.8
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "slab-040",
+   "kind": "procedural",
+   "position": [
+    0.0,
+    1.0,
+    -40.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.4,
+      6.0,
+      0.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": false,
+    "material": {
+     "baseColor": [
+      0.8,
+      0.8,
+      0.8
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  },
+  {
+   "name": "slab-060",
+   "kind": "procedural",
+   "position": [
+    0.0,
+    1.0,
+    -60.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.4,
+      6.0,
+      0.2
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": false,
+    "material": {
+     "baseColor": [
+      0.8,
+      0.8,
+      0.8
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0,
+     "unlit": true
+    }
+   }
+  }
+ ]
+}

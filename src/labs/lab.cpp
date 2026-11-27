@@ -106,10 +106,11 @@ constexpr std::array<LabDescriptor, 16> kLabs{{
      "src/rendering/post_processor.cpp:PostProcessor::run", "docs/hdr-lab/README.md",
      "examples/labs/hdr-lab.scene.json", "examples/labs/hdr/cases.json"},
 
-    {LabId::Volumetric, "volumetric", "Volumetric / Atmosphere Lab", LabStatus::Built,
-     "What is the air doing between the camera and the subject?",
-     "the volumetric march, its resolution and step scaling, the depth-aware composite, and the "
-     "atmospheric effects",
+    {LabId::Volumetric, "volumetric", "Volumetric Lighting Lab", LabStatus::Built,
+     "What is the air doing between the camera and the subject, and which light reaches it?",
+     "volumetric lighting's froxel grid (ADR-2210: inject, integrate, the apply in the composite, the lights "
+     "and shadow views it reads), the volumetric march, its resolution and step scaling, the depth-aware "
+     "composite, and the atmospheric effects; environments examples/labs/volumetric/eNN-*.json",
      "the bloom that the in-scatter later feeds -- that is the HDR Lab",
      "src/rendering/volume_renderer.cpp:VolumeRenderer::update", "docs/volumetric-lab/README.md",
      "examples/labs/volumetric-atmosphere-lab.scene.json", "examples/labs/volumetric/cases.json"},

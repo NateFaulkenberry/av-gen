@@ -1,0 +1,723 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Volumetric Lighting Lab e01: light shafts",
+ "_note": "Light shafts. The sun is low and behind the colonnade, so the camera looks into the light: forward scattering (anisotropy 0.6) makes the lit air between the columns bright and the air in each column's shadow dark -- the shafts are the shadow map seen in the medium, which a fog overlay cannot draw. A spot behind a grille wall on the right throws barred beams across the floor.",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.0,
+   3.0,
+   14.0
+  ],
+  "target": [
+   0.0,
+   6.0,
+   -40.0
+  ],
+  "fov": 55.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "background": [
+   0.004,
+   0.005,
+   0.009
+  ],
+  "skyIntensity": 0.0,
+  "skybox": false,
+  "lightFromEnvironment": false,
+  "intensity": 0.0,
+  "fogColor": [
+   0.02,
+   0.022,
+   0.03
+  ],
+  "fogHeightAmount": 0.0,
+  "volumeScattering": 1.0,
+  "volumeAbsorption": 1.0,
+  "volumeNoise": 0.0,
+  "volumeEmission": 0.0,
+  "volumetricLight": {
+   "enabled": true,
+   "distance": 160.0
+  },
+  "volumeDensity": 0.022,
+  "volumeAnisotropy": 0.6,
+  "shadowRange": 120.0,
+  "shadowCascades": 4
+ },
+ "lights": [
+  {
+   "name": "sun",
+   "type": "directional",
+   "direction": [
+    0.18,
+    -0.32,
+    0.93
+   ],
+   "color": [
+    1.0,
+    0.82,
+    0.62
+   ],
+   "intensity": 9.0,
+   "castsShadow": true,
+   "volumetric": 1.0
+  },
+  {
+   "name": "grille-spot",
+   "type": "spot",
+   "position": [
+    17.0,
+    7.0,
+    -22.0
+   ],
+   "direction": [
+    -0.05,
+    -0.45,
+    0.89
+   ],
+   "color": [
+    0.7,
+    0.85,
+    1.0
+   ],
+   "intensity": 900.0,
+   "range": 45.0,
+   "innerCone": 14.0,
+   "outerCone": 24.0,
+   "castsShadow": true,
+   "volumetric": 1.0
+  }
+ ],
+ "nodes": [
+  {
+   "name": "floor",
+   "kind": "procedural",
+   "position": [
+    0.0,
+    -0.1,
+    -30.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      120.0,
+      0.2,
+      140.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.32,
+      0.31,
+      0.3
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "column-00",
+   "kind": "procedural",
+   "position": [
+    -24.0,
+    6.0,
+    -28.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.6,
+      12.0,
+      1.6
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.47
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "column-01",
+   "kind": "procedural",
+   "position": [
+    -18.0,
+    6.0,
+    -28.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.6,
+      12.0,
+      1.6
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.47
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "column-02",
+   "kind": "procedural",
+   "position": [
+    -12.0,
+    6.0,
+    -28.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.6,
+      12.0,
+      1.6
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.47
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "column-03",
+   "kind": "procedural",
+   "position": [
+    -6.0,
+    6.0,
+    -28.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.6,
+      12.0,
+      1.6
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.47
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "column-04",
+   "kind": "procedural",
+   "position": [
+    0.0,
+    6.0,
+    -28.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.6,
+      12.0,
+      1.6
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.47
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "column-05",
+   "kind": "procedural",
+   "position": [
+    6.0,
+    6.0,
+    -28.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.6,
+      12.0,
+      1.6
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.47
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "column-06",
+   "kind": "procedural",
+   "position": [
+    12.0,
+    6.0,
+    -28.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.6,
+      12.0,
+      1.6
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.47
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "column-07",
+   "kind": "procedural",
+   "position": [
+    18.0,
+    6.0,
+    -28.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.6,
+      12.0,
+      1.6
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.47
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "column-08",
+   "kind": "procedural",
+   "position": [
+    24.0,
+    6.0,
+    -28.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.6,
+      12.0,
+      1.6
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.55,
+      0.52,
+      0.47
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "lintel",
+   "kind": "procedural",
+   "position": [
+    0.0,
+    12.6,
+    -28.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      52.0,
+      1.2,
+      2.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.5,
+      0.47,
+      0.43
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "bar-00",
+   "kind": "procedural",
+   "position": [
+    14.0,
+    3.0,
+    -12.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.35,
+      6.0,
+      0.35
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.4,
+      0.4,
+      0.42
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "bar-01",
+   "kind": "procedural",
+   "position": [
+    14.9,
+    3.0,
+    -12.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.35,
+      6.0,
+      0.35
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.4,
+      0.4,
+      0.42
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "bar-02",
+   "kind": "procedural",
+   "position": [
+    15.8,
+    3.0,
+    -12.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.35,
+      6.0,
+      0.35
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.4,
+      0.4,
+      0.42
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "bar-03",
+   "kind": "procedural",
+   "position": [
+    16.7,
+    3.0,
+    -12.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.35,
+      6.0,
+      0.35
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.4,
+      0.4,
+      0.42
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "bar-04",
+   "kind": "procedural",
+   "position": [
+    17.6,
+    3.0,
+    -12.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.35,
+      6.0,
+      0.35
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.4,
+      0.4,
+      0.42
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "bar-05",
+   "kind": "procedural",
+   "position": [
+    18.5,
+    3.0,
+    -12.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.35,
+      6.0,
+      0.35
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.4,
+      0.4,
+      0.42
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "bar-06",
+   "kind": "procedural",
+   "position": [
+    19.4,
+    3.0,
+    -12.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.35,
+      6.0,
+      0.35
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.4,
+      0.4,
+      0.42
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "grille-head",
+   "kind": "procedural",
+   "position": [
+    16.7,
+    6.3,
+    -12.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      7.0,
+      0.6,
+      0.6
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.4,
+      0.4,
+      0.42
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  }
+ ]
+}

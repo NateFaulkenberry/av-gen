@@ -1,0 +1,259 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Volumetric Lighting Lab e06: coloured scattering",
+ "_note": "Coloured scattering. Red, green and blue spots stand over a dark floor and point down through one grey haze; each beam's colour in the air must be its light's colour (the medium is neutral), and three posts cut a shadow through each beam. Anisotropy 0.3: the beams read from the side as well as toward the camera.",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.0,
+   5.0,
+   10.0
+  ],
+  "target": [
+   0.0,
+   6.0,
+   -22.0
+  ],
+  "fov": 55.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "background": [
+   0.004,
+   0.005,
+   0.009
+  ],
+  "skyIntensity": 0.0,
+  "skybox": false,
+  "lightFromEnvironment": false,
+  "intensity": 0.0,
+  "fogColor": [
+   0.02,
+   0.022,
+   0.03
+  ],
+  "fogHeightAmount": 0.0,
+  "volumeScattering": 1.0,
+  "volumeAbsorption": 1.0,
+  "volumeNoise": 0.0,
+  "volumeEmission": 0.0,
+  "volumetricLight": {
+   "enabled": true,
+   "distance": 160.0
+  },
+  "volumeDensity": 0.03,
+  "volumeAnisotropy": 0.3
+ },
+ "lights": [
+  {
+   "name": "spot-red",
+   "type": "spot",
+   "position": [
+    -9.0,
+    14.0,
+    -22.0
+   ],
+   "direction": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "color": [
+    1.0,
+    0.12,
+    0.08
+   ],
+   "intensity": 2200.0,
+   "range": 40.0,
+   "innerCone": 10.0,
+   "outerCone": 20.0,
+   "castsShadow": true,
+   "volumetric": 1.0
+  },
+  {
+   "name": "spot-green",
+   "type": "spot",
+   "position": [
+    0.0,
+    14.0,
+    -22.0
+   ],
+   "direction": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "color": [
+    0.12,
+    1.0,
+    0.18
+   ],
+   "intensity": 2200.0,
+   "range": 40.0,
+   "innerCone": 10.0,
+   "outerCone": 20.0,
+   "castsShadow": true,
+   "volumetric": 1.0
+  },
+  {
+   "name": "spot-blue",
+   "type": "spot",
+   "position": [
+    9.0,
+    14.0,
+    -22.0
+   ],
+   "direction": [
+    0.0,
+    -1.0,
+    0.0
+   ],
+   "color": [
+    0.15,
+    0.3,
+    1.0
+   ],
+   "intensity": 2200.0,
+   "range": 40.0,
+   "innerCone": 10.0,
+   "outerCone": 20.0,
+   "castsShadow": true,
+   "volumetric": 1.0
+  }
+ ],
+ "nodes": [
+  {
+   "name": "floor",
+   "kind": "procedural",
+   "position": [
+    0.0,
+    -0.1,
+    -20.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      80.0,
+      0.2,
+      80.0
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.2,
+      0.2,
+      0.21
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "post-red",
+   "kind": "procedural",
+   "position": [
+    -8.2,
+    4.0,
+    -22.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.5,
+      8.0,
+      0.5
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "post-green",
+   "kind": "procedural",
+   "position": [
+    0.8,
+    4.0,
+    -22.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.5,
+      8.0,
+      0.5
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "name": "post-blue",
+   "kind": "procedural",
+   "position": [
+    9.8,
+    4.0,
+    -22.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.5,
+      8.0,
+      0.5
+     ],
+     "subdivisions": 1
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "castsShadow": true,
+    "material": {
+     "baseColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  }
+ ]
+}

@@ -101,6 +101,70 @@
    "fps": 60.0,
    "seed": 0,
    "notes": "ADR-393 measured a related sampling failure one system along (the cosmic vortex's grain at 32 samples over four kilometres); the finding is about sample SPACING against feature size, and it applies to this pass whenever the density stops being uniform."
+  },
+  {
+   "lab": "volumetric",
+   "number": 101,
+   "title": "Light shafts: sun through a colonnade",
+   "question": "Is the light in the air shadowed by the geometry that shadows the floor?",
+   "expectation": "Shafts, not an overlay: bright lit air between the columns and dark air in each column's shadow, continuous with the column shadows on the floor; the grille spot throws barred beams. The shafts end where the cascades end (environment.shadowRange 120 m, ADR-358) and are reported, not hidden.",
+   "fixture": "examples/labs/volumetric/e01-light-shafts.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1920,
+    1080
+   ],
+   "fps": 30.0,
+   "seed": 0,
+   "tier": "realtime"
+  },
+  {
+   "lab": "volumetric",
+   "number": 102,
+   "title": "Light shafts at the offline tier",
+   "question": "What does the tier buy on the same frame?",
+   "expectation": "The same picture as case 101 sampled more finely: 240x135x128 froxels, a 2x2 shadow tap, four fixed sub-samples per froxel. Thin occluders alias less; nothing appears or disappears (ADR-2213: a tier scales sampling only).",
+   "fixture": "examples/labs/volumetric/e01-light-shafts.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1920,
+    1080
+   ],
+   "fps": 30.0,
+   "seed": 0,
+   "tier": "offline"
+  },
+  {
+   "lab": "volumetric",
+   "number": 201,
+   "title": "Dense atmosphere: the analytic transmittance check",
+   "question": "Does the froxel grid's transmittance match exp(-sigma_t d)?",
+   "expectation": "Within 3% at each of the five slabs (4, 12, 24, 40 and 60 m), with the medium scattering nothing so the only effect is extinction; asserted by tests/rendering/test_volumetric_light_gpu.cpp against the density-0 arm.",
+   "fixture": "examples/labs/volumetric/e02-dense-atmosphere.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1920,
+    1080
+   ],
+   "fps": 30.0,
+   "seed": 0,
+   "tier": "realtime"
+  },
+  {
+   "lab": "volumetric",
+   "number": 601,
+   "title": "Coloured scattering",
+   "question": "Does each beam carry its own light's colour through a neutral medium?",
+   "expectation": "Three beams, red, green and blue, each its own hue in the air; the posts cut a dark slot through each beam. No hue shift from the medium (its albedo is grey).",
+   "fixture": "examples/labs/volumetric/e06-coloured-scattering.json",
+   "timeSeconds": 0.5,
+   "size": [
+    1920,
+    1080
+   ],
+   "fps": 30.0,
+   "seed": 0,
+   "tier": "realtime"
   }
  ]
 }
