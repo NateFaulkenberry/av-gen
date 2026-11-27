@@ -98,6 +98,12 @@ struct Scene {
     spatial::SplineSet splines;                  // ADR-026; distributions, path deformers, camera, emitters
     std::vector<SdfObject> sdfs;                 // ADR-027; rendering::SdfRenderer / meshed entities
     Ecosystem ecosystem;                         // ADR-1200; rendering::EcosystemRenderer (the first Environment)
+    // ADR-2228 (115): the navigated crowd's diagnostics as coloured world-space line segments (pairs of
+    // points), written by the composition each frame it has a crowd and drawn by the `crowd` debug layer.
+    struct CrowdDebugLines {
+        std::vector<glm::vec3> points; // a, b, a, b, ...
+        std::vector<glm::vec4> colors; // one per segment
+    } crowdDebug;
     AstralForge astral;                          // ADR-1221; rendering::AstralRenderer (the second Environment)
     Clouds clouds;                           // ADR-1289; rendering::CloudRenderer (the third Environment)
     AttractorWorldBlock attractorWorld;      // ADR-1850 (drawn as engine geometry since ADR-1857/1861)

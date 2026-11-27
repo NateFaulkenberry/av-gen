@@ -422,6 +422,13 @@ void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugV
         draw.point(glm::vec3(0.0f), options.pointSize * 0.12f, kOriginColour);
     }
 
+    if (options.crowd) {
+        const auto& cd = scene.crowdDebug;
+        for (std::size_t i = 0; i + 1 < cd.points.size() && i / 2 < cd.colors.size(); i += 2) {
+            draw.line(cd.points[i], cd.points[i + 1], cd.colors[i / 2]);
+        }
+    }
+
     if (options.beams) {
         // The same integration `tests/unit/test_beam_lab.cpp` asserts against, spelled here so the
         // overlay and the test cannot disagree about where the column ends.

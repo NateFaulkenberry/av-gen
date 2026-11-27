@@ -48,7 +48,9 @@
 #include "scene/particles.hpp"
 #include "scene/pose_layers.hpp"
 #include "scene/root_motion.hpp"
+#include "crowd/crowd_world.hpp"
 #include "entity/entity.hpp"
+#include "nav/grid_surface.hpp"
 #include "entity/obstacles.hpp"
 #include "scene/scene_controller.hpp"
 #include "world/city.hpp"
@@ -835,6 +837,9 @@ public:
                           std::optional<bool> loop = std::nullopt, std::optional<double> blendFrom = std::nullopt);
     // What the last update() spent on posing, and how many rigs it skipped.
     [[nodiscard]] const RigStats& rigStats() const { return rigStats_; }
+    // ADR-2223 (115): the navigated crowd, read-only (labs, tests, the debug view).
+    [[nodiscard]] const crowd::CrowdWorld& navigatedCrowd() const { return crowd_; }
+    [[nodiscard]] crowd::CrowdWorld& navigatedCrowd() { return crowd_; }
 
     // Re-parents `name` under `parent` ("" = root). Errors: unknown node, a cycle.
     Result<void> setParent(const std::string& name, const std::string& parent);
@@ -2163,6 +2168,15 @@ private:
     std::vector<CrowdParams> crowds_;
     void registerCrowdParameters(params::ParameterSet& params);
     void driveCrowds();
+    // ADR-2223/2225 (115): the navigated crowd. Its members are the nodes whose `animation.crowd`
+    // names one of its groups (one crowd concept, 115 O2); it walks on `crowdSurface_` (ADR-2220).
+    crowd::CrowdDesc crowdDesc_;
+    crowd::CrowdWorld crowd_;
+    std::unique_ptr<nav::GridNavSurface> crowdSurface_;
+    std::vector<std::string> crowdNodes_;
+    void installCrowd();
+    void driveNavigatedCrowd(double seconds);
+    void addCrowdWalls(spatial::ObstacleField& field) const;
     // ADR-551. `terrainGround_` adapts this composition's own terrain to `IGroundQuery`;
     // `groundQuery_` is what the layers actually ask, and is null until something installs one.
     class TerrainGroundQuery final : public IGroundQuery {

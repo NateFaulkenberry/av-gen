@@ -67,7 +67,7 @@ constexpr std::string_view kSceneKeys[] = {
     "wind",       "post",           "environment",    "composition",   "heroes",
     "effects", "entityProfiles", "entities", "fields",
     "staging",    "graph",          "grids",          "materialPrograms", "nodes",
-    "worldEvents", "ecosystem", "astral", "clouds", "attractorWorld", "flight", "meshWire", "corruption", "lunarWorld", "portal", "portals", "looks"};
+    "worldEvents", "ecosystem", "astral", "clouds", "attractorWorld", "flight", "meshWire", "corruption", "lunarWorld", "portal", "portals", "looks", "crowd"};
 constexpr std::string_view kEnvironmentKeys[] = {
     "map", "lightRig", "intensity", "stylized", "rotation", "skyIntensity",
     "dayNight",
@@ -3648,6 +3648,9 @@ void Composition::applyPerformers(double now, double dt) {
 }
 
 void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBus& bus) {
+    // ADR-2225 (115): the navigated crowd is a pure function of the timeline second, so it runs here
+    // on every path -- play, seek landing, render -- and reads no bus, no entity and no view mode.
+    driveNavigatedCrowd(time.renderTime);
     if (entityWorld_.empty() || params_ == nullptr) {
         return;
     }
@@ -3977,6 +3980,11 @@ std::uint64_t Composition::replayInputKey() const {
 void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
                                    entity::SeekBudget budget, double step,
                                    entity::ReplaySignalSource* signals) {
+    // ADR-2225 (115): the one seek entry point seeks the navigated crowd too, to the same second on the
+    // same 1/60 grid. It keeps its own checkpoints (it reads no entity, no bus and no route); the day
+    // it reads an entity, or an entity reads it, it joins the hooks below -- the mixed-scene test in
+    // tests/unit/test_crowd_world.cpp ("crowd lab 804") is what holds the two seeks equal until then.
+    crowd_.advanceTo(seconds);
     staging_.reset(&entityWorld_, &params);
     seekPlacementLive_ = false;
     // ADR-870: the replay's bus. Reset to a play's frame-zero state here -- a replay from zero starts
@@ -7915,6 +7923,7 @@ void Composition::rebuild() {
                 movingHeroes.emplace_back(e.driven());
             }
             entity::obstaclesFromHeroes(heroes_, *obstacles_, 0.72f, movingHeroes);
+            addCrowdWalls(*obstacles_); // ADR-2222 (115): authored walls are solids the grid plans round
             obstacles_->build();
             // Publish it through §3's seam. Until this happens `TerrainQuery::isOccupied` answers a
             // narrower question than its name suggests -- heroes and the world's edge -- and
@@ -8707,6 +8716,7 @@ void Composition::rebuild() {
     if (!entityWorld_.empty()) {
         entityWorld_.setNavigator(buildNavigator());
     }
+    installCrowd(); // ADR-2223 (115): the crowd walks on the world this rebuild produced
     log::info("composition '{}': flattened {} node(s) -> {} entities, {} meshes, {} procedurals in {:.1f} ms"
               " ({} texture(s), digest {:.2f} ms, {})",
               name_, nodes_.size(), scene_.entities.size(), scene_.meshes.size(),
@@ -9005,6 +9015,154 @@ void Composition::updateCharacters(const FrameTime& time) {
 }
 
 // ADR-2117: a crowd's parameters, one set per name the nodes use.
+// ---- ADR-2223/2225 (115): the navigated crowd ---------------------------------------------------
+
+void Composition::addCrowdWalls(spatial::ObstacleField& field) const {
+    // An authored wall becomes a chain of solids the grid plans round (its links overlap by half, so
+    // there is no gap a body can be routed through); avoidance sees the same wall as segments.
+    for (const crowd::WallDesc& w : crowdDesc_.walls) {
+        const float r = 0.5f * w.thickness;
+        for (std::size_t k = 1; k < w.points.size(); ++k) {
+            const glm::vec2 a = w.points[k - 1];
+            const glm::vec2 b = w.points[k];
+            const float len = glm::length(b - a);
+            const int links = std::max(1, static_cast<int>(std::ceil(len / r)));
+            for (int i = 0; i <= links; ++i) {
+                spatial::NavigationObstacle o;
+                o.center = a + (b - a) * (static_cast<float>(i) / static_cast<float>(links));
+                o.radius = r;
+                o.base = w.base;
+                o.height = w.height;
+                o.type = spatial::ObstacleType::Structure;
+                o.traversal = spatial::Traversal::Blocking;
+                field.add(o);
+            }
+        }
+    }
+}
+
+void Composition::installCrowd() {
+    crowdNodes_.clear();
+    if (crowdDesc_.groups.empty()) {
+        crowd_.clear();
+        crowdSurface_.reset();
+        return;
+    }
+    std::vector<crowd::AgentInit> agents;
+    for (const auto& nodePtr : nodes_) {
+        const CompositionNode& node = *nodePtr;
+        if (node.animation.crowd.empty()) {
+            continue;
+        }
+        const auto g = std::find_if(crowdDesc_.groups.begin(), crowdDesc_.groups.end(),
+                                    [&](const crowd::GroupDesc& d) { return d.name == node.animation.crowd; });
+        if (g == crowdDesc_.groups.end()) {
+            continue; // a listening-only crowd (ADR-2117) with no navigated group of that name
+        }
+        crowd::AgentInit a;
+        a.node = node.name;
+        a.group = static_cast<int>(g - crowdDesc_.groups.begin());
+        a.position = glm::vec2(node.transform.position.x, node.transform.position.z);
+        {
+            // The authored facing about +Y, measured as the crowd measures yaw (forward = (sin, cos)).
+            const glm::vec3 fwd = node.transform.rotation * glm::vec3(0.0f, 0.0f, 1.0f);
+            a.yaw = std::atan2(fwd.x, fwd.z);
+        }
+        agents.push_back(std::move(a));
+        crowdNodes_.push_back(node.name);
+    }
+    auto surface = std::make_unique<nav::GridNavSurface>(buildNavigator());
+    const nav::INavSurface* use = surface->valid() ? surface.get() : nullptr;
+    if (use == nullptr) {
+        log::warn("crowd: no navigation surface (a navigated crowd needs a terrain node with a grid); "
+                  "agents avoid one another and the authored walls, and walk straight lines");
+    }
+    crowd_.configure(crowdDesc_, std::move(agents), use);
+    crowdSurface_ = std::move(surface);
+    log::info("crowd: {} agent(s) in {} group(s), surface {}, input key {:016x}", crowd_.size(),
+              crowdDesc_.groups.size(), use != nullptr ? nav::navBackendName(use->backend()) : "none", crowd_.inputKey());
+}
+
+void Composition::driveNavigatedCrowd(double seconds) {
+    scene_.crowdDebug.points.clear();
+    scene_.crowdDebug.colors.clear();
+    if (crowd_.empty() || params_ == nullptr) {
+        return;
+    }
+    crowd_.advanceTo(seconds);
+    const crowd::CrowdState& st = crowd_.state();
+    for (std::size_t i = 0; i < crowd_.size(); ++i) {
+        const std::string& name = crowd_.agents()[i].node;
+        const crowd::AgentPose pose = crowd_.pose(i, seconds);
+        const std::string prefix = prefix_ + "nodes/" + name + "/";
+        if (auto* position = params_->findAs<glm::vec3>(prefix + "position")) {
+            for (std::size_t c = 0; c < 3; ++c) {
+                position->setFinalComponent(c, pose.position[static_cast<glm::length_t>(c)]);
+            }
+        }
+        if (auto* rotation = params_->findAs<glm::vec3>(prefix + "rotation")) {
+            float deg = glm::degrees(pose.yaw);
+            deg = std::fmod(deg + 540.0f, 360.0f) - 180.0f;
+            rotation->setFinalComponent(1, deg);
+        }
+        if (pose.clip != nullptr) {
+            const crowd::GroupDesc& g = crowdDesc_.groups[static_cast<std::size_t>(crowd_.agents()[i].group)];
+            setNodeAnimation(name, *pose.clip, pose.clipOrigin, g.gait.blend, pose.clipRate, /*rebase=*/true,
+                             /*loop=*/true, pose.activityStart);
+        }
+        // The debug layer (ADR-2228): the agent's disc coloured by its state, its corridor, its goal.
+        static const glm::vec4 kModeColour[] = {
+            {0.6f, 0.6f, 0.6f, 1.0f}, // idle
+            {0.9f, 0.8f, 0.2f, 1.0f}, // departing
+            {0.2f, 0.8f, 1.0f, 1.0f}, // moving
+            {0.2f, 1.0f, 0.3f, 1.0f}, // arrived
+            {0.6f, 0.4f, 1.0f, 1.0f}, // dwelling
+            {1.0f, 0.15f, 0.15f, 1.0f}, // unreachable
+        };
+        const crowd::AgentMode mode = st.mode[i];
+        glm::vec4 colour = kModeColour[static_cast<std::size_t>(mode)];
+        if (mode == crowd::AgentMode::Moving && st.slowFor[i] > 2.0f) {
+            colour = glm::vec4(1.0f, 0.5f, 0.0f, 1.0f); // wedged
+        }
+        auto& dbg = scene_.crowdDebug;
+        const auto seg = [&](glm::vec3 a, glm::vec3 b, glm::vec4 c) {
+            dbg.points.push_back(a);
+            dbg.points.push_back(b);
+            dbg.colors.push_back(c);
+        };
+        const float r = crowdDesc_.groups[static_cast<std::size_t>(crowd_.agents()[i].group)].radius;
+        const glm::vec3 base = pose.position + glm::vec3(0.0f, 0.05f, 0.0f);
+        constexpr int kSides = 12;
+        for (int k = 0; k < kSides; ++k) {
+            const float a0 = 6.2831853f * static_cast<float>(k) / kSides;
+            const float a1 = 6.2831853f * static_cast<float>(k + 1) / kSides;
+            seg(base + r * glm::vec3(std::sin(a0), 0.0f, std::cos(a0)), base + r * glm::vec3(std::sin(a1), 0.0f, std::cos(a1)),
+                colour);
+        }
+        seg(base, base + glm::vec3(std::sin(pose.yaw), 0.0f, std::cos(pose.yaw)) * (r * 2.0f), colour);
+        if (mode == crowd::AgentMode::Moving) {
+            glm::vec3 prev = base;
+            const auto& path = st.path[i];
+            for (std::size_t k = st.cursor[i]; k < path.size(); ++k) {
+                const glm::vec3 q(path[k].x, base.y, path[k].y);
+                seg(prev, q, glm::vec4(0.3f, 0.6f, 1.0f, 0.6f));
+                prev = q;
+            }
+        }
+        if (mode != crowd::AgentMode::Idle) {
+            const glm::vec3 gp(st.goal[i].x, base.y, st.goal[i].y);
+            seg(gp - glm::vec3(0.15f, 0.0f, 0.0f), gp + glm::vec3(0.15f, 0.0f, 0.0f), glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+            seg(gp - glm::vec3(0.0f, 0.0f, 0.15f), gp + glm::vec3(0.0f, 0.0f, 0.15f), glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+        }
+    }
+    for (const crowd::OrcaSegment& w : crowd_.walls()) {
+        const float y = 0.05f;
+        scene_.crowdDebug.points.emplace_back(w.a.x, y, w.a.y);
+        scene_.crowdDebug.points.emplace_back(w.b.x, y, w.b.y);
+        scene_.crowdDebug.colors.emplace_back(1.0f, 1.0f, 1.0f, 1.0f);
+    }
+}
+
 void Composition::registerCrowdParameters(params::ParameterSet& params) {
     for (const CrowdParams& c : crowds_) {
         for (const char* leaf : {"look", "sway", "lag", "lookTarget"}) {
@@ -12709,6 +12867,9 @@ nlohmann::json Composition::toJson() const {
     if (graph_) {
         j["graph"] = graph_->toJson();
     }
+    if (!crowdDesc_.empty()) {
+        j["crowd"] = crowd::crowdToJson(crowdDesc_); // ADR-2225
+    }
     if (astral_.enabled) {
         j["astral"] = astralToJson(astral_); // ADR-1221
     }
@@ -13863,6 +14024,14 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
         if (auto ok = comp->setStaging(std::move(*staging)); !ok) {
             return fail("scene file '{}': {}", scenePath.string(), ok.error().message);
         }
+    }
+    if (j.contains("crowd")) {
+        // ADR-2225 (115): the navigated crowd, as document data.
+        auto crowd = crowd::crowdFromJson(j.at("crowd"));
+        if (!crowd) {
+            return fail("scene file '{}': {}", scenePath.string(), crowd.error().message);
+        }
+        comp->crowdDesc_ = std::move(*crowd);
     }
     if (j.contains("graph")) {
         const json& gj = j.at("graph");

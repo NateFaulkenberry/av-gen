@@ -48,7 +48,8 @@ struct DebugViewOptions {
     // orders of magnitude out. None of those is visible in a luminance number.
     bool wind = false;            // the wind field: direction and strength on a grid, and each
                                   // declared wind body's origin, height and radius
-    bool vortex = false;          // the vortex's mouth, throat, depth and swirl direction
+    bool vortex = false;
+    bool crowd = false;           // ADR-2228: navigated crowd -- walls, corridors, goals, agents by state          // the vortex's mouth, throat, depth and swirl direction
     bool frustum = false;
     float frustumAspect = 16.0f / 9.0f;
     bool transformTrail = false;  // the recorded world path of the selected object (transform_history.hpp)

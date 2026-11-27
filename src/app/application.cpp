@@ -3336,6 +3336,7 @@ Result<void> Application::applyDebugDraw() {
         {"lightClusters", &d.lightClusters},
         {"wind", &d.wind},          // ADR-382 section 19
         {"vortex", &d.vortex},
+        {"crowd", &d.crowd},        // ADR-2228
     };
     std::string enabled;
     std::stringstream stream(options_.debugDraw);
