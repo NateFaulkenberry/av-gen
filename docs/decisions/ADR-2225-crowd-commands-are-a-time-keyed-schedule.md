@@ -1,7 +1,6 @@
 # ADR-2225: crowd commands are a time-keyed schedule; the crowd at t is a pure function of t; checkpoints make a seek cheap
 
-- **Status:** Accepted (2026-11-26), on `eng/115-crowds` (115 programme, Agent 3).
-  - 115 decision C3 says proceed. It goes to the owner as a confirmation, not a blocker.
+- **Status:** Accepted (2026-11-26), on `eng/115-crowds` (115 programme, Agent 3). The owner **confirmed** 115 decision C3 on 2026-11-27: crowd commands are a time-keyed schedule in document data.
 - **Code:**
   - `src/crowd/crowd_desc.{hpp,cpp}` (the scene file's top-level `crowd` block);
   - `CrowdWorld::advanceTo`, `advanceToStep`, `recordCheckpoint` and `pose`;
