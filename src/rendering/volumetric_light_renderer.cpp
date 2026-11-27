@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <string>
 
 namespace avgen::rendering {
@@ -258,37 +259,48 @@ void VolumetricLightRenderer::encode(wgpu::CommandEncoder& encoder, const Volume
         e = entry(2); e.buffer = glow; e.size = kParticleGlowBytes; own.push_back(e);
         e = entry(3); e.textureView = im.scatterView; own.push_back(e);
     }
-    {
-        wgpu::ComputePassDescriptor pd{};
-        pd.label = "volumetric-light-inject";
-        pd.timestampWrites = im.timeline != nullptr
-                                 ? im.timeline->mark("froxel.inject", gpu::FrameTimeline::PassKind::Compute)
-                                 : nullptr;
-        wgpu::ComputePassEncoder pass = encoder.BeginComputePass(&pd);
-        pass.SetPipeline(im.inject);
-        pass.SetBindGroup(0, group(im.inject, 0, frame));
-        pass.SetBindGroup(1, group(im.inject, 1, own));
-        pass.DispatchWorkgroups((im.dims.x + 3) / 4, (im.dims.y + 3) / 4, (im.dims.z + 3) / 4);
-        pass.End();
-    }
-    {
-        std::vector<wgpu::BindGroupEntry> f0;
-        auto e = entry(0); e.buffer = in.frameUniforms; f0.push_back(e);
-        std::vector<wgpu::BindGroupEntry> f1;
-        e = entry(1); e.buffer = im.uniforms; f1.push_back(e);
-        e = entry(4); e.textureView = im.scatterView; f1.push_back(e);
-        e = entry(5); e.textureView = im.integratedView; f1.push_back(e);
-        wgpu::ComputePassDescriptor pd{};
-        pd.label = "volumetric-light-integrate";
-        pd.timestampWrites = im.timeline != nullptr
-                                 ? im.timeline->mark("froxel.integrate", gpu::FrameTimeline::PassKind::Compute)
-                                 : nullptr;
-        wgpu::ComputePassEncoder pass = encoder.BeginComputePass(&pd);
-        pass.SetPipeline(im.integrate);
-        pass.SetBindGroup(0, group(im.integrate, 0, f0));
-        pass.SetBindGroup(1, group(im.integrate, 1, f1));
-        pass.DispatchWorkgroups((im.dims.x + 7) / 8, (im.dims.y + 7) / 8, 1);
-        pass.End();
+    // DIAGNOSTIC ONLY: AVGEN_VOLUMETRIC_REPEAT=n encodes inject and integrate n times a frame, so their cost can be
+    // measured by amplification -- compute timestamps are unwritten on this Dawn/Metal path (ADR-2210) and a single
+    // pass hides inside a frame A/B's noise. The result is identical (each repeat rewrites the same volumes); the
+    // variable is an AVGEN_* override, so every run that sets it says so in its first log lines.
+    static const std::uint32_t repeat = [] {
+        const char* v = std::getenv("AVGEN_VOLUMETRIC_REPEAT");
+        const long n = v != nullptr ? std::strtol(v, nullptr, 10) : 1;
+        return static_cast<std::uint32_t>(std::clamp<long>(n, 1, 64));
+    }();
+    for (std::uint32_t rep = 0; rep < repeat; ++rep) {
+        {
+            wgpu::ComputePassDescriptor pd{};
+            pd.label = "volumetric-light-inject";
+            pd.timestampWrites = im.timeline != nullptr && rep == 0
+                                     ? im.timeline->mark("froxel.inject", gpu::FrameTimeline::PassKind::Compute)
+                                     : nullptr;
+            wgpu::ComputePassEncoder pass = encoder.BeginComputePass(&pd);
+            pass.SetPipeline(im.inject);
+            pass.SetBindGroup(0, group(im.inject, 0, frame));
+            pass.SetBindGroup(1, group(im.inject, 1, own));
+            pass.DispatchWorkgroups((im.dims.x + 3) / 4, (im.dims.y + 3) / 4, (im.dims.z + 3) / 4);
+            pass.End();
+        }
+        {
+            std::vector<wgpu::BindGroupEntry> f0;
+            auto e = entry(0); e.buffer = in.frameUniforms; f0.push_back(e);
+            std::vector<wgpu::BindGroupEntry> f1;
+            e = entry(1); e.buffer = im.uniforms; f1.push_back(e);
+            e = entry(4); e.textureView = im.scatterView; f1.push_back(e);
+            e = entry(5); e.textureView = im.integratedView; f1.push_back(e);
+            wgpu::ComputePassDescriptor pd{};
+            pd.label = "volumetric-light-integrate";
+            pd.timestampWrites = im.timeline != nullptr && rep == 0
+                                     ? im.timeline->mark("froxel.integrate", gpu::FrameTimeline::PassKind::Compute)
+                                     : nullptr;
+            wgpu::ComputePassEncoder pass = encoder.BeginComputePass(&pd);
+            pass.SetPipeline(im.integrate);
+            pass.SetBindGroup(0, group(im.integrate, 0, f0));
+            pass.SetBindGroup(1, group(im.integrate, 1, f1));
+            pass.DispatchWorkgroups((im.dims.x + 7) / 8, (im.dims.y + 7) / 8, 1);
+            pass.End();
+        }
     }
 }
 

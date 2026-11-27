@@ -51,3 +51,10 @@ the grid costs well under a millisecond at Realtime.
   later phases.
 - The lab: `examples/labs/volumetric/` (environments e01 light shafts, e02 dense atmosphere, e06 coloured scattering;
   cases 101, 102, 201, 601). Regenerate with `python3 examples/labs/volumetric/build.py`.
+
+## Measuring the cost
+
+Compute timestamps are unwritten on the Dawn/Metal path, so the grid's own passes read 0 ms in the GPU timeline.
+`AVGEN_VOLUMETRIC_REPEAT=n` (diagnostic only; 1..64) encodes inject and integrate n times a frame with an identical
+result, so their cost is `(GPU frame at n - GPU frame at 1) / (n - 1)`. The apply's cost is the
+`volume.composite` render pass, which is timed.
