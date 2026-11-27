@@ -223,7 +223,8 @@ void VolumetricLightRenderer::update(const scene::Scene& scene, const FrameTime&
     }
 }
 
-void VolumetricLightRenderer::encode(wgpu::CommandEncoder& encoder, const VolumetricLightInputs& in) {
+void VolumetricLightRenderer::encode(wgpu::CommandEncoder& encoder, const VolumetricLightInputs& in,
+                                     bool allowDiagnosticRepeat) {
     Impl& im = *impl_;
     if (!im.activeThisFrame) {
         return;
@@ -260,7 +261,7 @@ void VolumetricLightRenderer::encode(wgpu::CommandEncoder& encoder, const Volume
         e = entry(3); e.textureView = im.scatterView; own.push_back(e);
     }
     // DIAGNOSTIC ONLY: AVGEN_VOLUMETRIC_REPEAT=n encodes inject and integrate n times a frame, so their cost can be
-    // measured by amplification -- compute timestamps are unwritten on this Dawn/Metal path (ADR-2210) and a single
+    // measured by amplification, at any tier but Offline -- compute timestamps are unwritten on this Dawn/Metal path (ADR-2210) and a single
     // pass hides inside a frame A/B's noise. The result is identical (each repeat rewrites the same volumes); the
     // variable is an AVGEN_* override, so every run that sets it says so in its first log lines.
     static const std::uint32_t repeat = [] {
@@ -268,7 +269,14 @@ void VolumetricLightRenderer::encode(wgpu::CommandEncoder& encoder, const Volume
         const long n = v != nullptr ? std::strtol(v, nullptr, 10) : 1;
         return static_cast<std::uint32_t>(std::clamp<long>(n, 1, 64));
     }();
-    for (std::uint32_t rep = 0; rep < repeat; ++rep) {
+    // Never in an offline render: a final carries no diagnostic, even one that changes only its cost.
+    static bool loggedIgnored = false;
+    if (repeat > 1 && !allowDiagnosticRepeat && !loggedIgnored) {
+        log::warn("AVGEN_VOLUMETRIC_REPEAT={} ignored: this render is at the Offline tier", repeat);
+        loggedIgnored = true;
+    }
+    const std::uint32_t passes = allowDiagnosticRepeat ? repeat : 1u;
+    for (std::uint32_t rep = 0; rep < passes; ++rep) {
         {
             wgpu::ComputePassDescriptor pd{};
             pd.label = "volumetric-light-inject";

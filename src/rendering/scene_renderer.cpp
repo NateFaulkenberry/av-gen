@@ -5628,7 +5628,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             in.shadowSampler = shadows_->comparisonSampler();
             in.terrainHeight = terrainHeightView();
             in.particleGlow = particles_->glowBuffer();
-            volumetricLight_->encode(encoder, in);
+            volumetricLight_->encode(encoder, in, tier_ != QualityTier::Offline);
         }
         volumes_->update(scene, time, hdr_.width(), hdr_.height(), hdr_.depthView(), fields_.get(),
                          particles_->glowSystems(), qualitySettings_, volumetricLight_->apply());

@@ -107,7 +107,8 @@ public:
                 const std::array<int, 8>& packedIndexOf, const std::array<bool, 8>& shadowsAir,
                 const QualitySettings& quality, std::uint32_t particleGlowSystems);
     // Encodes inject and integrate. No-op when the last update() found it inactive.
-    void encode(wgpu::CommandEncoder& encoder, const VolumetricLightInputs& inputs);
+    // `allowDiagnosticRepeat` false (the Offline tier) ignores AVGEN_VOLUMETRIC_REPEAT, and says so once.
+    void encode(wgpu::CommandEncoder& encoder, const VolumetricLightInputs& inputs, bool allowDiagnosticRepeat = true);
 
     // For the volume composite: the integrated grid and how to address it (`active` false when off).
     [[nodiscard]] VolumetricLightApply apply() const;
