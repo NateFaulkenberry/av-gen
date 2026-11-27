@@ -41,6 +41,8 @@ A navigated crowd is history-dependent: avoidance has no closed form. If command
    - **The coupling rule.** The day the crowd reads an entity (entity obstacles, ADR-2223 §7.7 of the plan), or an entity reads the crowd (density, avoidance of the crowd), the crowd must join `EntityWorld::seek`'s `SeekHooks.capture/restore`, so one replay drives both. Short of that, the two seeks must be proven to agree.
    - **Enforced by** `tests/unit/test_crowd_world.cpp`, "crowd lab 804". In a scene with both wandering entities and a crowd, one `seekWithDirector` from a warmed state must equal a play from zero, for the crowd's state hash and every entity's position. The targets fall inside schedule entries: mid-departure-stagger, mid-walk, mid-dwell. The test asserts that all three states were in fact hit.
 
+- **Schema.** `/crowd` is registered `x-avgen-untyped` in `src/api/schema_types_scene.cpp` (a data-only line, under the L3-gate exception the orchestrator granted). It must be typed before the phase B3 `crowd.*` Session tools land.
+
 ## Consequences
 
 - A scrub replays at most one second of crowd (warm). A cold first seek deep into a film replays from the nearest checkpoint, or from zero. A background pre-roll at load is phase B3 work.

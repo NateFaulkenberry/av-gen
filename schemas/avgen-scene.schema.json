@@ -1657,6 +1657,10 @@
       "description": "ADR-1873.",
       "x-avgen-untyped": true
     },
+    "crowd": {
+      "description": "ADR-2225: the navigated crowd (crowd::crowdFromJson): groups, walls, a time-keyed schedule.",
+      "x-avgen-untyped": true
+    },
     "ecosystem": {
       "description": "ADR-1200.",
       "x-avgen-untyped": true

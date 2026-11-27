@@ -97,6 +97,9 @@ void rootEntries(std::vector<TypingEntry>& e) {
     add(e, "/portal", untyped("ADR-1879."));
     add(e, "/portals", untyped("ADR-1895; needs `portal`."));
     add(e, "/looks", untyped("ADR-1886: named parameter looks by portal crossing."));
+    // ---- 115 Agent 3 (ADR-2225): the navigated crowd. Untyped until its shape settles; typed before the B3
+    // crowd.* Session tools.
+    add(e, "/crowd", untyped("ADR-2225: the navigated crowd (crowd::crowdFromJson): groups, walls, a time-keyed schedule."));
 }
 
 // ---- environment (kEnvironmentKeys) and its sky (kSkyKeys) ------------------------------------------
