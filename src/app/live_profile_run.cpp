@@ -148,7 +148,9 @@ void Application::fillLiveProfileConditions(LiveProfileRecord& record, bool live
     c.renderScale = renderer_->qualitySettings().renderScale;
     c.internalWidth = renderer_->stats().width;
     c.internalHeight = renderer_->stats().height;
-    c.camera = o.camera.empty() ? engine_->scene().camera.name : o.camera;
+    // ADR-2231: what the run actually looked through. The name used to be copied from `--camera` whether or not anything
+    // selected it, which made the record claim a camera the frame was never from.
+    c.camera = options_.camera.film() ? engine_->scene().camera.name : describeRenderCamera(options_.camera);
     c.startSeconds = o.startSeconds;
     c.warmupCapSeconds = o.warmupSeconds;
     c.measureSeconds = o.measureSeconds;

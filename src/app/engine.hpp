@@ -479,6 +479,15 @@ public:
     // Replaces the composition's camera collection, re-registers `cameras/<slug>/*` and re-binds the
     // timeline. Refuses an invalid collection whole and changes nothing on a refusal.
     [[nodiscard]] Result<void> setCameraDirection(scene::CameraDirection direction);
+    // ADR-2231: look through `camera` for the rest of this engine's life -- a render job's, a headless run's or a lab
+    // case's. Named pins one authored camera (by display name, else by slug) through the composition's viewport view
+    // (`ViewportCamera::Through`), so it holds the frame whatever the director does and still moves if it is keyed or
+    // follows something; Pose pins a fixed eye and aim (`ViewportCamera::Editor`); Film restores the director's answer.
+    // Refused, changing nothing, when there is no composition or the name matches no camera -- and the error lists
+    // the names that exist, because "camera not found" is half an answer.
+    [[nodiscard]] Result<void> pinCamera(const RenderCamera& camera);
+    // Every camera's display name, the main camera first. Empty without a composition.
+    [[nodiscard]] std::vector<std::string> cameraNames() const;
 
     // ---- the cinematic sequence (ADR-089) ----
     // The timed performance: shots, scene slots, actors, overlay cues, markers. Held by value

@@ -360,6 +360,10 @@ struct AppOptions {
     // the parser a case has become a project, a size, a tier and a set of arms.
     bool listLabs = false;
     std::optional<labs::LabCase> labCase;
+    // ADR-2231: `--camera <name>` / `--camera-pose ex,ey,ez,ax,ay,az[,fov]`, or a lab case's camera. Applied to every
+    // path that draws: the render job (RenderSettings::camera), the headless loops, the live profile and the editor's
+    // viewport. Film unless asked.
+    RenderCamera camera;
     // ADR-902: `--audit-routes <out.json>` loads --project headless (no window, no GPU), writes the
     // route/track/effect liveness report to the file ("-" = stdout) and exits.
     std::optional<std::filesystem::path> auditRoutes;

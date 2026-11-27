@@ -1050,6 +1050,59 @@ scene::ActiveCameraState Engine::activeCamera() const {
     return scene::ActiveCameraState{};
 }
 
+std::vector<std::string> Engine::cameraNames() const {
+    std::vector<std::string> out;
+    if (const scene::Composition* comp = composition()) {
+        for (const scene::CameraRig& rig : comp->cameraDirection().cameras) {
+            out.push_back(rig.name.empty() ? rig.slug : rig.name);
+        }
+    }
+    return out;
+}
+
+Result<void> Engine::pinCamera(const RenderCamera& camera) {
+    scene::Composition* comp = composition();
+    if (camera.film()) {
+        if (comp != nullptr) {
+            comp->setViewportView({});
+        }
+        return {};
+    }
+    if (comp == nullptr) {
+        return fail("{} needs a composition: this scene has one camera and no named ones",
+                    describeRenderCamera(camera));
+    }
+    if (camera.kind == RenderCamera::Kind::Pose) {
+        scene::CameraPose pose;
+        pose.position = glm::vec3(camera.eye[0], camera.eye[1], camera.eye[2]);
+        pose.target = glm::vec3(camera.aim[0], camera.aim[1], camera.aim[2]);
+        pose.fovDegrees = camera.fovDegrees; // 0: the film's own field of view (Composition::applyViewportView)
+        pose.focalLength = 0.0f;
+        comp->setEditorCamera(pose);
+        comp->setViewportView({scene::ViewportCamera::Editor, scene::kNoCamera});
+        return {};
+    }
+    const scene::CameraDirection& direction = comp->cameraDirection();
+    const scene::CameraRig* rig = direction.findByName(camera.name);
+    if (rig == nullptr) {
+        for (const scene::CameraRig& r : direction.cameras) {
+            if (r.slug == camera.name) {
+                rig = &r;
+                break;
+            }
+        }
+    }
+    if (rig == nullptr) {
+        std::string names;
+        for (const std::string& n : cameraNames()) {
+            names += (names.empty() ? "'" : ", '") + n + "'";
+        }
+        return fail("no camera named '{}' in this project; its cameras are {}", camera.name, names);
+    }
+    comp->setViewportView({scene::ViewportCamera::Through, rig->id});
+    return {};
+}
+
 Result<void> Engine::setCameraDirection(scene::CameraDirection direction) {
     auto* comp = composition();
     if (comp == nullptr) {

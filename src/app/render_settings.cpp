@@ -13,6 +13,8 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdlib>
+#include <vector>
 #include <thread>
 
 namespace avgen::app {
@@ -41,6 +43,83 @@ std::span<const RenderOutputSpelling> renderOutputSpellings() {
 
 bool isSequence(RenderOutput output) {
     return output != RenderOutput::Video;
+}
+
+// ---- ADR-2231: the render camera ----------------------------------------------------------------------------------
+
+RenderCamera RenderCamera::named(std::string cameraName) {
+    RenderCamera c;
+    c.kind = Kind::Named;
+    c.name = std::move(cameraName);
+    return c;
+}
+
+RenderCamera RenderCamera::pose(const float eyeXyz[3], const float aimXyz[3], float fov) {
+    RenderCamera c;
+    c.kind = Kind::Pose;
+    for (int i = 0; i < 3; ++i) {
+        c.eye[i] = eyeXyz[i];
+        c.aim[i] = aimXyz[i];
+    }
+    c.fovDegrees = fov;
+    return c;
+}
+
+std::string describeRenderCamera(const RenderCamera& c) {
+    switch (c.kind) {
+    case RenderCamera::Kind::Film: return "film";
+    case RenderCamera::Kind::Named: return fmt::format("camera '{}'", c.name);
+    case RenderCamera::Kind::Pose:
+        return fmt::format("pose eye ({:g}, {:g}, {:g}) aim ({:g}, {:g}, {:g}){}", c.eye[0], c.eye[1], c.eye[2], c.aim[0],
+                           c.aim[1], c.aim[2], c.fovDegrees > 0.0f ? fmt::format(" fov {:g}", c.fovDegrees) : "");
+    }
+    return "film";
+}
+
+Result<RenderCamera> parseCameraPose(std::string_view text) {
+    std::vector<float> v;
+    std::size_t start = 0;
+    while (start <= text.size()) {
+        const std::size_t comma = text.find(',', start);
+        const std::string part(text.substr(start, comma == std::string_view::npos ? std::string_view::npos : comma - start));
+        char* end = nullptr;
+        const float f = std::strtof(part.c_str(), &end);
+        if (part.empty() || end == part.c_str() || *end != '\0' || !std::isfinite(f)) {
+            return fail("--camera-pose expects ex,ey,ez,ax,ay,az[,fov] (numbers), got '{}'", text);
+        }
+        v.push_back(f);
+        if (comma == std::string_view::npos) {
+            break;
+        }
+        start = comma + 1;
+    }
+    if (v.size() != 6 && v.size() != 7) {
+        return fail("--camera-pose expects 6 numbers (eye, aim) or 7 (and the vertical fov), got {}", v.size());
+    }
+    const float fov = v.size() == 7 ? v[6] : 0.0f;
+    if (v.size() == 7 && (fov <= 0.0f || fov >= 180.0f)) {
+        return fail("--camera-pose: the field of view must be between 0 and 180 degrees, got {:g}", fov);
+    }
+    if (v[0] == v[3] && v[1] == v[4] && v[2] == v[5]) {
+        return fail("--camera-pose: the eye and the aim are the same point, so there is no view");
+    }
+    return RenderCamera::pose(v.data(), v.data() + 3, fov);
+}
+
+std::string renderCameraFlags(const RenderCamera& c) {
+    switch (c.kind) {
+    case RenderCamera::Kind::Film: return {};
+    case RenderCamera::Kind::Named: {
+        const bool plain = std::all_of(c.name.begin(), c.name.end(), [](unsigned char ch) {
+            return std::isalnum(ch) != 0 || ch == '-' || ch == '_' || ch == '.';
+        });
+        return plain ? fmt::format(" --camera {}", c.name) : fmt::format(" --camera '{}'", c.name);
+    }
+    case RenderCamera::Kind::Pose:
+        return fmt::format(" --camera-pose {:g},{:g},{:g},{:g},{:g},{:g}{}", c.eye[0], c.eye[1], c.eye[2], c.aim[0],
+                           c.aim[1], c.aim[2], c.fovDegrees > 0.0f ? fmt::format(",{:g}", c.fovDegrees) : "");
+    }
+    return {};
 }
 
 const char* RenderSettings::defaultPattern(RenderOutput output) {

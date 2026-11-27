@@ -8,6 +8,7 @@
 #include <fstream>
 #include <stdexcept>
 #include <algorithm>
+#include <cctype>
 
 namespace avgen::labs {
 namespace {
@@ -64,7 +65,9 @@ json toJson(const LabCase& c) {
     j["size"] = json::array({c.width, c.height});
     j["fps"] = c.fps;
     j["seed"] = c.seed;
-    if (c.hasCamera) {
+    if (!c.cameraName.empty()) {
+        j["camera"] = c.cameraName;
+    } else if (c.hasCamera) {
         j["camera"] = json{{"eye", json::array({c.eye.x, c.eye.y, c.eye.z})},
                            {"aim", json::array({c.aim.x, c.aim.y, c.aim.z})}};
     }
@@ -125,6 +128,14 @@ Result<LabCase> caseFromJson(const json& doc) {
     }
     c.fps = doc.value("fps", 60.0);
     c.seed = doc.value("seed", std::uint64_t{0});
+    if (auto it = doc.find("camera"); it != doc.end() && it->is_string()) {
+        c.cameraName = it->get<std::string>();
+        if (c.cameraName.empty()) {
+            return fail("{} case {} names an empty camera", c.lab, c.number);
+        }
+    } else if (it != doc.end() && !it->is_object()) {
+        return fail("{} case {}: 'camera' is a camera's name or {{eye, aim}}", c.lab, c.number);
+    }
     if (auto it = doc.find("camera"); it != doc.end() && it->is_object()) {
         const auto read = [](const json& j, const char* key, glm::vec3& out) {
             if (auto a = j.find(key); a != j.end() && a->is_array() && a->size() == 3) {
@@ -316,9 +327,20 @@ std::string reproduceCommand(const LabCase& c) {
     if (!c.aovs.empty()) {
         cmd += fmt::format(" --aov {}", joinList(c.aovs));
     }
+    // ADR-2231: the case's camera, in the flags `--lab-case` maps it to.
+    if (!c.cameraName.empty()) {
+        const bool plain = std::all_of(c.cameraName.begin(), c.cameraName.end(), [](unsigned char ch) {
+            return std::isalnum(ch) != 0 || ch == '-' || ch == '_' || ch == '.';
+        });
+        cmd += plain ? fmt::format(" --camera {}", c.cameraName) : fmt::format(" --camera '{}'", c.cameraName);
+    } else if (c.hasCamera) {
+        cmd += fmt::format(" --camera-pose {:g},{:g},{:g},{:g},{:g},{:g}", c.eye.x, c.eye.y, c.eye.z, c.aim.x, c.aim.y,
+                           c.aim.z);
+    }
     // The time is a range of one frame, which is what `--range` means and what makes this a
-    // reproduction of the case rather than of the whole fixture.
-    cmd += fmt::format(" --range {:g}:{:g}", c.timeSeconds, c.timeSeconds);
+    // reproduction of the case rather than of the whole fixture. ADR-2231: and a render of it -- without an output
+    // the pasted command drew the frame and wrote nothing.
+    cmd += fmt::format(" --range {:g}:{:g} --render renders/labs/{}-{}", c.timeSeconds, c.timeSeconds, c.lab, c.number);
     return cmd;
 }
 

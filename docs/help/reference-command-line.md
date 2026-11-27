@@ -44,6 +44,8 @@ This page covers the flags most work needs; it is not complete. `avgen --help` p
 | `--capture <file>` | write the last frame; `.png` gives a PNG, anything else a PPM |
 | `--tier <t>` | `preview`, `realtime`, `high` or `offline` |
 | `--headless` | no window; `--render` and `--queue` imply it |
+| `--camera <name>` | look through this authored camera (display name or slug) for the whole run: `--render`, `--headless`, `--lab-case`, `--live-profile`. It holds the frame whatever the director does; an unknown name fails and lists the cameras (ADR-2231) |
+| `--camera-pose <ex,ey,ez,ax,ay,az[,fov]>` | look from a fixed eye at a fixed aim instead; without the seventh number the film's field of view is kept (ADR-2231) |
 
 **A render waits its turn on the GPU** (ADR-2165). `--render`, `--queue` and the Render panel run on the engine
 host's job queue and take the machine's GPU lock -- `tools/gpu-lock.sh`'s -- for as long as each job renders. Run

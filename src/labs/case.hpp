@@ -65,6 +65,10 @@ struct LabCase {
     bool hasCamera = false;
     glm::vec3 eye{0.0f};
     glm::vec3 aim{0.0f};
+    // ADR-2231: or one of the fixture's authored cameras, by name -- `"camera": "cam-overview"`. The pose then lives once,
+    // in the fixture, and the case only says which. Exclusive with `eye`/`aim`. Both are applied by `--lab-case` and
+    // printed by `reproduceCommand` (before ADR-2231 neither was, and every case camera was a silent no-op).
+    std::string cameraName;
 
     // `--supersample`. 1.0 is off. Here because the Rendering Lab's reference arm is defined by
     // it and nothing else: the reference and the candidate are the same scene at the same second,

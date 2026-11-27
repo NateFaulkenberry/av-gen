@@ -183,6 +183,10 @@ std::string usageText() {
            "                      EXR sequence, before tone mapping), or video\n"
            "  --range <a>:<b>     render time range in seconds (either side may be empty); with\n"
            "                      --headless and no --render, every benchmark block starts at <a>\n"
+           "  --camera <name>     look through this authored camera for the whole run (render, headless,\n"
+           "                      --lab-case, --live-profile), whatever the director does; by display name\n"
+           "                      or slug. An unknown name is an error that lists the cameras (ADR-2231)\n"
+           "  --camera-pose <ex,ey,ez,ax,ay,az[,fov]>  look from a fixed eye at a fixed aim instead\n"
            "  --codec <id>        video codec: prores4444, prores422, h264, hevc, or an ffmpeg encoder name\n"
            "  --quality <0-100>   video quality\n"
            "  --queue <file>      run a render queue (JSON list of projects and render settings), headless\n"
@@ -431,6 +435,18 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
     AppOptions options = std::move(*parsed);
     const LiveProfileOptions& o = lp.options;
     options.liveProfile = o;
+    // ADR-2231: the profiler's `--camera` used to be written into the record and applied to nothing.
+    if (!o.camera.empty()) {
+        if (!options.camera.film()) {
+            return fail("--live-profile --camera '{}': {} was already given", o.camera, describeRenderCamera(options.camera));
+        }
+        options.camera = RenderCamera::named(o.camera);
+    }
+    if (!options.camera.film() && o.mode == LiveProfileMode::Live && o.projection) {
+        return fail("--live-profile --mode live with {}: the projection output always shows the film (ADR-391), so the "
+                    "measured frame would not be the named one; add --projection off",
+                    describeRenderCamera(options.camera));
+    }
     options.liveTargetFps = static_cast<int>(std::lround(o.targetFps));
     if (const auto level = liveQualityLevelFromToken(o.quality)) {
         options.liveQuality = {true, *level};
@@ -669,6 +685,22 @@ Result<AppOptions> parseArgsImpl(int argc, char** argv) {
                             resolved->number, resolved->title, resolved->blockedBy);
             }
             options.labCase = *resolved;
+            ++i;
+        } else if (arg == "--camera" || arg == "--camera-pose") {
+            auto v = need(i, arg.c_str());
+            if (!v) return std::unexpected(v.error());
+            if (!options.camera.film()) {
+                return fail("{}: a run looks through one camera, and {} was already given", arg,
+                            describeRenderCamera(options.camera));
+            }
+            if (arg == "--camera") {
+                if (v->empty()) return fail("--camera needs a camera name");
+                options.camera = RenderCamera::named(std::string(*v));
+            } else {
+                auto pose = parseCameraPose(*v);
+                if (!pose) return std::unexpected(pose.error());
+                options.camera = *pose;
+            }
             ++i;
         } else if (arg == "--list-midi") {
             options.listMidi = true;
@@ -1289,6 +1321,17 @@ Result<AppOptions> parseArgsImpl(int argc, char** argv) {
         }
         if (c.supersample != 1.0 && options.supersample <= 1.0) {
             options.supersample = static_cast<float>(c.supersample);
+        }
+        // ADR-2231: the case's camera. It was parsed and saved and applied by nothing, so every case that set one
+        // reproduced through the fixture's own camera. A `--camera` typed beside the case wins, like every other flag.
+        if (options.camera.film()) {
+            if (!c.cameraName.empty()) {
+                options.camera = RenderCamera::named(c.cameraName);
+            } else if (c.hasCamera) {
+                const float eye[3] = {c.eye.x, c.eye.y, c.eye.z};
+                const float aim[3] = {c.aim.x, c.aim.y, c.aim.z};
+                options.camera = RenderCamera::pose(eye, aim);
+            }
         }
     }
     // ADR-277, and ADR-225's rule: a flag the program then ignores is worse than one it refuses.
@@ -2744,6 +2787,18 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
     // ADR-1390: whatever start-up opened was configured by the code that opened it; from here on a change of project
     // is the frame loop's to notice.
     projectSwitch_.sync(engine_->projectGeneration());
+    // ADR-2231: the camera this run looks through, on the session's own engine (the headless loops, the live profile
+    // and the editor's viewport; a render job gets it through RenderSettings::camera). An unknown name fails start-up
+    // with the list of names, rather than measuring or showing the film under a camera nobody asked for.
+    if (!options.camera.film()) {
+        if (auto r = engine_->pinCamera(options.camera); !r) {
+            return std::unexpected(r.error());
+        }
+        if (const scene::Composition* comp = engine_->composition()) {
+            viewportView_ = comp->viewportView(); // the editor's frame loop re-applies its own view every frame
+        }
+        log::info("camera: through {}", describeRenderCamera(options.camera));
+    }
     if (options.labCase) {
         const labs::LabCase& c = *options.labCase;
         if (c.timeSeconds > 0.0) {
@@ -6722,6 +6777,7 @@ RenderSettings Application::renderSettingsFromOptions() const {
     if (options_.supersample > 1.0f) s.supersample = options_.supersample;
     if (options_.aovs) s.aovs = *options_.aovs;
     if (!options_.postStages.empty()) s.postStages = options_.postStages;
+    s.camera = options_.camera; // ADR-2231
     return s;
 }
 
@@ -6973,6 +7029,7 @@ int Application::runQueue(const std::filesystem::path& queueFile) {
         if (options_.aovs) settings.aovs = *options_.aovs;
         if (!options_.postStages.empty()) settings.postStages = options_.postStages;
         if (options_.renderOutput) settings.output = *options_.renderOutput;
+        settings.camera = options_.camera; // ADR-2231
         settings.normalisePattern();
         if (settings.outputPath.empty()) {
             settings.outputPath = project.stem().string() + "_frames";

@@ -44,6 +44,38 @@ struct RenderOutputSpelling {
 [[nodiscard]] std::span<const RenderOutputSpelling> renderOutputSpellings();
 [[nodiscard]] bool isSequence(RenderOutput output);
 
+// ADR-2231: the camera a render, a headless run or a lab case looks through. A reproducible INPUT, like the tier and
+// the range: before it existed a lab case's `camera` was parsed, saved and applied by nothing, and `--live-profile
+// --camera` wrote the name into its record without selecting anything.
+//
+//   Film  -- the director's answer (shots, events, the default camera). Every render that does not ask.
+//   Named -- one of the composition's authored cameras (`cameraDirection.cameras`, by display name or slug), pinned
+//            for the whole run whatever the director does: the camera's own pose and lens, evaluated every frame,
+//            so a keyed or following camera still moves. An unknown name is an error that lists the names.
+//   Pose  -- a fixed eye and aim (a lab case's `camera {eye, aim}`); `fovDegrees` 0 keeps the film's field of view.
+//
+// Applied through the composition's viewport view (ADR-391's Through and Editor), which a job's fresh engine
+// otherwise never sets: so the film is still the only thing a render sees unless the render names a camera.
+struct RenderCamera {
+    enum class Kind : std::uint8_t { Film, Named, Pose };
+    Kind kind = Kind::Film;
+    std::string name;
+    float eye[3] = {0.0f, 0.0f, 0.0f};
+    float aim[3] = {0.0f, 0.0f, 0.0f};
+    float fovDegrees = 0.0f;
+
+    [[nodiscard]] bool film() const { return kind == Kind::Film; }
+    [[nodiscard]] static RenderCamera named(std::string cameraName);
+    [[nodiscard]] static RenderCamera pose(const float eyeXyz[3], const float aimXyz[3], float fov = 0.0f);
+    friend bool operator==(const RenderCamera&, const RenderCamera&) = default;
+};
+// "film", "camera 'Valley Wide'", "pose eye (1, 2, 3) aim (0, 1, 0)".
+[[nodiscard]] std::string describeRenderCamera(const RenderCamera& camera);
+// `--camera-pose`: "ex,ey,ez,ax,ay,az" or with a seventh number, the vertical field of view in degrees.
+[[nodiscard]] Result<RenderCamera> parseCameraPose(std::string_view text);
+// The command-line flags that reproduce `camera` (empty for Film), with a leading space: " --camera 'Valley Wide'".
+[[nodiscard]] std::string renderCameraFlags(const RenderCamera& camera);
+
 
 // ADR-255 + ADR-182: what `--aov shadow` needs before its output is a measurement rather than a
 // constant. A free function, and here rather than on the render job, so the preconditions can be
@@ -136,6 +168,10 @@ struct RenderSettings {
     float supersample = 1.0f;
 
     std::string limits = "tier";
+
+    // ADR-2231: the camera this render looks through. Film unless asked; not written to a project's `render` block
+    // (a pinned camera is a property of one request, like `--range`, not of the project).
+    RenderCamera camera;
 
     // ---- AOV export (ADR-242) ----------------------------------------------------------------
     //

@@ -155,6 +155,15 @@ Result<void> RenderJob::start() {
         }
     }
 
+    // ADR-2231: the camera this render looks through, set before the warm-up and the history so every frame the job
+    // draws -- the ones it keeps and the ones it discards -- is through it. Film (the default) changes nothing.
+    if (!settings_.camera.film()) {
+        if (auto r = engine_->pinCamera(settings_.camera); !r) {
+            return r;
+        }
+        log::info("render: through {}", describeRenderCamera(settings_.camera));
+    }
+
     // Warm-up: the first frames drawn with freshly compiled pipelines in a process differ by 1 LSB
     // in a few scattered pixels from every later render (Metal replaces the pipelines' GPU
     // binaries shortly after creation; Dawn caches pipeline objects device-wide, so a throwaway
