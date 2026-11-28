@@ -172,7 +172,7 @@ TEST_CASE("The light in the air is shadowed by what shadows the floor", "[volume
     CHECK(b.renderer->stats().volumetricLight.shadowedLights >= 1);
     b.setBool("lights/sun/castsShadow", false);
     const gpu::ImageF open = b.render();
-    // The upper half is air in front of the colonnade and the sky: where the shafts are.
+    // The upper half is the hall's air under the slit roof: where the shafts are.
     const double withShadow = luminance(shadowed, 0, 0, kW, kH / 2);
     const double without = luminance(open, 0, 0, kW, kH / 2);
     INFO("air luminance, shadowed " << withShadow << ", unshadowed " << without);

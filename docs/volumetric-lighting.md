@@ -1,6 +1,6 @@
 # Volumetric lighting
 
-Light you can see in the air: shafts through a colonnade, a spotlight's cone in haze, coloured beams. A froxel grid
+Light you can see in the air: shafts through a slit roof, a spotlight's cone in haze, coloured beams. A froxel grid
 (a 3D grid aligned to the camera) carries the scene's air from the eye out to a distance and lights it with the
 scene's own lights and their shadows (ADR-2210).
 

@@ -1,7 +1,7 @@
 {
  "format": "avgen-project",
  "version": 4,
- "_note": "Light shafts: a low sun through a colonnade, a spot through a grille.",
+ "_note": "Light shafts: a high sun through the slit roof of an enclosed hall, a spot through a grille.",
  "app": {
   "name": "avgen",
   "version": "0.1.0"

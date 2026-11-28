@@ -6,7 +6,7 @@ Edit this script, not the JSON beside it: every eNN-*.json and eNN-*.scene.json 
 what it would write, byte for byte.
 
 One project per environment, numbered by the programme spec's list (spec 2, Agent 2, "Volumetric lighting test lab"):
-  e01 light shafts          a low sun through a colonnade and a spot through a grille: shafts, not an overlay
+  e01 light shafts          a sun through the slit roof of a hall and a spot through a grille: shafts
   e02 dense atmosphere      unlit slabs at known distances, nothing scattering: the analytic transmittance check
   e06 coloured scattering   red, green and blue spots through one haze, three anisotropies
 Environments 3, 4, 5, 7 and 8 arrive with the phases that build what they test (B2..B4).
@@ -73,40 +73,49 @@ def dark_environment(**extra):
 
 
 def e01():
-    """Light shafts. The sun is low and behind the colonnade, so the camera looks into the light: forward
-    scattering (anisotropy 0.6) makes the lit air between the columns bright and the air in each column's
-    shadow dark -- the shafts are the shadow map seen in the medium, which a fog overlay cannot draw. A spot
-    behind a grille wall on the right throws barred beams across the floor."""
-    nodes = [box("floor", [0.0, -0.1, -30.0], [120.0, 0.2, 140.0], [0.16, 0.155, 0.15])]
-    for i in range(9):
-        x = -24.0 + i * 6.0
-        nodes.append(box(f"column-{i:02d}", [x, 6.0, -28.0], [1.6, 12.0, 1.6], [0.55, 0.52, 0.47]))
-    nodes.append(box("lintel", [0.0, 12.6, -28.0], [52.0, 1.2, 2.0], [0.5, 0.47, 0.43]))
-    # The grille: a wall of vertical bars with a spot behind it, on the right of frame.
-    for i in range(7):
-        nodes.append(box(f"bar-{i:02d}", [14.0 + i * 0.9, 3.0, -12.0], [0.35, 6.0, 0.35], [0.4, 0.4, 0.42]))
-    nodes.append(box("grille-head", [16.7, 6.3, -12.0], [7.0, 0.6, 0.6], [0.4, 0.4, 0.42]))
+    """Light shafts. An enclosed hall -- walls, and a roof of planks with slits between them -- under a high sun:
+    the only lit air inside is the air the slits let the sun into, so the shafts are the shadow map seen in the
+    medium, which a fog overlay cannot draw. (The first fixture, an open colonnade, lit nearly all of its air and
+    read as a white-out: shafts need the light blocked for most of the volume.) A spot behind a grille at the far
+    end throws barred beams down the hall."""
+    W, L, H = 24.0, 60.0, 12.0  # the hall's inner width, length and height; centred on x = 0, z from +30 to -30
+    wall = [0.32, 0.3, 0.28]
+    nodes = [box("floor", [0.0, -0.1, 0.0], [W + 4.0, 0.2, L + 4.0], [0.16, 0.155, 0.15]),
+             box("wall-left", [-W / 2 - 0.5, H / 2, 0.0], [1.0, H, L + 2.0], wall),
+             box("wall-right", [W / 2 + 0.5, H / 2, 0.0], [1.0, H, L + 2.0], wall),
+             box("wall-back", [0.0, H / 2, -L / 2 - 0.5], [W + 2.0, H, 1.0], wall),
+             box("wall-front", [0.0, H / 2, L / 2 + 0.5], [W + 2.0, H, 1.0], wall)]
+    # The roof: planks across the hall, 3.5 m wide with 1 m slits between them.
+    z = -L / 2
+    i = 0
+    while z < L / 2:
+        width = min(3.5, L / 2 - z)
+        nodes.append(box(f"roof-{i:02d}", [0.0, H + 0.25, z + width / 2], [W + 2.0, 0.5, width], wall))
+        z += width + 1.0
+        i += 1
+    # The grille near the back wall, with a spot behind it.
+    for k in range(7):
+        nodes.append(box(f"bar-{k:02d}", [-2.7 + k * 0.9, 3.0, -22.0], [0.35, 6.0, 0.35], [0.4, 0.4, 0.42]))
+    nodes.append(box("grille-head", [0.0, 6.3, -22.0], [7.0, 0.6, 0.6], [0.4, 0.4, 0.42]))
     scene = {
         "format": "avgen-scene",
         "version": 1,
         "name": "Volumetric Lighting Lab e01: light shafts",
         "_note": e01.__doc__.replace("\n    ", " ").strip(),
-        "camera": {"mode": 1, "position": [0.0, 3.0, 14.0], "target": [0.0, 6.0, -40.0], "fov": 55.0,
+        "camera": {"mode": 1, "position": [0.0, 2.5, 26.0], "target": [0.0, 5.0, -30.0], "fov": 60.0,
                    "orbitSpeed": 0.0},
-        # Thin air (an optical depth under 1 across the hall) so the lit and shadowed air differ, rather than
-        # saturating to a white-out as 0.022 did in the first gate's still; the sun slants across the view.
-        "environment": dark_environment(volumeDensity=0.008, volumeAnisotropy=0.55, shadowRange=120.0,
+        "environment": dark_environment(volumeDensity=0.02, volumeAnisotropy=0.5, shadowRange=120.0,
                                         shadowCascades=4),
         "lights": [
-            {"name": "sun", "type": "directional", "direction": [0.5, -0.38, 0.78],
-             "color": [1.0, 0.82, 0.62], "intensity": 6.0, "castsShadow": True, "volumetric": 1.0},
-            {"name": "grille-spot", "type": "spot", "position": [17.0, 7.0, -22.0], "direction": [-0.05, -0.45, 0.89],
-             "color": [0.7, 0.85, 1.0], "intensity": 900.0, "range": 45.0, "innerCone": 14.0, "outerCone": 24.0,
+            {"name": "sun", "type": "directional", "direction": [0.42, -0.82, -0.38],
+             "color": [1.0, 0.85, 0.66], "intensity": 8.0, "castsShadow": True, "volumetric": 1.0},
+            {"name": "grille-spot", "type": "spot", "position": [0.0, 6.0, -28.0], "direction": [0.0, -0.25, 0.97],
+             "color": [0.7, 0.85, 1.0], "intensity": 700.0, "range": 40.0, "innerCone": 14.0, "outerCone": 24.0,
              "castsShadow": True, "volumetric": 1.0},
         ],
         "nodes": nodes,
     }
-    return scene, "Light shafts: a low sun through a colonnade, a spot through a grille."
+    return scene, "Light shafts: a high sun through the slit roof of an enclosed hall, a spot through a grille."
 
 
 SLAB_DISTANCES = [4.0, 12.0, 24.0, 40.0, 60.0]

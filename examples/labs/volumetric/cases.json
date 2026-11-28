@@ -105,9 +105,9 @@
   {
    "lab": "volumetric",
    "number": 101,
-   "title": "Light shafts: sun through a colonnade",
+   "title": "Light shafts: sun through a slit roof",
    "question": "Is the light in the air shadowed by the geometry that shadows the floor?",
-   "expectation": "Shafts, not an overlay: bright lit air between the columns and dark air in each column's shadow, continuous with the column shadows on the floor; the grille spot throws barred beams. The shafts end where the cascades end (environment.shadowRange 120 m, ADR-358) and are reported, not hidden.",
+   "expectation": "Shafts, not an overlay: the hall is enclosed and its roof is planks with slits, so the only lit air is the sun's slanting shafts through the slits, continuous with the bright strips on the floor; the grille spot throws barred beams down the hall. Shadowed against unshadowed air differs by more than 3% (tests/rendering/test_volumetric_light_gpu.cpp).",
    "fixture": "examples/labs/volumetric/e01-light-shafts.json",
    "timeSeconds": 0.5,
    "size": [
