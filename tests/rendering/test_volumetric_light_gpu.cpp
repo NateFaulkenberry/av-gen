@@ -229,7 +229,6 @@ TEST_CASE("Switching volumetric lighting off is a picture without it, and the ti
     const rendering::QualitySettings offlineTier = rendering::QualitySettings::forTier(rendering::QualityTier::Offline);
     q.volumetricLightTile = offlineTier.volumetricLightTile;
     q.volumetricLightSlices = offlineTier.volumetricLightSlices;
-    q.volumetricLightShadowTaps = offlineTier.volumetricLightShadowTaps;
     q.volumetricLightSubsamples = offlineTier.volumetricLightSubsamples;
     q.volumetricLightLocalLights = offlineTier.volumetricLightLocalLights;
     b.renderer->setQualitySettings(q);

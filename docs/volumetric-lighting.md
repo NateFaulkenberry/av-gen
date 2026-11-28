@@ -39,7 +39,8 @@ frame (ADR-2212).
 ## Quality
 
 The tier sets the sampling, never the look (ADR-2213): 80x45x32 froxels at Preview, 160x90x64 at Realtime, 240x135x128
-at High and Offline (with a 2x2 shadow tap, and four fixed samples a froxel offline). Measured at 1080p on an M2 Max,
+at High and Offline; two fixed samples a froxel at Realtime and High, four offline, and the same 2x2 shadow tap at
+every tier. Measured at 1080p on an M2 Max,
 the grid costs well under a millisecond at Realtime.
 
 ## Limits (B1)

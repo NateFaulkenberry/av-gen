@@ -171,7 +171,7 @@ void VolumetricLightRenderer::update(const scene::Scene& scene, const FrameTime&
     const float origin = std::min(kSliceOrigin, far * 0.5f);
     const float logRatio = std::log(far / origin);
     const std::uint32_t subsamples = std::clamp<std::uint32_t>(quality.volumetricLightSubsamples, 1, 4);
-    const std::uint32_t taps = quality.volumetricLightShadowTaps >= 4 ? 4u : 1u;
+    constexpr std::uint32_t taps = 4; // ADR-2213: the same 2x2 shadow box at every tier, never a tier lever
     const std::uint32_t local = std::min<std::uint32_t>(quality.volumetricLightLocalLights, 32);
 
     VolumetricLightUniforms u{};

@@ -123,7 +123,7 @@
    "number": 102,
    "title": "Light shafts at the offline tier",
    "question": "What does the tier buy on the same frame?",
-   "expectation": "The same picture as case 101 sampled more finely: 240x135x128 froxels, a 2x2 shadow tap, four fixed sub-samples per froxel. Thin occluders alias less; nothing appears or disappears (ADR-2213: a tier scales sampling only).",
+   "expectation": "The same picture as case 101 sampled more finely: 240x135x128 froxels and four fixed sub-samples per froxel (the shadow tap is the same 2x2 box at every tier). Thin occluders alias less; nothing appears or disappears (ADR-2213: a tier scales sampling only).",
    "fixture": "examples/labs/volumetric/e01-light-shafts.json",
    "timeSeconds": 0.5,
    "size": [

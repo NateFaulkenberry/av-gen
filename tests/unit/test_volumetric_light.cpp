@@ -95,8 +95,9 @@ TEST_CASE("Each tier's froxel grid at 1080p is the one ADR-2213 names", "[volume
     // Only sampling moves between tiers (ADR-035): the offline tier samples each froxel four times with a
     // 2x2 shadow tap; nothing about what lights the air changes.
     CHECK(QualitySettings::forTier(QualityTier::Offline).volumetricLightSubsamples == 4);
-    CHECK(QualitySettings::forTier(QualityTier::Realtime).volumetricLightSubsamples == 1);
-    CHECK(QualitySettings::forTier(QualityTier::High).volumetricLightShadowTaps == 4);
+    CHECK(QualitySettings::forTier(QualityTier::Realtime).volumetricLightSubsamples == 2);
+    CHECK(QualitySettings::forTier(QualityTier::High).volumetricLightSubsamples == 2);
+    CHECK(QualitySettings::forTier(QualityTier::Preview).volumetricLightSubsamples == 1);
     // The grid follows the frame: 4K at the Realtime tile is twice 1080p's in each axis, and a tiny frame
     // still has a froxel.
     CHECK(rendering::volumetricLightGrid(3840, 2160, QualitySettings::forTier(QualityTier::Realtime)) ==
