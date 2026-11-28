@@ -182,6 +182,7 @@ not be created.
 | `AVGEN_EXAMPLES_DIR` | prepended to the examples search path — **and to the asset browser's scan roots** |
 | `AVGEN_HELP_DIR` | where this Help system looks for its content first |
 | `AVGEN_TIMELINE_RAW` | dump raw GPU timestamps to standard error |
+| `AVGEN_VOLUMETRIC_REPEAT` | diagnostic only: encode volumetric lighting's inject and integrate passes n times a frame (1..64, identical pixels) to measure their cost by amplification; ignored, with a warning, at the Offline tier (ADR-2210) |
 | `AVGEN_FRAME_COUNTERS` | log the submission split every thirtieth frame |
 | `AVGEN_CPU_STAGES` | log the CPU stage split every thirtieth frame |
 | `AVGEN_SLOW_PHASE_MS` | log what was being written on any frame slower than this |
